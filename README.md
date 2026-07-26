@@ -36,7 +36,7 @@ into this repo once it is pushed to GitHub.
 | `eidr_core.normalize` | Unicode fold, homoglyph maps, numeral/date/duration parsing | BMR-Review `normalize.py` (seed), eidr-dq homoglyph maps, EIDR MCP `_sanitize_field` |
 | `eidr_core.registry` | SDK client factory (target selection, credential precedence, write gate) | eidr-wikidata `eidr/registry_client.py` |
 | `eidr_core.compare` | Pure comparison primitives parameterized by compare-spec | eidr-dq `matching/compare.py` (already written for extraction) |
-| `eidr_core.codes` | Country/language validation: `dq_country_validity` + `language_registry` consumers; alpha-2/alpha-4/M49 code-set convention | eidr-wikidata `bmr/country.py`, eidr-dq validators |
+| `eidr_core.codes` | ✅ **LANDED** — `normalize_country_code` (SU→SUHH crosswalk), consumed by eidr-wikidata + BMR-Review. Grows the `dq_country_validity` + `language_registry` readers next. | eidr-wikidata `bmr/country.py`, BMR-Review `normalize.py`, eidr-dq validators |
 | `eidr_core.secrets_loader` | One secrets loader (AWS Secrets Manager + local `.secrets.json`, one section layout) | eidr-dq/XML_to_JSON `secrets_loader.py`, EIDR MCP loader, eidr-wikidata `secrets.py` |
 | `eidr_core.external` | Shared external-source chassis (cache, rate limit, retry) | eidr-dq `external/cache.py` (seed) |
 

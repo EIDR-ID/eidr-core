@@ -10,7 +10,8 @@ Python programs, never code.
 | Artifact | Contents | Seeded from |
 |---|---|---|
 | `normalized-record.md` | ✅ **LANDED (v1 draft, 2026-07-27)** — field model + canonical ordering; documents & resolves the two XML_to_JSON↔BMR-Review divergences (title order, alt-ID order). Awaiting operator ratification of §4/§6. | XML_to_JSON codec + BMR-Review `render_record` |
-| `compare-spec.json` (+ `compare-spec.md`) | **Versioned** comparison rules: per-field comparator, weights, thresholds (e.g. Jaro-Winkler 0.94), tolerance windows (e.g. runtime ±max(5 min, 10%)), epoch-date handling, normalization semantics | BMR-Review current tuning + De-Dupe UI `review_score_rules.json` / `review_comparison_rules.json` |
+| `unified-scoring.md` | ✅ **DRAFTED 2026-07-27** — design for ONE match-candidate scoring engine (layered; L3 seeded from BMR-Review; states = banded qualities; UI consumes engine payloads). Awaits operator ratification (§8). | BMR-Review engine + De-Dupe UI spec v1.4.5 |
+| `compare-spec.json` (+ `compare-spec.md`) | **Versioned** runtime config of the unified engine (per `unified-scoring.md`): per-creation-type weights, calibration thresholds, gate constants, band edges, q→state banding, normalization semantics. Generated from BMR-Review `config.py` in migration step 2. | BMR-Review `config.py` + De-Dupe UI declarative-config discipline |
 | `golden-pairs/` | Conformance corpus: record pairs with expected per-field comparator outputs and total-score bands, versioned WITH the compare-spec | Every scoring bug fixed anywhere becomes a permanent pair (SU/SUHH, epoch dates, homoglyph titles, ...) |
 | `dedupe-worklist.md` | De-Dupe UI local work-list file format (produced by BMR-Review) and results-file format (appended by the UI as the operator progresses) | Operator design, 2026-07-18 — the UI's 4th data-source option |
 | `altidtool-format.md` | The AltIDTool 5-column TSV contract | eidr-wikidata `bmr/altidtool.py` behavior |

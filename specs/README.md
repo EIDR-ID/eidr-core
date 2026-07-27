@@ -9,7 +9,7 @@ Python programs, never code.
 
 | Artifact | Contents | Seeded from |
 |---|---|---|
-| `normalized-record.md` | The EIDR-compatible normalized record: field model + canonical ordering rules (casefold sorts, title/credit/alt-ID ranking) | XML_to_JSON codec + BMR-Review `render_record` |
+| `normalized-record.md` | ✅ **LANDED (v1 draft, 2026-07-27)** — field model + canonical ordering; documents & resolves the two XML_to_JSON↔BMR-Review divergences (title order, alt-ID order). Awaiting operator ratification of §4/§6. | XML_to_JSON codec + BMR-Review `render_record` |
 | `compare-spec.json` (+ `compare-spec.md`) | **Versioned** comparison rules: per-field comparator, weights, thresholds (e.g. Jaro-Winkler 0.94), tolerance windows (e.g. runtime ±max(5 min, 10%)), epoch-date handling, normalization semantics | BMR-Review current tuning + De-Dupe UI `review_score_rules.json` / `review_comparison_rules.json` |
 | `golden-pairs/` | Conformance corpus: record pairs with expected per-field comparator outputs and total-score bands, versioned WITH the compare-spec | Every scoring bug fixed anywhere becomes a permanent pair (SU/SUHH, epoch dates, homoglyph titles, ...) |
 | `dedupe-worklist.md` | De-Dupe UI local work-list file format (produced by BMR-Review) and results-file format (appended by the UI as the operator progresses) | Operator design, 2026-07-18 — the UI's 4th data-source option |

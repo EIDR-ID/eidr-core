@@ -1,7 +1,12 @@
-# Unified Match-Candidate Evaluation & Scoring (design proposal, v1)
+# Unified Match-Candidate Evaluation & Scoring (design, v1)
 
-**Status:** draft for operator ratification (register Phase 2.2 shape decision,
-2026-07-27). No code changed yet.
+**Status: ✅ APPROVED by operator, 2026-07-27** (register Phase 2.2 shape
+decision). Operator emphasis on approval: **per-creation-type rules and
+weights are the load-bearing structure** — they enable future tuning with
+constrained, type-scoped impact and MUST be preserved as the organizing
+structure of `compare-spec.json`. Migration (§6) may proceed; step 1 starts
+after the parallel BMR-Review tuning thread has ingested the coordination
+notes in BMR-Review's CLAUDE.md.
 **Problem:** BMR-Review and De-Dupe UI evaluate the same thing — the matching system-generated
 match candidates against EIDR records — with two independently designed scoring
 engines. The operator wants ONE approach so accuracy work in either tool

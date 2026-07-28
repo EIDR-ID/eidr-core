@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
-version = "0.0.1"
+version = "0.1.0"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers
@@ -16,6 +16,10 @@ requires-python = ">=3.10"
 # eidr SDK for registry, boto3 for secrets_loader).
 
 [project.optional-dependencies]
+# eidr_core.compare needs rapidfuzz (imported at module load). eidr_core.codes
+# and eidr_core.normalize are dependency-free, so consumers that only need
+# those (e.g. eidr-wikidata today) can install without extras.
+compare = ["rapidfuzz>=3"]
 # Placeholders; populate as each module lands.
 # bmr = ["openpyxl>=3.1"]
 # db = ["psycopg[binary]>=3.1"]
@@ -24,3 +28,8 @@ requires-python = ">=3.10"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+# word_alias.csv ships with the normalize package (aliases.py loads it
+# relative to its own file; degrades gracefully if absent).
+"eidr_core.normalize" = ["data/*.csv"]

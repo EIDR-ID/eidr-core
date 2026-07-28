@@ -128,9 +128,14 @@ One engine + one config + one corpus makes cross-tool learning automatic:
 
 ## 6. Migration plan (each step small and independently useful)
 
-1. **Extract L2** comparators (+ `nonlinear`, gate helpers as needed) into
-   `eidr_core.compare`; BMR-Review imports them. (Phase 3 item 6, pulled
-   forward; eidr-dq's `matching/compare.py` primitives fold in here too.)
+1. ✅ **DONE 2026-07-28** (eidr-core `18627cd`, BMR-Review `17574c4`).
+   `compare`/`titles`/`nonlinear` → `eidr_core.compare`;
+   `normalize`/`aliases`+CSV → `eidr_core.normalize`. BMR-Review keeps
+   re-export shims (imports unchanged) and registers its `config.py` via
+   `eidr_core.compare.set_params` — the tuning surface is untouched until
+   step 2. eidr-dq's `matching/compare.py` primitives fold in later,
+   opportunistically. Verified: 6/6 tests, 7 entry points, end-to-end
+   `score_pair`, eidr-wikidata 503 green.
 2. **Externalize L3 config**: generate `compare-spec.json` v2.0 from the
    current `config.py` values; the engine loads the spec; `config.py` becomes a
    thin loader. Define the q→state banding + rationale schema in the spec.

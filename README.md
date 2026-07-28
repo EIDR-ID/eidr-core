@@ -31,11 +31,11 @@ into this repo once it is pushed to GitHub.
 | Module | Contents | Extracted from |
 |---|---|---|
 | `eidr_core.bmr_io` | BMR template schema, family/repeat-group model, workbook reader + writer | eidr-wikidata `bmr/writer.py` (canonical), BMR-Review's two vendored copies, XML_to_JSON's BMR codec, eidr-dq `flatten.py` |
+| `eidr_core.compare` | ✅ **LANDED 0.1.0** — the L2 comparator library: field comparators (`COMPARATORS`, `FieldResult`), episode-aware `titles`, `nonlinear` accumulation; parameters via `set_params()` (BMR-Review registers its `config.py`; later the compare-spec) | BMR-Review `compare.py`/`titles.py`/`nonlinear.py` (now shims) |
+| `eidr_core.normalize` | ✅ **LANDED 0.1.0** — L1 normalization: fold/case/alias/numeral, name/title/code normalizers incl. `norm_country`/`canon_country`, date/duration parsing, `word_alias.csv` | BMR-Review `normalize.py`/`aliases.py` (now shims) |
 | `eidr_core.ordering` | Canonical EIDR record ordering (casefold sorts, title/credit/alt-ID ranking) | XML_to_JSON star-mode sort + BMR-Review `render_record` |
 | `eidr_core.altidtool_io` | AltIDTool 5-column TSV read/write | eidr-wikidata `bmr/altidtool.py`, EIDR MCP `eidrtoaltid.py`, BMRtoAltID |
-| `eidr_core.normalize` | Unicode fold, homoglyph maps, numeral/date/duration parsing | BMR-Review `normalize.py` (seed), eidr-dq homoglyph maps, EIDR MCP `_sanitize_field` |
 | `eidr_core.registry` | SDK client factory (target selection, credential precedence, write gate) | eidr-wikidata `eidr/registry_client.py` |
-| `eidr_core.compare` | Pure comparison primitives parameterized by compare-spec | eidr-dq `matching/compare.py` (already written for extraction) |
 | `eidr_core.codes` | ✅ **LANDED** — `normalize_country_code` (SU→SUHH crosswalk), consumed by eidr-wikidata + BMR-Review. Grows the `dq_country_validity` + `language_registry` readers next. | eidr-wikidata `bmr/country.py`, BMR-Review `normalize.py`, eidr-dq validators |
 | `eidr_core.secrets_loader` | One secrets loader (AWS Secrets Manager + local `.secrets.json`, one section layout) | eidr-dq/XML_to_JSON `secrets_loader.py`, EIDR MCP loader, eidr-wikidata `secrets.py` |
 | `eidr_core.external` | Shared external-source chassis (cache, rate limit, retry) | eidr-dq `external/cache.py` (seed) |

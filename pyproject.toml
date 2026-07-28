@@ -33,3 +33,7 @@ where = ["src"]
 # word_alias.csv ships with the normalize package (aliases.py loads it
 # relative to its own file; degrades gracefully if absent).
 "eidr_core.normalize" = ["data/*.csv"]
+# compare-spec.json — the versioned tuning surface of the unified engine —
+# ships inside the package so eidr_core.compare.spec can locate it via
+# importlib.resources in any install mode.
+"eidr_core" = ["specs/*.json"]

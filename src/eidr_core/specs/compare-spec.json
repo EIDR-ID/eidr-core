@@ -1,0 +1,253 @@
+{
+  "$spec": {
+    "name": "compare-spec",
+    "version": "2.0.0",
+    "updated": "2026-07-28",
+    "doc": "Versioned runtime configuration of the unified match-candidate evaluation engine (eidr-core/specs/unified-scoring.md, approved 2026-07-27). THE portfolio's single tuning surface: BMR-Review's config.py loads this file and exposes every value unchanged, so scorer/gate/comparators read the same names as always. TUNE HERE, per creation type, then bump this version; a version change is the cross-tool signal to regenerate golden-pair expectations. Provenance: generated 1:1 from BMR-Review eidr_dedup_score/config.py as of 2026-07-28 (the fully annotated original is preserved in that repo's git history; curated rationale in compare-spec.md).",
+    "loader": "eidr_core.compare.spec.load_spec",
+    "consumers": [
+      "BMR-Review (eidr_dedup_score.config)",
+      "future: work-list producer, Shim-mode scoring service"
+    ]
+  },
+  "types": {
+    "ALWAYS_APPLICABLE": "set",
+    "CHILD_CREATION_TYPES": "set",
+    "CROSS_TYPE_EPISODE_CLASSES": "set",
+    "GATE_ANTHOLOGY_CLASSES": "set",
+    "GATE_COMPILATION_SERIES_CLASSES": "set",
+    "GATE_EPISODE_CROSS_BASIC_CLASSES": "set",
+    "GATE_MINI_LIMITED_CLASSES": "set",
+    "OUTPUT_KNOTS": "tuple"
+  },
+  "weights": {
+    "Basic": {
+      "thresholds": [
+        56,
+        85
+      ],
+      "weights": {
+        "title": 70,
+        "release_date": 15,
+        "director": 10,
+        "actor": 10,
+        "country": 5,
+        "assoc_org": 5,
+        "length": 5,
+        "original_language": 2,
+        "version_language": 2
+      }
+    },
+    "Series": {
+      "thresholds": [
+        60,
+        90
+      ],
+      "weights": {
+        "title": 70,
+        "director": 15,
+        "actor": 15,
+        "release_date": 5,
+        "country": 5,
+        "assoc_org": 5,
+        "end_date": 5,
+        "original_language": 2,
+        "version_language": 2
+      }
+    },
+    "Season": {
+      "thresholds": [
+        60,
+        90
+      ],
+      "weights": {
+        "title": 70,
+        "sequence_number": 22,
+        "release_date": 20,
+        "end_date": 6,
+        "director": 4,
+        "actor": 4,
+        "original_language": 2,
+        "version_language": 2
+      }
+    },
+    "Episode": {
+      "thresholds": [
+        60,
+        90
+      ],
+      "weights": {
+        "title": 55,
+        "release_date": 30,
+        "distribution_number": 22,
+        "length": 6,
+        "house_sequence": 4,
+        "time_slot": 3,
+        "director": 3,
+        "actor": 3,
+        "assoc_org": 3,
+        "original_language": 2,
+        "version_language": 2
+      }
+    },
+    "Edit": {
+      "thresholds": [
+        60,
+        90
+      ],
+      "weights": {
+        "title": 50,
+        "release_date": 22,
+        "length": 20,
+        "version_language": 6,
+        "original_language": 4,
+        "distribution_number": 8,
+        "director": 2,
+        "actor": 2,
+        "assoc_org": 2
+      }
+    },
+    "Compilation": {
+      "thresholds": [
+        60,
+        90
+      ],
+      "weights": {
+        "title": 70,
+        "director": 15,
+        "actor": 15,
+        "release_date": 5,
+        "country": 5,
+        "assoc_org": 5,
+        "end_date": 5,
+        "original_language": 2,
+        "version_language": 2
+      }
+    },
+    "Clip": {
+      "$alias": "Edit",
+      "$doc": "Shares the Edit profile object: tune Edit, this follows."
+    },
+    "Manifestation": {
+      "$alias": "Edit",
+      "$doc": "Shares the Edit profile object: tune Edit, this follows."
+    }
+  },
+  "values": {
+    "ACCEPT_REQUIRES_CORROBORATION": true,
+    "ALT_ID_FLOOR_MAX_CONFLICTS": 3,
+    "ALT_ID_MATCH_BONUS": 8.0,
+    "ALT_ID_PENALTY_CAP": 0.75,
+    "ALT_ID_PENALTY_PER_CONFLICT": 0.12,
+    "ALWAYS_APPLICABLE": [
+      "release_date"
+    ],
+    "AUTOMATCH_DURATION_RATIO": 0.5,
+    "AUTOMATCH_NAME_SIM": 0.8,
+    "AUTOMATCH_SCORE_BYPASS": 99.0,
+    "AUTOMATCH_YEAR_GAP": 3,
+    "BAND_ACCEPT_AT": 80,
+    "BAND_REJECT_BELOW": 30,
+    "CHILD_CREATION_TYPES": [
+      "Clip",
+      "Edit",
+      "Episode",
+      "Manifestation",
+      "Season"
+    ],
+    "CORROBORATION_FIELDS_HIGH": {
+      "director": 0.8,
+      "actor": 0.8,
+      "assoc_org": 0.8,
+      "length": 0.9,
+      "end_date": 0.9,
+      "distribution_number": 0.99,
+      "sequence_number": 0.99,
+      "house_sequence": 0.99,
+      "version_language": 0.99,
+      "edit_class": 0.99
+    },
+    "CROSS_SEASON_SEASON_TOL": 1,
+    "CROSS_SEASON_TITLE_SIM": 0.8,
+    "CROSS_SEASON_YEAR_TOL": 1,
+    "CROSS_TYPE_EPISODE_CLASSES": [
+      "pilot",
+      "special",
+      "standalone"
+    ],
+    "CROSS_TYPE_SERIES_CLASS": "anthology",
+    "DATE_EPISODE_YEAR_MATCH_CREDIT": 0.6,
+    "DATE_EPOCH_MATCH_CREDIT": 0.5,
+    "DATE_EPOCH_MISMATCH_FLOOR": 0.4,
+    "DATE_EPOCH_MIXED_MATCH_CREDIT": 0.75,
+    "DATE_EPOCH_YEAR": 1970,
+    "DATE_ESTIMATED_LENIENCY": 2.0,
+    "DATE_FULL_HALFLIFE_DAYS": 540.0,
+    "DATE_YEAR_HALFLIFE_YEARS": 4.0,
+    "DATE_YEAR_HALFLIFE_YEARS_EPISODE": 6.0,
+    "DUR_ABS_HALFLIFE_MIN": 12.0,
+    "DUR_ESTIMATED_LENIENCY": 2.0,
+    "EARLY_CINEMA_MAX_MINUTES": 15,
+    "EARLY_CINEMA_MAX_YEAR": 1915,
+    "EARLY_CINEMA_MAX_YEAR_GAP": 1,
+    "EARLY_CINEMA_TITLE_MIN": 0.95,
+    "FIELD_BONUS_CAP": 1.0,
+    "GATE_ANTHOLOGY_CLASSES": [
+      "anthology"
+    ],
+    "GATE_COMPILATION_SERIES_CLASSES": [
+      "episodic",
+      "series"
+    ],
+    "GATE_CROSS_REVIEW_CAP": 70.0,
+    "GATE_EPISODE_CROSS_BASIC_CLASSES": [
+      "pilot",
+      "special",
+      "standalone"
+    ],
+    "GATE_INELIGIBLE_CEILING": 20.0,
+    "GATE_MINI_LIMITED_CLASSES": [
+      "limited series",
+      "limited-series",
+      "limitedseries",
+      "mini-series",
+      "miniseries"
+    ],
+    "IMDB_FIELD_FLOOR": 0.85,
+    "IMDB_OTHERS_ABOVE": 0.75,
+    "IMDB_OUTLIER_BELOW": 0.5,
+    "NAME_MATCH_MIN": 0.8,
+    "NL_MODIFIER": 0.75,
+    "OUTPUT_KNOTS": [
+      0.0,
+      30.0,
+      80.0,
+      100.0
+    ],
+    "PART_RELATED_TITLE_MIN": 0.9,
+    "REVIEW_TOP": 79.0,
+    "SERIES_REQUIRE_COUNTRY_MATCH": true,
+    "SHARED_TITLE_SIM": 0.5,
+    "SUPPLEMENTAL_SHORT_RATIO": 0.5,
+    "SYSTEM_TITLE_DISCOUNT": 0.5,
+    "YEAR_PLUS_MINUS_ONE": 0.5
+  },
+  "states": {
+    "$doc": "q->state banding for the De-Dupe UI presentation layer (per unified-scoring: the four comparison states are BANDS over the engine's per-field continuous quality q). Consumed by the work-list producer / scoring service when building payloads (dedupe-worklist.md section 4); NOT used in scoring itself. identical: q >= identical_at (or exact match after normalization); similar: q >= similar_at; below similar_at the state is mismatch when the field is discriminative (conflict-bearing), else neutral; a field absent on either side (quality None) is neutral. Per-field overrides win over defaults.",
+    "default": {
+      "identical_at": 0.985,
+      "similar_at": 0.75
+    },
+    "per_field": {},
+    "discriminative_fields": [
+      "alt_id",
+      "release_date",
+      "length",
+      "edit_class",
+      "manifestation_class"
+    ]
+  },
+  "rationale_schema": {
+    "$doc": "Shape of the engine's explainability payload (public contract; see dedupe-worklist.md section 4). rationale: list of {field, weight, quality, contribution, applicable}; notes: list of gate/guard messages (verbatim); alt_id_conflicts: int. Additive changes only - never remove or rename these fields without a coordinated spec-version bump."
+  }
+}

@@ -136,9 +136,15 @@ One engine + one config + one corpus makes cross-tool learning automatic:
    step 2. eidr-dq's `matching/compare.py` primitives fold in later,
    opportunistically. Verified: 6/6 tests, 7 entry points, end-to-end
    `score_pair`, eidr-wikidata 503 green.
-2. **Externalize L3 config**: generate `compare-spec.json` v2.0 from the
-   current `config.py` values; the engine loads the spec; `config.py` becomes a
-   thin loader. Define the q→state banding + rationale schema in the spec.
+2. ✅ **DONE 2026-07-28.** `compare-spec.json` v2.0.0 generated 1:1 from the
+   live `config.py` (55 names; per-type `weights` with `$alias` for
+   Clip/Manifestation; container types preserved via `types`; q→state banding
+   in `states`; rationale schema declared). Packaged at
+   `src/eidr_core/specs/compare-spec.json`; loaded by
+   `eidr_core.compare.spec.load_spec` (env override `EIDR_COMPARE_SPEC`);
+   BMR-Review `config.py` is now a loader shim — the JSON is the single
+   tuning surface. Fidelity: 55/55 values+types identical, exact score_pair
+   regression, 13/13 tests. Rationale curated in `specs/compare-spec.md`.
 3. **Phase 2.6** work-list/results formats include the per-candidate scoring
    payload (score, band, states, rationale) + the `unscored` request row.
 4. **Phase 4.1** builds De-Dupe UI as a renderer of those payloads.

@@ -34,6 +34,7 @@ where = ["src"]
 # relative to its own file; degrades gracefully if absent).
 "eidr_core.normalize" = ["data/*.csv"]
 # compare-spec.json — the versioned tuning surface of the unified engine —
-# ships inside the package so eidr_core.compare.spec can locate it via
+# and the golden-pair corpus ship inside the package so
+# eidr_core.compare.spec / BMR-Review's golden.py locate them via
 # importlib.resources in any install mode.
-"eidr_core" = ["specs/*.json"]
+"eidr_core" = ["specs/*.json", "specs/golden_pairs/*.json"]

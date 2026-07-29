@@ -1,0 +1,85 @@
+{
+  "id": "basic-strong-match",
+  "added": "2026-07-29",
+  "why": "Baseline positive: a near-identical Basic pair (title article-inversion, full date vs year-only, director initial vs full name, ISO duration vs minutes) must Accept. This is the canonical smoke pair used since migration step 1; if it ever stops Accepting, the engine itself moved.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "The Matrix",
+        "lang": "en"
+      }
+    ],
+    "release_date": "1999-03-31",
+    "directors": [
+      "Lana Wachowski"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "length_minutes": "136"
+  },
+  "candidate": {
+    "eidr_id": "10.5240/GOLD-0000-0000-0001-0000-X",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Matrix, The",
+        "lang": "en"
+      }
+    ],
+    "release_date": "1999",
+    "directors": [
+      "L. Wachowski"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "length_minutes": "PT2H16M"
+  },
+  "invariants": {
+    "verdict_in": [
+      "Accept"
+    ],
+    "field_quality_min": {
+      "title": 0.95,
+      "country": 1.0
+    }
+  },
+  "expected": {
+    "spec_version": "2.0.0",
+    "confidence": 98.8,
+    "verdict": "Accept",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 1.0,
+      "director": 0.9,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": 1.0,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "identical",
+      "director": "similar",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "identical",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

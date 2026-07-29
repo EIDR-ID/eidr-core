@@ -1,0 +1,75 @@
+{
+  "id": "early-cinema-title-gate",
+  "added": "2026-07-29",
+  "why": "Early short-form (actuality) profile: for pairs where both sides are ≤1915 and ≤15 minutes, the usual corroborators are near-constant within a studio's era output (same year, director, country, one-minute runtime) and carry almost no discriminating power. Identity rests on a genuinely close title (EARLY_CINEMA_TITLE_MIN 0.95 — observed true matches ≥0.978, wrong ≤0.855). Two different actualities from the same year/studio with merely similar titles must NOT Accept.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Arrival of a Train at the Station",
+        "lang": "en"
+      }
+    ],
+    "release_date": "1896",
+    "directors": [
+      "Louis Lumont"
+    ],
+    "countries": [
+      "FR"
+    ],
+    "length_minutes": "1"
+  },
+  "candidate": {
+    "eidr_id": "10.5240/GOLD-0000-0000-0008-0000-X",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Arrival of the Mail Boat at the Station",
+        "lang": "en"
+      }
+    ],
+    "release_date": "1896",
+    "directors": [
+      "Louis Lumont"
+    ],
+    "countries": [
+      "FR"
+    ],
+    "length_minutes": "1"
+  },
+  "invariants": {
+    "verdict_not_in": [
+      "Accept"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.0.0",
+    "confidence": 10.7,
+    "verdict": "Reject",
+    "field_qualities": {
+      "title": 0.882,
+      "release_date": 1.0,
+      "director": 1.0,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": 1.0,
+      "original_language": null,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "similar",
+      "release_date": "identical",
+      "director": "identical",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "identical",
+      "original_language": "neutral",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "id": "country-codeset-su-suhh",
+  "added": "2026-07-29",
+  "why": "The original operator-reported pain (register Phase 1.1): the matching system pairs a record coded SU against a candidate coded SUHH — the SAME country (USSR) in two EIDR code sets (alpha-2 transitional vs ISO 3166-3 alpha-4). The country comparator must treat them as an exact match via the eidr_core.codes crosswalk, never as a mismatch. Regressed once (2026-07-27 cross-thread rebuild); pinned forever here.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Красная палатка",
+        "lang": "ru"
+      }
+    ],
+    "release_date": "1969",
+    "directors": [
+      "Mikhail Kalatozov"
+    ],
+    "countries": [
+      "SU"
+    ],
+    "original_languages": [
+      "ru"
+    ],
+    "length_minutes": "158"
+  },
+  "candidate": {
+    "eidr_id": "10.5240/GOLD-0000-0000-0002-0000-X",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Красная палатка",
+        "lang": "ru"
+      }
+    ],
+    "release_date": "1969",
+    "directors": [
+      "Mikhail Kalatozov"
+    ],
+    "countries": [
+      "SUHH"
+    ],
+    "original_languages": [
+      "ru"
+    ],
+    "length_minutes": "158"
+  },
+  "invariants": {
+    "verdict_in": [
+      "Accept"
+    ],
+    "field_quality_min": {
+      "country": 1.0
+    }
+  },
+  "expected": {
+    "spec_version": "2.0.0",
+    "confidence": 100.0,
+    "verdict": "Accept",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 1.0,
+      "director": 1.0,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": 1.0,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "identical",
+      "director": "identical",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "identical",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

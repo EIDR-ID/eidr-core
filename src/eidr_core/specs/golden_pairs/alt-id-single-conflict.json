@@ -1,0 +1,94 @@
+{
+  "id": "alt-id-single-conflict",
+  "added": "2026-07-29",
+  "why": "Alt-ID conflict shaping: a same-kind id with a DIFFERING value is the only metadata-internal negative signal, but a SINGLE uncorroborated conflict (typically a registrant's mistyped IMDb id on an otherwise-agreeing record) must cost only a modest slice — suppliers commonly attach one wrong third-party id. The conflict must be COUNTED (visible to the reviewer) without nuking an otherwise-strong match to Reject.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Quiet Harbor",
+        "lang": "en"
+      }
+    ],
+    "release_date": "1994-09-23",
+    "directors": [
+      "Frank Darabont"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "length_minutes": "142",
+    "alt_ids": [
+      {
+        "value": "tt0111161",
+        "id_type": "IMDB"
+      }
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/GOLD-0000-0000-0007-0000-X",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Quiet Harbor",
+        "lang": "en"
+      }
+    ],
+    "release_date": "1994-09-23",
+    "directors": [
+      "Frank Darabont"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "length_minutes": "142",
+    "alt_ids": [
+      {
+        "value": "tt9999999",
+        "id_type": "IMDB"
+      }
+    ]
+  },
+  "invariants": {
+    "alt_id_conflicts_min": 1,
+    "verdict_not_in": [
+      "Reject"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.0.0",
+    "confidence": 84.0,
+    "verdict": "Accept",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 1.0,
+      "director": 1.0,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": 1.0,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "identical",
+      "director": "identical",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "identical",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 1
+  }
+}

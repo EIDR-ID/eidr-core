@@ -1,0 +1,61 @@
+{
+  "id": "title-year-no-corroboration",
+  "added": "2026-07-29",
+  "why": "Accept requires corroboration beyond title + year-level date (ACCEPT_REQUIRES_CORROBORATION): a title match plus a year can collide across different works ('State' vs 'Narco State', same year). With NOTHING else on either record, the pair must be demoted to Review for a human — never auto-Accept.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "State of Fear",
+        "lang": "en"
+      }
+    ],
+    "release_date": "2004"
+  },
+  "candidate": {
+    "eidr_id": "10.5240/GOLD-0000-0000-0004-0000-X",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "State of Fear",
+        "lang": "en"
+      }
+    ],
+    "release_date": "2004"
+  },
+  "invariants": {
+    "verdict_not_in": [
+      "Accept"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.0.0",
+    "confidence": 79.0,
+    "verdict": "Review",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 1.0,
+      "director": null,
+      "actor": null,
+      "country": null,
+      "assoc_org": null,
+      "length": null,
+      "original_language": null,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "identical",
+      "director": "neutral",
+      "actor": "neutral",
+      "country_of_origin": "neutral",
+      "associated_org": "neutral",
+      "duration": "neutral",
+      "original_language": "neutral",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

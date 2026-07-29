@@ -1,0 +1,73 @@
+{
+  "id": "series-format-sale",
+  "added": "2026-07-29",
+  "why": "Series format-sale guard (SERIES_REQUIRE_COUNTRY_MATCH): format sales (Love Island, Millionaire, Top Gear…) resell a show to be remade in another country, producing near-identical Series that differ mainly by country and year. A Series pair whose country-of-origin lists are not EXACTLY equal may not auto-Accept — it lands in Review as a possible format sale.",
+  "submitted": {
+    "creation_type": "Series",
+    "titles": [
+      {
+        "text": "Big House",
+        "lang": "en"
+      }
+    ],
+    "release_date": "2000",
+    "countries": [
+      "NL"
+    ],
+    "original_languages": [
+      "nl"
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/GOLD-0000-0000-0006-0000-X",
+    "creation_type": "Series",
+    "titles": [
+      {
+        "text": "Big House",
+        "lang": "en"
+      }
+    ],
+    "release_date": "2000",
+    "countries": [
+      "DE"
+    ],
+    "original_languages": [
+      "de"
+    ]
+  },
+  "invariants": {
+    "verdict_not_in": [
+      "Accept"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.0.0",
+    "confidence": 79.0,
+    "verdict": "Review",
+    "field_qualities": {
+      "title": 1.0,
+      "director": null,
+      "actor": null,
+      "release_date": 1.0,
+      "country": 0.0,
+      "assoc_org": null,
+      "end_date": null,
+      "original_language": 0.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "director": "neutral",
+      "actor": "neutral",
+      "release_date": "identical",
+      "country_of_origin": "neutral",
+      "associated_org": "neutral",
+      "series_end_date": "neutral",
+      "original_language": "neutral",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

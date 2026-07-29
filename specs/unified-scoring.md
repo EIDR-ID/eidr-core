@@ -148,8 +148,15 @@ One engine + one config + one corpus makes cross-tool learning automatic:
 3. **Phase 2.6** work-list/results formats include the per-candidate scoring
    payload (score, band, states, rationale) + the `unscored` request row.
 4. **Phase 4.1** builds De-Dupe UI as a renderer of those payloads.
-5. **Phase 2.3** golden corpus pins the ONE engine; the ~1,371 human decisions
-   become its evaluation set.
+5. ✅ **DONE 2026-07-29 (seed).** Golden-pair corpus landed:
+   `src/eidr_core/specs/golden_pairs/` (8 pairs, each with a `why` story,
+   version-independent `invariants`, and an exact `expected` snapshot at
+   compare-spec 2.0.0). Conformance in BMR-Review
+   `tests/test_golden_pairs.py`; `regen_golden_pairs.py` regenerates
+   snapshots after a deliberate tune and REFUSES pairs whose lessons the
+   tune breaks. Growth path: every future misclassification found in either
+   tool becomes a new pair; the ~1,371 human decisions remain the bulk
+   evaluation set for tuning (distinct from this per-pair pinning corpus).
 6. Later: scoring service for API-Shim mode; De-Dupe UI spec §9.5 revised.
 
 ## 7. Trade-offs stated plainly

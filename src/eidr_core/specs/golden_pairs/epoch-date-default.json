@@ -1,0 +1,82 @@
+{
+  "id": "epoch-date-default",
+  "added": "2026-07-29",
+  "why": "Unix-epoch default dates: third-party systems default an unknown release date to 1970-01-01. A mismatch against such a suspect value must not be punished like a real five-year gap — release_date quality is floored (DATE_EPOCH_MISMATCH_FLOOR), so an otherwise-agreeing pair stays reviewable instead of sinking.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "The Sound of Music",
+        "lang": "en"
+      }
+    ],
+    "release_date": "1965-04-20",
+    "directors": [
+      "Robert Wise"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "length_minutes": "174"
+  },
+  "candidate": {
+    "eidr_id": "10.5240/GOLD-0000-0000-0003-0000-X",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "The Sound of Music",
+        "lang": "en"
+      }
+    ],
+    "release_date": "1970-01-01",
+    "directors": [
+      "Robert Wise"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "length_minutes": "174"
+  },
+  "invariants": {
+    "field_quality_min": {
+      "release_date": 0.4,
+      "title": 0.99
+    }
+  },
+  "expected": {
+    "spec_version": "2.0.0",
+    "confidence": 88.8,
+    "verdict": "Accept",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 0.4,
+      "director": 1.0,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": 1.0,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "mismatch",
+      "director": "identical",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "identical",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

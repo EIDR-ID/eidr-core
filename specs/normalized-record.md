@@ -1,6 +1,13 @@
 # Normalized EIDR Record — field model & canonical ordering (SPEC v1)
 
-**Status:** draft for operator ratification (register Phase 2.1, 2026-07-27).
+**Status: ✅ RATIFIED with amendments by the operator, 2026-07-29** (register
+Phase 2.1). The amendments are folded in below: §3 field-model corrections
+(Parent scope, sequence-number scoping, Conversion Table as the field
+authority), §4.1 (title scoring semantics + the three-bucket presentation
+order), §4.2 (canonical (kind, value) sort; IMDb-first + ShortDOI-suppression
+confirmed as display rules — see the API Shim handoff,
+`altid-display-order.md`). Engine-behavior gaps surfaced by §4.1 are flagged
+in §7 for the next BMR engine cycle.
 **Consumers:** the Python suite (eidr-wikidata, BMR-Review, XML_to_JSON) and the
 node.js side (eidr-ui-nextjs / De-Dupe UI). This is a language-neutral contract:
 each program implements it, and conformance is pinned by the golden-pair corpus
@@ -59,8 +66,9 @@ signal.
 | `ApproximateLength` | string/int | duration (minutes) |
 | `Status` | string | publication status |
 | `AlternateID` | list⟨AltID⟩ | AltID(value), Kind(domain\|type), Relation; ordering §4.2 |
-| `Parent` | string | parent EIDR ID (Season/Episode) |
-| `SequenceNumber` | int | season/episode number |
+| `Parent` | string | parent EIDR ID — ALL child records (Season, Episode, Edit, Clip, Manifestation), not just Season/Episode |
+| `SequenceNumber` | int | Seasons ONLY: `ExtraObjectMetadata/SeasonInfo/SequenceNumber` |
+| `DistributionNumber` | int/string | Episodes ONLY: `ExtraObjectMetadata/EpisodeInfo/SequenceInfo/md:DistributionNumber` |
 | `MadeForRegion` | list⟨code⟩ | Edits/Manifestations only; ordering §3.2 |
 
 Sub-models:
@@ -68,9 +76,13 @@ Sub-models:
 * **Org** = `{ PartyID?, Role?, Name: [DisplayName, …AlternateNames] }`.
 * **AltID** = `{ AltID (value), Kind (domain if present else type), Relation? }`.
 
-(Exhaustive per-type fields — episodes, seasons, edits, composites, compilation
-entries/elements — follow the same ordering primitives; see the source
-normalizers. This spec pins the comparison-bearing families both tools share.)
+**Field authority (operator, 2026-07-29):** the per-type fields are NOT
+enumerated here. The authoritative cross-reference of every EIDR record field
+is `D:\Software\XML_to_JSON\XML_to_JSON-ConversionTable.xlsx`. Any EIDR field
+can appear in a BMR spreadsheet (technically the SELF-DEFINED record, not the
+full record); the matching system evaluates only the fields in the Conversion Table's
+**StarSchema** column. This spec pins the ordering primitives and the
+comparison-bearing families the tools share.
 
 ## 3.x Casefold
 
@@ -105,37 +117,50 @@ Both fields below differ between the two implementations. Recommended canonical
 rule stated; **the display preference is preserved as an explicit display-layer
 step (§2), not baked into the canonical form.**
 
-### 4.1 Titles — DIVERGENT
+### 4.1 Titles — RATIFIED 2026-07-29
 
-* XML_to_JSON: entry at position 0 is treated as primary and kept first; the rest
-  are sorted by Title casefold. Primary is POSITIONAL.
-* BMR-Review `title_rank`: grouped by CLASS — Resource Name (`is_resource`, or
-  class `release`/`resource`) → top; `internal` → bottom; everything else →
-  middle; each group sorted by text casefold.
+**Evaluation (scoring) — order-independent; class affects WEIGHT, never
+membership:**
+* ALL titles — ResourceName and every AlternateResourceName — participate in
+  comparison equally. Title Class is ignored for scoring, with two
+  diminished-impact cases:
+  * `Internal` titles: diminished value is acceptable, but they must NOT be
+    ignored entirely.
+  * `SystemGenerated` titles: diminished impact; the title field is ignored
+    entirely ONLY when both the submitted and the candidate side are
+    SystemGenerated.
 
-**Recommended canonical rule:** class-based, like BMR-Review, because position-0
-is fragile (depends on upstream list order). Canonical title order =
-`(rank, casefold(text))` where rank is `0` for the Resource/primary title, `1`
-for ordinary alternates, `2` for `internal`. XML_to_JSON adopts the class-based
-rank in place of its positional primary.
+**Presentation / canonical serialization — three buckets:**
+1. **ResourceName** — always first. There is only ever one, so no sort; it
+   stays first EVEN IF its class is Internal.
+2. **AlternateResourceNames excluding Internal** (0..n) — alphabetical,
+   casefold.
+3. **AlternateResourceNames that are Internal** (0..n) — last, alphabetical,
+   casefold.
 
-### 4.2 Alt IDs — DIVERGENT
+In the display, SystemGenerated and Internal titles are visually marked to
+indicate their limited impact on de-duplication.
 
-* XML_to_JSON: sorted by AltID **value** casefold. Presentation-neutral.
-* BMR-Review: sorted `(IMDb-first, casefold(domain), casefold(type))` — value is
-  not a key at all — and ShortDOI entries are excluded from the view.
+### 4.2 Alt IDs — RATIFIED 2026-07-29
 
-**Recommended canonical rule:** sort by `(casefold(kind), casefold(value))` where
-kind = domain if present else type — presentation-neutral and stable, and unlike
-XML_to_JSON's value-only key it groups same-kind IDs together (so two IMDb IDs
-sit adjacent). ShortDOI is **retained** in the canonical form (dropping it is a
-BMR-Review display choice, and ShortDOI is a valid Alt ID type). BMR-Review's
-"IMDb-first" and "hide ShortDOI" become an explicit display-layer re-sort applied
-after canonicalization, not part of the normalized record.
+**Canonical order:** sort by `(casefold(kind), casefold(value))`, where
+**kind is the composite of Type and Domain**. Groups same-kind IDs adjacently
+(so two distinct IMDb IDs sit together — ties into the 2026-07-25 multi-value
+fix). ShortDOI is retained in the canonical/export form (it is a valid Alt ID
+type).
 
-> Rationale for keeping multi-value groups adjacent ties into the 2026-07-25 Alt
-> ID fix (two distinct IMDb IDs must both survive): canonical order groups them by
-> kind so a reviewer/diff sees them together.
+**Display order (ratified as a display rule, applied on top of canonical):**
+1. **Suppress ShortDOI** — it is not used in de-dupe evaluation and serves no
+   purpose in human review.
+2. **IMDb first** — the most-used Alt ID; presenting it first has real review
+   value. Within IMDb, and within every other kind group, order is
+   `(casefold(kind), casefold(value))` as canonical.
+
+**API Shim note:** the matching system does not sort Alt ID entries — it presents them in
+API-Shim order, so **the API Shim must emit the display order**. The
+standalone handoff for that (separate) project is
+**`altid-display-order.md`** in this directory: narrative + language-neutral
+pseudocode + worked example.
 
 ## 5. Conformance
 
@@ -145,9 +170,35 @@ regenerates expectations, so a lagging program fails its conformance test — th
 cross-project drift alarm for ordering (complementary to the file-hash drift
 check, which deliberately does NOT track these region-level rules).
 
-## 6. Open decisions for the operator
+## 6. Decisions — RESOLVED (operator, 2026-07-29)
 
-1. Ratify §4.1 (class-based canonical title order) and §4.2 (kind+value canonical
-   Alt ID order; ShortDOI retained).
-2. Confirm the canonical-vs-display split (§2): BMR-Review keeps IMDb-first / hide
-   ShortDOI as a display layer, not in the normalized record.
+1. §4.1 titles: ratified as amended — evaluation is order-independent with
+   class-based *weighting* (Internal/SystemGenerated diminished, never
+   silently excluded except the both-sides-SystemGenerated case);
+   presentation = the three-bucket order with ResourceName first even when
+   Internal.
+2. §4.2 alt IDs: canonical `(casefold(kind), casefold(value))` with kind =
+   Type+Domain composite; IMDb-first and ShortDOI-suppression confirmed as
+   DISPLAY rules; ShortDOI excluded from evaluation.
+3. §2 canonical-vs-display split: confirmed.
+4. §3: Parent applies to all child records; sequence numbers scoped to
+   Season (`SeasonInfo/SequenceNumber`) and Episode
+   (`EpisodeInfo/SequenceInfo/md:DistributionNumber`); the Conversion Table
+   is the field authority; the matching system evaluates StarSchema-column fields only.
+
+## 7. Engine gaps surfaced by §4.1 (for the next BMR engine cycle)
+
+The ratified title-scoring semantics differ from the CURRENT engine
+(`eidr_core.compare` `cmp_titles`/`select_titles`) in two ways:
+
+1. **Internal titles are currently EXCLUDED from evaluation** entirely;
+   ratified: include with diminished value.
+2. **The title field is currently dropped when EITHER side has only
+   system-generated titles**; ratified: diminished impact when one side is
+   SystemGenerated, dropped only when BOTH sides are.
+
+These are engine-behavior changes with tuning implications (the diminished
+weights are compare-spec knobs — e.g. `SYSTEM_TITLE_DISCOUNT`, and a new
+Internal discount). They belong in the next engine-tuning cycle alongside the
+human-results review: implement → add golden pairs pinning both behaviors →
+bump the compare-spec version. Flagged in BMR-Review's CLAUDE.md.

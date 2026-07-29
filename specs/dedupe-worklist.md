@@ -1,6 +1,17 @@
 # De-Dupe Work-List & Results File Formats (SPEC v1)
 
-**Status:** v1 draft (register Phase 2.6, 2026-07-27). Language-neutral
+**Status:** v1 — **producer LANDED 2026-07-28**: `BMR-Review/run_worklist.py`
+emits this format from a post-the matching system BMR sheet (same inputs and scoring pass as
+`run_assessment.py`, so work list and assessment always agree; per-candidate
+payloads are built inside `evaluate_case` itself). v1 producer notes:
+`enqueued_at` = generation timestamp (the sheet carries no enqueue times;
+Shim mode will supply real ones); `upstream_bucket` = null with an optional
+`upstream_score` field instead (the sheet carries the matching system scores, not bucket
+labels) — the UI may sort on it within the null bucket; lookup-failed
+candidates carry `"unresolved": true` and no `scoring`; record views
+currently follow BMR-Review `render_record` (canonical class-ranked titles ✓;
+alt-ID display order pending normalized-record §4 ratification). Originally
+drafted as register Phase 2.6, 2026-07-27. Language-neutral
 contract between **BMR-Review** (producer: work list + scoring payloads) and
 the **De-Dupe UI** eidr-ui-nextjs module (consumer: renders, appends
 decisions). This is the pilot's data plane per the approved

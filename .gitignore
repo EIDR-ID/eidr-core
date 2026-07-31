@@ -9,3 +9,6 @@ venv/
 .env
 .idea/
 .vscode/
+
+# Distribution copies of specs (renamed/copied for emailing) are not source
+specs/*.md.txt

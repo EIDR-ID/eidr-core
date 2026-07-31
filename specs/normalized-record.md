@@ -141,6 +141,11 @@ membership:**
 In the display, SystemGenerated and Internal titles are visually marked to
 indicate their limited impact on de-duplication.
 
+**API Shim handoff:** the standalone document for the (separate) API Shim
+project is **`title-display-order.md`** in this directory (narrative +
+pseudocode + worked example verified against the reference implementation) —
+sibling of `altid-display-order.md`.
+
 ### 4.2 Alt IDs — RATIFIED 2026-07-29
 
 **Canonical order:** sort by `(casefold(kind), casefold(value))`, where

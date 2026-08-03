@@ -23,7 +23,7 @@ tiers:
 
 The governing document — the cross-project overlap register and phased
 plan — currently lives at
-`D:\Software\eidr-wikidata\CROSS_PROJECT_OVERLAP_REGISTER.md` and migrates
+`D:\Software\eidr-core\CROSS_PROJECT_OVERLAP_REGISTER.md` and migrates
 into this repo once it is pushed to GitHub.
 
 ## Module map (planned; stubs document their seeds)

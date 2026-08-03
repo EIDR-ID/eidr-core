@@ -1,0 +1,577 @@
+{
+  "database": "eidr_dq_db",
+  "owner": "eidr-dq",
+  "version": "2026.08.03",
+  "generated_at": "2026-08-03T16:30:17+00:00",
+  "source": "live database (authoritative; operator 2026-08-03)",
+  "tables": {
+    "dq_articles": {
+      "columns": [
+        {
+          "name": "lang_tag",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "article_text",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "article_text_stripped",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "dq_config": {
+      "columns": [
+        {
+          "name": "key",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "value",
+          "type": "jsonb",
+          "nullable": false
+        }
+      ]
+    },
+    "dq_country_freq_snapshot": {
+      "columns": [
+        {
+          "name": "snapshot_ts",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "country_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "occurrences",
+          "type": "bigint",
+          "nullable": false
+        }
+      ]
+    },
+    "dq_country_validity": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "valid_from_year",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "valid_to_year",
+          "type": "integer",
+          "nullable": true
+        }
+      ]
+    },
+    "dq_errors_raw": {
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "rule_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "registrant",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "field_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "subfield",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "offending_value",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "evidence",
+          "type": "jsonb",
+          "nullable": true
+        },
+        {
+          "name": "error_key_hash",
+          "type": "bytea",
+          "nullable": false
+        },
+        {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        }
+      ]
+    },
+    "dq_external_facts": {
+      "columns": [
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "external_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "facts",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "fetched_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        }
+      ]
+    },
+    "dq_finding": {
+      "columns": [
+        {
+          "name": "error_key_hash",
+          "type": "bytea",
+          "nullable": false
+        },
+        {
+          "name": "rule_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "field_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "subfield",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "offending_value",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "registrant",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "first_seen_run",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "first_seen_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "last_seen_run",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "seen_count",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "resolved_run",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "resolved_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "recurrence_count",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "disposition",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "disposition_by",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "disposition_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "disposition_note",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "dq_inclusion_list": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "dq_lang_freq_snapshot": {
+      "columns": [
+        {
+          "name": "snapshot_ts",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "lang_tag",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "occurrences",
+          "type": "bigint",
+          "nullable": false
+        }
+      ]
+    },
+    "dq_registrant_recipients": {
+      "columns": [
+        {
+          "name": "registrant",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "dq_report_id_map": {
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "seq_no",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "report_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "error_key_hash",
+          "type": "bytea",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        }
+      ]
+    },
+    "dq_rule": {
+      "columns": [
+        {
+          "name": "rule_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "scope",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "default_params",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "enabled_weekly",
+          "type": "boolean",
+          "nullable": false
+        },
+        {
+          "name": "enabled_monthly",
+          "type": "boolean",
+          "nullable": false
+        },
+        {
+          "name": "ignore_cutoff_on_monthly",
+          "type": "boolean",
+          "nullable": false
+        },
+        {
+          "name": "verifiable",
+          "type": "boolean",
+          "nullable": false
+        },
+        {
+          "name": "severity",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "weekly_use_closure",
+          "type": "boolean",
+          "nullable": false
+        }
+      ]
+    },
+    "dq_run": {
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "run_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "params",
+          "type": "jsonb",
+          "nullable": false
+        }
+      ]
+    },
+    "dq_run_rule_stats": {
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "rule_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "registrant",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "severity",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "finding_count",
+          "type": "bigint",
+          "nullable": false
+        }
+      ]
+    },
+    "dq_verification": {
+      "columns": [
+        {
+          "name": "run_id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "error_key_hash",
+          "type": "bytea",
+          "nullable": false
+        },
+        {
+          "name": "rule_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "verdict",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "registry_value",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "detail",
+          "type": "jsonb",
+          "nullable": false
+        },
+        {
+          "name": "verified_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        }
+      ]
+    },
+    "dq_whitelist": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "rule_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "field_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "subfield",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "error_key_hash",
+          "type": "bytea",
+          "nullable": false
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "whitelisted_by",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "whitelisted_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        }
+      ]
+    },
+    "temp": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    }
+  }
+}

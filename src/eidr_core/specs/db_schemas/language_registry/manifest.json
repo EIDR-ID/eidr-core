@@ -1,0 +1,242 @@
+{
+  "database": "language_registry",
+  "owner": "LanguageCode",
+  "version": "2026.08.03",
+  "generated_at": "2026-08-03T16:30:18+00:00",
+  "source": "live database (authoritative; operator 2026-08-03)",
+  "tables": {
+    "code_mapping": {
+      "columns": [
+        {
+          "name": "language_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "scheme",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "language": {
+      "columns": [
+        {
+          "name": "code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "group_tag",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "deprecated",
+          "type": "boolean",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "preferred_value",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "language_group": {
+      "columns": [
+        {
+          "name": "group_tag",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "group_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "language_mode": {
+      "columns": [
+        {
+          "name": "language_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "mode",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "language_name": {
+      "columns": [
+        {
+          "name": "language_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name_lang",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "alt_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "scheme_info": {
+      "columns": [
+        {
+          "name": "scheme",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "version",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "copyright",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "license",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "maintainer",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "source_url",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "retrieved_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "license_file",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "temp": {
+      "columns": [
+        {
+          "name": "language_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "language_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "group_code",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "group_name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "rule_no",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "ISO Language Code\tLanguage Name",
+          "type": "character varying",
+          "nullable": true
+        }
+      ]
+    }
+  }
+}

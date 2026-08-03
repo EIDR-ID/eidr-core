@@ -1,0 +1,1566 @@
+{
+  "database": "eidr_mirror_db",
+  "owner": "EIDR MCP",
+  "version": "2026.08.03",
+  "generated_at": "2026-08-03T16:30:17+00:00",
+  "source": "live database (authoritative; operator 2026-08-03)",
+  "tables": {
+    "classes": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "class",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "clips": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "parent_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "components_mode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "start",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "start_timecode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "duration",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "duration_timecode",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "compilation_entries": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "entry_number",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "entry_class",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "referenced_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "compilations": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "compilation_class",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "has_other_inclusions",
+          "type": "boolean",
+          "nullable": true
+        }
+      ]
+    },
+    "composite_elements": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "element_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "components_mode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "source_start",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "source_start_timecode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "source_duration",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "source_duration_timecode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "destination_start",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "destination_start_timecode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "destination_duration",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "destination_duration_timecode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "composites": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "composite_class",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "content_alternate_ids": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "alt_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "id_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "domain",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "relation",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_alternate_ids_self": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "alt_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "id_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "domain",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "relation",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_associated_org_names": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "org_index",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_associated_org_names_self": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "org_index",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_associated_orgs": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "party_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_associated_orgs_self": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "party_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_core": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "structural_type",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "mode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "referent_type",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "title_lang",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "title_class",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "system_generated",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "release_date",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "release_year",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "approximate_length",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "length_timecode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "length_minutes",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "registrant_extra",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "description_lang",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "target_id",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "content_core_self": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "structural_type",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "mode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "referent_type",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "title_lang",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "title_class",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "system_generated",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "release_date",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "release_year",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "approximate_length",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "length_timecode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "length_minutes",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "registrant_extra",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "description_lang",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "target_id",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "content_countries": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "country_code",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_countries_self": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "country_code",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_credits": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "sort_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_credits_self": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "sort_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_languages": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "lang",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "mode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "is_original",
+          "type": "boolean",
+          "nullable": false
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_languages_self": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "lang",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "mode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "is_original",
+          "type": "boolean",
+          "nullable": false
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_metadata_authorities": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "party_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_metadata_authorities_self": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "party_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_provenance": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "txn_id",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "issue_number",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "registrant",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "creation_date",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "creation_time",
+          "type": "time without time zone",
+          "nullable": true
+        },
+        {
+          "name": "last_modification_date",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "last_modification_time",
+          "type": "time without time zone",
+          "nullable": true
+        },
+        {
+          "name": "publication_date",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "publication_time",
+          "type": "time without time zone",
+          "nullable": true
+        }
+      ]
+    },
+    "content_titles": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "title_lang",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "title_class",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "system_generated",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "content_titles_self": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "title_lang",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "title_class",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "system_generated",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "details": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "detail",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "domain",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "diagnostic_failures": {
+      "columns": [
+        {
+          "name": "failure_id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "id_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "identifier",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "error_msg",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "ingest_phase",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "first_seen",
+          "type": "timestamp without time zone",
+          "nullable": false
+        },
+        {
+          "name": "last_seen",
+          "type": "timestamp without time zone",
+          "nullable": false
+        },
+        {
+          "name": "failure_count",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "diagnostics_log": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "timestamp",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "txn_id",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "level",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "module",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "function",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "edits": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "parent_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "edit_use",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "color_type",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "three_d",
+          "type": "boolean",
+          "nullable": true
+        }
+      ]
+    },
+    "episode_numbers": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "number",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "domain",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "episodes": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "parent_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "episode_class",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "distribution_number",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "house_sequence",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "time_slot",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "lightweight_relationships": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "target_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "class",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "manifestation_digital": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "xml_block",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "manifestations": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "parent_id",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "mirror_scheduler": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "last_run_time",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "next_run_time",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "last_txn_id",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        }
+      ]
+    },
+    "party_core": {
+      "columns": [
+        {
+          "name": "party_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "account_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "sort_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "allowed_roles",
+          "type": "ARRAY",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "target_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ]
+    },
+    "party_names": {
+      "columns": [
+        {
+          "name": "party_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "raw_records": {
+      "columns": [
+        {
+          "name": "txn_id",
+          "type": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "xml_payload",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "timestamp",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ]
+    },
+    "recon_checkpoint": {
+      "columns": [
+        {
+          "name": "entity_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "last_checked",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "regions": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "region",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "report_log": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "report_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "sent_time",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "seasons": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "parent_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "end_date",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "end_year",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "season_class",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "number_required",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "date_required",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "original_title_required",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "sequence_number",
+          "type": "integer",
+          "nullable": true
+        }
+      ]
+    },
+    "series": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "end_date",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "end_year",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "series_class",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "number_required",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "date_required",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "original_title_required",
+          "type": "boolean",
+          "nullable": true
+        }
+      ]
+    },
+    "service_affiliations": {
+      "columns": [
+        {
+          "name": "service_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "affiliated_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "service_alternate_ids": {
+      "columns": [
+        {
+          "name": "service_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "alt_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "domain",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "service_core": {
+      "columns": [
+        {
+          "name": "service_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "display_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "primary_audio_language",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "primary_time_zone",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "delivery_model",
+          "type": "ARRAY",
+          "nullable": true
+        },
+        {
+          "name": "parent_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "target_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": true
+        }
+      ]
+    },
+    "service_names": {
+      "columns": [
+        {
+          "name": "service_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "abbreviation",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": false
+        }
+      ]
+    },
+    "temp": {
+      "columns": [
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    }
+  }
+}

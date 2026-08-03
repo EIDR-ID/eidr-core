@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
-version = "0.2.0"
+version = "0.3.0"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers
@@ -37,4 +37,7 @@ where = ["src"]
 # and the golden-pair corpus ship inside the package so
 # eidr_core.compare.spec / BMR-Review's golden.py locate them via
 # importlib.resources in any install mode.
-"eidr_core" = ["specs/*.json", "specs/golden_pairs/*.json"]
+"eidr_core" = ["specs/*.json", "specs/golden_pairs/*.json",
+               "specs/db_schemas/*/manifest.json",
+               "specs/db_schemas/*/schema.sql",
+               "specs/db_schemas/*/CHANGES.md"]

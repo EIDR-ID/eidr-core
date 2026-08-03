@@ -16,7 +16,7 @@ Python programs, never code.
 | `altid-display-order.md` + `title-display-order.md` | ✅ **API Shim handoffs (2026-07-29/30)** — the two ratified DISPLAY orders (Alt IDs: ShortDOI suppressed, IMDb first, then (kind, value); Titles: three buckets, ResourceName first even when Internal, SystemGenerated/Internal visually marked). the matching system presents in Shim order → the Shim emits these. Worked examples verified against the reference implementation (BMR-Review `render_record`). | normalized-record.md §4.1/§4.2 |
 | `dedupe-worklist.md` | ✅ **LANDED (v1, 2026-07-27)** — work-list / results / supplement JSONL formats incl. the per-candidate scoring payload (score, band, field states+qualities, rationale) shared verbatim with Shim-mode; unscored-request flow; decisions carry engine context for the eval set | Operator design 2026-07-18 + unified-scoring §3 |
 | `altidtool-format.md` | The AltIDTool 5-column TSV contract | eidr-wikidata `bmr/altidtool.py` behavior |
-| `mirror-schema.md` (→ `mirror-schema/`) | ⚠ **DESIGN DRAFTED 2026-08-03, awaiting operator review** — canonical DDL + generated JSON manifest + date version; MCP validator re-sourced; three drifted DDL copies retired; optional reader startup assertions | live `eidr_mirror_db` (ground truth) |
+| `db-schema-contracts.md` + `src/eidr_core/specs/db_schemas/` | ✅ **APPROVED & LANDED 2026-08-03** — schema contracts for ALL THREE DBs (mirror 48 / dq 17 / language 7 tables): manifest + DDL + CHANGES, date-versioned, generated from the live DBs by `tools/dump_db_schema.py` (`--check` = drift alarm); consumers assert via `eidr_core.db_schemas.assert_tables` | live databases (authoritative) |
 
 ## The sync mechanism
 

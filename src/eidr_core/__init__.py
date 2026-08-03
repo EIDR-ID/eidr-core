@@ -6,4 +6,4 @@ its canonical implementation remains in the source project named in the
 module's docstring — change it THERE and update siblings per the register.
 """
 
-__version__ = "0.0.1"
+__version__ = "0.2.0"

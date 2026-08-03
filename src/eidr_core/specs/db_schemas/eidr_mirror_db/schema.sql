@@ -1866,6 +1866,61 @@ ALTER TABLE ONLY public.content_provenance
 
 
 --
+-- Name: alias_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.alias_log (
+    id integer NOT NULL,
+    content_id text NOT NULL,
+    creation_type text NOT NULL,
+    logged_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
+-- Name: alias_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.alias_log_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: alias_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.alias_log_id_seq OWNED BY public.alias_log.id;
+
+
+--
+-- Name: alias_log alias_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alias_log
+    ADD CONSTRAINT alias_log_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: alias_log alias_log_content_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alias_log
+    ADD CONSTRAINT alias_log_content_id_key UNIQUE (content_id);
+
+
+--
+-- Name: idx_alias_log_logged_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_alias_log_logged_at ON public.alias_log USING btree (logged_at DESC);
+
+
+--
 -- Name: content_titles content_titles_content_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 

@@ -1,10 +1,34 @@
 {
   "database": "eidr_mirror_db",
   "owner": "EIDR MCP",
-  "version": "2026.08.03",
-  "generated_at": "2026-08-03T16:30:17+00:00",
+  "version": "2026.08.03-1",
+  "generated_at": "2026-08-03T00:00:00+00:00",
   "source": "live database (authoritative; operator 2026-08-03)",
   "tables": {
+    "alias_log": {
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "content_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "creation_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "logged_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        }
+      ]
+    },
     "classes": {
       "columns": [
         {

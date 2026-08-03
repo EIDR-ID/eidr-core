@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
-version = "0.3.0"
+version = "0.4.0"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers

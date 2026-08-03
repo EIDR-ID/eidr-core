@@ -30,7 +30,7 @@ into this repo once it is pushed to GitHub.
 
 | Module | Contents | Extracted from |
 |---|---|---|
-| `eidr_core.bmr_io` | BMR template schema, family/repeat-group model, workbook reader + writer | eidr-wikidata `bmr/writer.py` (canonical), BMR-Review's two vendored copies, XML_to_JSON's BMR codec, eidr-dq `flatten.py` |
+| `eidr_core.bmr_io` | ✅ **PRIMITIVES LANDED 0.4.0** — workbook surgery (HEADER_ROW, read/count/rightmost/expand family, transplant, fix_shared_strings); orchestration stays per-consumer. Open: reader half (BMRtoAltID, XML_to_JSON codec, combine script) + eidr-dq `flatten.py` fold-in | eidr-wikidata `bmr/writer.py` (canonical) + BMR-Review `audit/bmr_writer.py` (both now importers) |
 | `eidr_core.compare` | ✅ **LANDED 0.1.0** — the L2 comparator library: field comparators (`COMPARATORS`, `FieldResult`), episode-aware `titles`, `nonlinear` accumulation; parameters via `set_params()` (BMR-Review registers its `config.py`; later the compare-spec) | BMR-Review `compare.py`/`titles.py`/`nonlinear.py` (now shims) |
 | `eidr_core.normalize` | ✅ **LANDED 0.1.0** — L1 normalization: fold/case/alias/numeral, name/title/code normalizers incl. `norm_country`/`canon_country`, date/duration parsing, `word_alias.csv` | BMR-Review `normalize.py`/`aliases.py` (now shims) |
 | `eidr_core.ordering` | ✅ **LANDED 0.2.0** — canonical + display ordering key functions per the ratified normalized-record spec (title three-bucket, alt-ID kind/value + display rule, ShortDOI test); consumed by XML_to_JSON star mode and BMR-Review `render_record` | XML_to_JSON + BMR-Review (both now importers) |

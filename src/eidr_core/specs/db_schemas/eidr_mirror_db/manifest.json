@@ -2,7 +2,7 @@
   "database": "eidr_mirror_db",
   "owner": "EIDR MCP",
   "version": "2026.08.03-1",
-  "generated_at": "2026-08-03T00:00:00+00:00",
+  "generated_at": "2026-08-04T01:37:08+00:00",
   "source": "live database (authoritative; operator 2026-08-03)",
   "tables": {
     "alias_log": {

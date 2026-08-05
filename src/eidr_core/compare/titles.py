@@ -1,3 +1,14 @@
+"""Title matching — THE shared implementation (eidr_core.compare.titles).
+
+Updated 2026-08-05 from the BMR-Review engine cycle: multi-language part
+words (Teil/partie/parte/del/osa/Folge…), postfix and mid-title part
+numbering, bare trailing numbers (Rocky 2), and select_titles internal-
+as-fallback semantics. Consumed by eidr_core.compare.cmp_titles and
+BMR-Review's scorer — keep single-homed HERE (the local BMR-Review
+titles.py is a shim).
+
+Original module docstring follows.
+"""
 """
 Title matching with episode-aware rules.
 
@@ -37,6 +48,11 @@ _PART = re.compile(r"^(.*?)[\s,:;.\-]+" + _PART_WORD + r"\.?\s*(" + _NUM_TOKEN +
 # Nordic/postfix form: the number precedes the part word ("3. del", "2. Del",
 # "3 osa"). The ordinal dot after the digit is optional.
 _PART_POST = re.compile(r"^(.*?)[\s,:;.\-]+(" + _NUM_TOKEN + r")\.?\s*" + _PART_WORD + r"\s*$", re.I)
+# Mid-title numbering: the part number sits between the base and a subtitle
+# ("Miserabili 2: Tempesta su Parigi", "Kampf um Rom II - Der Verrat"). Only
+# 1-2 digit or roman tokens qualify (years never match), and both a base and a
+# subtitle must be present.
+_PART_MID = re.compile(r"^(.*?\S)\s+([0-9]{1,2}|[ivx]{1,4})\s*[:\-\u2013\u2014]\s+\S.+$", re.I)
 # "... 2 of 3", "... (1 of 2)"
 _PART_OF = re.compile(r"^(.*?)[\s,:;.\-]*\(?\b([0-9]+)\s+of\s+([0-9]+)\)?\s*$", re.I)
 # bare trailing number, no part word: "Rocky 2", "Rocky II", "Ocean's Eight".
@@ -76,6 +92,11 @@ def parse_part(raw, *, bare=True):
         if idx is not None and m.group(1).strip():
             return norm_title(m.group(1)), idx
     m = _PART_POST.match(s)
+    if m:
+        idx = _to_int(m.group(2))
+        if idx is not None and m.group(1).strip():
+            return norm_title(m.group(1)), idx
+    m = _PART_MID.match(s)
     if m:
         idx = _to_int(m.group(2))
         if idx is not None and m.group(1).strip():
@@ -167,6 +188,15 @@ def parts_conflict(a_raws, b_raws):
     pb = [parse_part(x) for x in b_raws]
     na = [norm_title(x) for x in a_raws if x]
     nb = [norm_title(x) for x in b_raws if x]
+    # Bare-base variants with a LEADING numeral token stripped. Some articles
+    # normalise into digits ("I miserabili" -> "1 miserabili": the Italian
+    # article is read as roman numeral I), which hides the bare base from the
+    # one-sided comparison below. Either reading -- article or part-one marker
+    # -- makes a pair against "<base> 2" a part question, so the stripped
+    # variant participates in the bare-base check.
+    _lead = re.compile(r"^(?:[0-9]{1,2}|[ivx]{1,4})\s+")
+    na = na + [_lead.sub("", t) for t in na if _lead.match(t)]
+    nb = nb + [_lead.sub("", t) for t in nb if _lead.match(t)]
     for x in pa:
         if not x:
             continue

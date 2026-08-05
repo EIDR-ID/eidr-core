@@ -14,10 +14,12 @@ loads it and restores exact Python semantics:
   ``WEIGHTS["Clip"] is WEIGHTS["Edit"]`` identity (tune Edit, Clip follows);
 * the spec version is exposed as ``COMPARE_SPEC_VERSION``.
 
-BMR-Review's ``eidr_dedup_score/config.py`` is now a thin shim that does
-``globals().update(load_spec())``, so every consumer keeps reading
-``config.NAME`` unchanged and the registered-parameter mechanism
-(``_params`` / ``set_params``) is untouched.
+Direction of authority (INVERTED 2026-08-05): BMR-Review's
+``eidr_dedup_score/config.py`` is the AUTHORING surface — its
+``regen_compare_spec.py`` GENERATES this spec from config and round-trips
+through ``load_spec`` before writing. This loader remains the consumer-side
+contract for every OTHER reader (golden-pair regen, the future Shim-mode
+scoring service); BMR-Review itself no longer loads the spec at runtime.
 
 Spec resolution order: explicit ``path`` argument → ``EIDR_COMPARE_SPEC``
 environment variable (test/experiment override) → the packaged file.

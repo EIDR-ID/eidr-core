@@ -31,7 +31,7 @@ Lines are therefore **3, 4, or 5 columns wide**:
 | Producer | Shape | Status |
 |---|---|---|
 | eidr-wikidata `bmr/altidtool.py` (`altid_additions.tsv`, ~2.2M rows/run) + `outputs` (`missing_from_eidr.altid.tsv`) | canonical variable-width | ✅ composes via `eidr_core.altidtool_io.format_line` (2026-08-04) |
-| BMRtoAltID `bmr_to_altid.py` | **fixed 5 columns** (trailing tabs when Domain/Relation empty) | tolerated by `parse_line` (trailing empties collapse); ⚠ **operator decision open**: switch it to the canonical variable-width writer, or record fixed-5 as an accepted dialect? |
+| BMRtoAltID `bmr_to_altid.py` | canonical variable-width | ✅ composes via `eidr_core.altidtool_io.format_line` (2026-08-04; **operator ruling**: variable columns, max 5, no trailing tabs — the fixed-5 dialect is retired; `parse_line` still tolerates old files) |
 | EIDR MCP `eidrtoaltid.py` | **NOT this format** — a 2–4 column extract *report* WITH a header (id + value, optional Relation/Resource Name). Previously mischaracterized as a parallel emitter (OVERLAPS row 4 / drift group); corrected 2026-08-04 | out of scope |
 
 ## For consumers/readers

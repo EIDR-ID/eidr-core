@@ -23,7 +23,41 @@ BMR-Review that had drifted from it. Six primitives, canonical semantics:
 Orchestration stays per-consumer BY DESIGN: eidr-wikidata's typed
 ``BMRWriter``/``FAMILIES`` and BMR-Review's dict-based multi-template
 ``write_bmr_files`` serve different jobs; only the workbook surgery was
-duplicated. Full reader/writer consolidation (bmr_io reader) remains open.
+duplicated.
+
+READER HALF (added 2026-08-06, register R3 tail):
+
+* ``read_sheet(path, sheet_name, ...)`` — streaming sheet read: header-row
+  map + one ``{header: value}`` dict per data row. Canonical semantics =
+  eidr-wikidata ``scripts/combine_bmr_sheets.py::_read_chunk`` (the only
+  reader that was already built on this module's constants). The two other
+  portfolio readers stop early instead of reading everything, so the stop
+  rule is a parameter — ``stop=None`` (read all, skip blank rows; combine),
+  ``stop="blank_first_col"`` (halt when column A is empty; BMRtoAltID and
+  the real BMR tool's behavior), ``stop="blank_row"`` (halt at the first
+  fully-blank row; XML_to_JSON's BMR codec).
+* ``family_layout(header_names, members)`` — SPARSE, index-preserving map
+  ``{group_index: {member: actual_header}}`` for a repeating column family.
+  Sparse-by-design: XML_to_JSON's ``_collect_numbered`` densifies groups
+  before pairing ``Alt Title Class N``, which mis-aligns class/language
+  when group 1 is blank — the shared layout keeps original indices so
+  consumers can't repeat that bug. A bare member name (no number) counts
+  as group 1, matching ``count_family``; a numbered ``"X 1"`` wins over a
+  bare ``"X"`` if both somehow coexist.
+* ``RepeatPlan`` — union-max repeat-group counts across records, with
+  per-family minimums (folded in from eidr-dq ``flatten.py``, which
+  hardcoded Director>=2 / Actor>=4 inside ``finalize``). The same
+  union-max model backs combine's chunk merging and the writer's
+  ``_max_counts``.
+* ``pad_groups(items, count, width)`` — flatten one family's per-record
+  values to exactly ``count`` groups of ``width`` cells, padding with
+  ``fill``. Replaces the ~18 hand-written pad loops in flatten.py.
+
+Consumer POLICY stays out of the reader by design: sheet auto-detection
+strategies (XML_to_JSON's exact-tab allowlist vs BMRtoAltID's reserved-name
+exclusion), value trimming/blank sentinels, the "." -> Proprietary domain
+split, ShortDOI filtering, and IMDb/ISAN/V-ISAN singleton promotion all
+differ per consumer and belong above this layer.
 """
 from __future__ import annotations
 
@@ -35,7 +69,7 @@ import shutil
 import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
-from typing import Optional
+from typing import Iterable, Mapping, Optional, Sequence
 
 log = logging.getLogger(__name__)
 
@@ -43,8 +77,13 @@ log = logging.getLogger(__name__)
 # (identical in both pre-extraction writers).
 HEADER_ROW = 3
 
-__all__ = ["HEADER_ROW", "read_headers", "count_family", "rightmost_in",
-           "expand_family", "transplant", "fix_shared_strings"]
+# First data row in every EIDR BMR template (row 1-2 = banner, 3 = headers).
+DATA_START = 4
+
+__all__ = ["HEADER_ROW", "DATA_START", "read_headers", "count_family",
+           "rightmost_in", "expand_family", "transplant",
+           "fix_shared_strings",
+           "read_sheet", "family_layout", "RepeatPlan", "pad_groups"]
 
 
 def read_headers(ws) -> dict[int, str]:
@@ -237,3 +276,162 @@ def fix_shared_strings(xlsx_path: str) -> None:
                 os.remove(tmp)
         except Exception:
             pass
+
+
+# ---------------------------------------------------------------------------
+# Reader half (2026-08-06)
+# ---------------------------------------------------------------------------
+
+def read_sheet(path: str, sheet_name: str, *,
+               header_row: int = HEADER_ROW,
+               data_start: int = DATA_START,
+               stop: Optional[str] = None,
+               ) -> tuple[dict[int, str], list[dict[str, object]]]:
+    """Read one BMR sheet: ``(headers, rows)``.
+
+    ``headers`` is ``{1-based column: header text}`` (trimmed, blanks
+    skipped, NO truncation at header gaps — spacer columns don't hide
+    the columns to their right). ``rows`` is one ``{header: value}``
+    dict per data row; blank cells are simply absent from the dict, so
+    the blank sentinel is the consumer's choice (``row.get(h)`` vs
+    ``row.get(h, "")``).
+
+    ``stop`` selects the end-of-data rule (see module docstring). With
+    ``stop=None`` fully-blank rows are skipped, not terminal — chunked
+    BMR output carries trailing pre-allocated empty rows.
+
+    Streaming ``read_only`` mode throughout: ``ws.cell(r, c)`` in
+    read-only mode is O(N) per access because openpyxl rescans the
+    worksheet stream each time; ``iter_rows`` walks it once.
+    """
+    if stop not in (None, "blank_row", "blank_first_col"):
+        raise ValueError(f"unknown stop rule: {stop!r}")
+    # Lazy import keeps eidr_core.bmr_io importable without openpyxl for
+    # consumers that only use the zip-surgery / layout / plan helpers.
+    import openpyxl
+
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    try:
+        if sheet_name not in wb.sheetnames:
+            raise ValueError(
+                f"{path}: expected sheet {sheet_name!r}, found "
+                f"{wb.sheetnames!r}"
+            )
+        ws = wb[sheet_name]
+
+        headers: dict[int, str] = {}
+        for row_vals in ws.iter_rows(min_row=header_row, max_row=header_row,
+                                     values_only=True):
+            for col_idx, v in enumerate(row_vals, 1):
+                if v is None:
+                    continue
+                s = str(v).strip()
+                if s:
+                    headers[col_idx] = s
+            break
+
+        n_cols = max(headers, default=0)
+        headers_by_pos = [headers.get(i + 1) for i in range(n_cols)]
+
+        rows: list[dict[str, object]] = []
+        for row_vals in ws.iter_rows(min_row=data_start, values_only=True):
+            if stop == "blank_first_col":
+                first = row_vals[0] if row_vals else None
+                if first is None or (isinstance(first, str) and not first.strip()):
+                    break
+            row_dict: dict[str, object] = {}
+            for i, val in enumerate(row_vals[:n_cols]):
+                if val is None or val == "":
+                    continue
+                hdr = headers_by_pos[i]
+                if hdr:
+                    row_dict[hdr] = val
+            if not row_dict:
+                if stop == "blank_row":
+                    break
+                continue    # stop=None: blank row is skippable padding
+            rows.append(row_dict)
+        return headers, rows
+    finally:
+        wb.close()
+
+
+def family_layout(header_names: Iterable[str], members: Sequence[str],
+                  ) -> dict[int, dict[str, str]]:
+    """Map a repeating family's headers to ``{group_index: {member: header}}``.
+
+    Group indices are the sheet's OWN numbering, gaps preserved (sparse) —
+    callers densify only after pairing companion columns, never before.
+    A bare member name is group 1; ``"Member N"`` (one-or-more spaces,
+    digits) is group N, and beats the bare form for group 1.
+    """
+    pats = {m: re.compile(re.escape(m) + r"\s+(\d+)$") for m in members}
+    out: dict[int, dict[str, str]] = {}
+    for h in header_names:
+        for m in members:
+            if h == m:
+                out.setdefault(1, {}).setdefault(m, h)
+            else:
+                mt = pats[m].fullmatch(h)
+                if mt:
+                    out.setdefault(int(mt.group(1)), {})[m] = h
+    return out
+
+
+class RepeatPlan:
+    """Union-max repeat-group counts across a record set.
+
+    ``bump`` records the widest instance seen per family; ``finalize``
+    applies the construction-time minimums and floors every recorded
+    family at 1 (a family that appeared at all gets at least one column
+    group). ``get`` never returns less than 1 — header layouts always
+    carry one group even for families empty across the whole set.
+    """
+
+    def __init__(self, minimums: Optional[Mapping[str, int]] = None):
+        self.counts: dict[str, int] = {}
+        self.minimums: dict[str, int] = dict(minimums or {})
+
+    def bump(self, family: str, n: Optional[int]) -> None:
+        if n is None:
+            return
+        self.counts[family] = max(self.counts.get(family, 0), int(n))
+
+    def finalize(self) -> None:
+        for fam, minv in self.minimums.items():
+            self.counts[fam] = max(self.counts.get(fam, 0), minv)
+        for fam in list(self.counts.keys()):
+            self.counts[fam] = max(self.counts[fam], 1)
+
+    def get(self, family: str, default: int = 1) -> int:
+        v = self.counts.get(family)
+        return max(v if v is not None else default, 1)
+
+
+def pad_groups(items: Sequence, count: int, width: int,
+               fill: str = "") -> list:
+    """Flatten one family's values to exactly ``count`` groups of
+    ``width`` cells, padding missing groups with ``fill``.
+
+    Each item is a tuple/list of ``width`` cells, or a scalar when
+    ``width == 1`` (e.g. a plain country-code list).
+    """
+    out: list = []
+    for idx in range(count):
+        if idx < len(items):
+            item = items[idx]
+            if isinstance(item, (tuple, list)):
+                if len(item) != width:
+                    raise ValueError(
+                        f"group {idx + 1} has {len(item)} cells, expected {width}"
+                    )
+                out.extend(item)
+            elif width == 1:
+                out.append(item)
+            else:
+                raise ValueError(
+                    f"scalar group value with width={width}; pass tuples"
+                )
+        else:
+            out.extend([fill] * width)
+    return out

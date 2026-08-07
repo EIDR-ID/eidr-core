@@ -217,3 +217,46 @@ def parse_minutes(raw):
         return float(s)                # bare minutes
     except ValueError:
         return None
+
+
+# ---------------------------------------------------------------------------
+# Transport safety (distinct from the comparison normalisers above)
+# ---------------------------------------------------------------------------
+# Everything above neutralises harmless variation BEFORE fuzzy comparison and
+# is lossy by design (case, articles, punctuation all go). ``sanitize_field``
+# is a different job: make a value SAFE TO CARRY through a delimited or
+# database transport without changing what it says. Apply it last, on the way
+# out — never as the basis for a comparison.
+
+def sanitize_field(s) -> str:
+    """Normalise a text field for bulk loading or delimited output.
+
+    - ``None`` and whitespace-only become ``""``
+    - Strip leading/trailing whitespace
+    - Remove NUL bytes (PostgreSQL rejects them outright)
+    - Replace tabs / CR / LF with spaces (they would break TSV, and COPY
+      handles some but not all of them on its own)
+    - Replace every remaining C0 control character except space with a space,
+      so nothing invisible survives into the output
+
+    Extracted from EIDR MCP ``reset_alt_ids.py::_sanitize_field`` (register R6,
+    2026-08-06) — the fuller of that repo's two copies, and the canonical
+    behaviour. EXTRACT-ONLY: MCP keeps its own copies under the standing
+    "not ported unless it independently needs a major update" decision, so
+    this exists for NEW consumers and for the eventual port, not as a shim
+    MCP imports today.
+
+    NOTE for the MCP thread: the two copies had already drifted when this was
+    extracted. ``shortdoi_audit.py``'s copy does only the strip-and-replace
+    half — no NUL removal, no C0 sweep — and that script writes TSV, so a
+    control character in registry XML can reach its output and break a
+    downstream parse. This function is the behaviour to converge on.
+    """
+    if s is None:
+        return ""
+    s = str(s).strip()
+    if not s:
+        return ""
+    s = s.replace("\x00", "")
+    s = s.replace("\t", " ").replace("\r", " ").replace("\n", " ")
+    return "".join(" " if (ord(ch) < 0x20 and ch != " ") else ch for ch in s)

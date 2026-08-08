@@ -26,9 +26,14 @@ aws = ["boto3>=1.34"]
 # eidr_core.bmr_io imports openpyxl lazily — only read_sheet needs it; the
 # zip-surgery / layout / plan helpers work without it.
 bmr = ["openpyxl>=3.1"]
-# Placeholders; populate as each module lands.
-# db = ["psycopg[binary]>=3.1"]
-# registry = ["eidr[client]"]
+# eidr_core.registry is the portfolio's SDK factory — it imports `eidr` lazily
+# inside get_registry_client(), so only consumers that actually talk to the
+# registry API need this extra.
+registry = ["eidr[client]>=0.1.0rc1"]
+# No `db` extra: eidr_core.db_schemas is stdlib-only (it reads packaged
+# manifests and takes a connection the caller already owns), and no other
+# module touches a driver — the external fact-cache seam is deliberately
+# driver-free. Consumers declare their own psycopg/psycopg2.
 
 [tool.setuptools.packages.find]
 where = ["src"]

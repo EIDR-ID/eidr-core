@@ -5,9 +5,18 @@ Modules are populated incrementally by extraction from consumer projects
 its canonical implementation remains in the source project named in the
 module's docstring — change it THERE and update siblings per the register.
 """
+from __future__ import annotations
 
-# Must move in lockstep with pyproject.toml [project] version — this string
-# sat stale at 0.6.0 through six releases (caught 2026-08-09) because nothing
-# consumed it; consumers pin @main and read metadata, so pyproject.toml is
-# the authority and this is a convenience mirror only.
-__version__ = "0.13.0"
+from importlib.metadata import PackageNotFoundError, version as _version
+
+try:
+    # pyproject.toml [project].version is the single source of truth; this
+    # reads the INSTALLED distribution's metadata rather than duplicating
+    # the string, which is what let __version__ sit stale at 0.6.0 through
+    # six releases (caught 2026-08-09) with nothing to notice the drift.
+    __version__ = _version("eidr-core")
+except PackageNotFoundError:
+    # Source checkout with no install record (e.g. running straight out of
+    # a git clone without `pip install -e .`) — not expected for consumers,
+    # who all install via pip, but fail soft rather than raise on import.
+    __version__ = "0.0.0+unknown"

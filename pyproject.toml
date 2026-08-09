@@ -10,10 +10,12 @@ readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers
 # run 3.12-3.14.
 requires-python = ">=3.10"
-# No hard dependencies yet: modules are added incrementally as they are
-# extracted from consumer projects (see docs/ and OVERLAPS.md). Optional
-# extras will grow with them (openpyxl for bmr_io, psycopg for codes, the
-# eidr SDK for registry, boto3 for secrets_loader).
+# No hard dependencies: every third-party need (rapidfuzz, openpyxl, boto3,
+# the eidr SDK) is an optional extra below, imported lazily by the module
+# that needs it — a consumer that only touches dependency-free modules
+# (codes, normalize, ordering, altidtool_io, db_schemas, external, verify,
+# registry.operation_status) installs with none of them. See OVERLAPS.md
+# for what each module was extracted from.
 
 [project.optional-dependencies]
 # eidr_core.compare needs rapidfuzz (imported at module load). eidr_core.codes
@@ -33,7 +35,8 @@ registry = ["eidr[client]>=0.1.0rc1"]
 # Test runner. eidr-core's own test suite is deliberately thin — spec-driven
 # modules are verified by the siblings' conformance tests (CLAUDE.md) — but
 # safety surfaces whose wrong answer is SILENT are pinned here instead of
-# in a consumer. See tests/test_registry_operation_status.py.
+# in a consumer: tests/test_registry_operation_status.py (R5) and
+# tests/test_external_failover.py (R13).
 dev = ["pytest>=8.0"]
 # No `db` extra: eidr_core.db_schemas is stdlib-only (it reads packaged
 # manifests and takes a connection the caller already owns), and no other
@@ -44,14 +47,16 @@ dev = ["pytest>=8.0"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-# word_alias.csv ships with the normalize package (aliases.py loads it
-# relative to its own file; degrades gracefully if absent).
-"eidr_core.normalize" = ["data/*.csv"]
-# compare-spec.json — the versioned tuning surface of the unified engine —
-# and the golden-pair corpus ship inside the package so
-# eidr_core.compare.spec / BMR-Review's golden.py locate them via
-# importlib.resources in any install mode.
-"eidr_core" = ["specs/*.json", "specs/golden_pairs/*.json",
+# py.typed marks the package as inline-typed (PEP 561) so consumers' type
+# checkers (e.g. eidr-wikidata's mypy) read eidr_core's own annotations
+# instead of treating it as untyped. compare-spec.json — the versioned
+# tuning surface of the unified engine — and the golden-pair corpus ship
+# inside the package so eidr_core.compare.spec / BMR-Review's golden.py
+# locate them via importlib.resources in any install mode.
+"eidr_core" = ["py.typed", "specs/*.json", "specs/golden_pairs/*.json",
                "specs/db_schemas/*/manifest.json",
                "specs/db_schemas/*/schema.sql",
                "specs/db_schemas/*/CHANGES.md"]
+# word_alias.csv ships with the normalize package (aliases.py loads it
+# relative to its own file; degrades gracefully if absent).
+"eidr_core.normalize" = ["data/*.csv"]

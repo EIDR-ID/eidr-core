@@ -48,12 +48,22 @@ Usage (Phase 4+ pattern)
 ------------------------
 ::
 
-    from eidr_core.registry import get_registry_client
+    from eidr_core.registry import get_registry_client, token_operation_status
 
     with get_registry_client() as client:
         record = client.resolve("10.5240/...")
         token = client.modify(record, immediate=False)
-        result = token.operation_result(timeout=120)
+
+        # Do NOT trust token.operation_result() alone to tell you the write
+        # succeeded: as of SDK v1.1.1 a REJECTED write still reports as
+        # pending, because the rejection lives in an inner OperationStatus
+        # the SDK does not surface. Ask for the registry's actual verdict.
+        # See operation_status.py — that gap cost 62 production records.
+        status = token_operation_status(token)
+        if status is None:
+            ...   # no verdict yet — poll again later, do not assume success
+        elif status.is_failure:
+            log.error("registry rejected %s: %s", token.value, status)
 
 Or with explicit credentials lifted from the project's secrets:
 
@@ -82,6 +92,28 @@ from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any, Optional
+
+# Re-exported so callers get the factory and the verdict reader from one
+# import. Stdlib-only, so this costs nothing to consumers that never write
+# — unlike the SDK itself, which stays lazily imported below.
+from .operation_status import (
+    CODE_SUCCESS,
+    OperationStatus,
+    parse_operation_status,
+    parse_operation_statuses,
+    token_operation_status,
+)
+
+__all__ = [
+    "CODE_SUCCESS",
+    "DEFAULT_REGISTRY",
+    "OperationStatus",
+    "build_registry_credentials",
+    "get_registry_client",
+    "parse_operation_status",
+    "parse_operation_statuses",
+    "token_operation_status",
+]
 
 if TYPE_CHECKING:
     # Type-check-only imports so static analysis sees the SDK types

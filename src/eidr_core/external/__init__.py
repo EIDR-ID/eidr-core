@@ -56,19 +56,37 @@ consumer appears; only the chassis is shared. Current homes:
 * **TMDb** — eidr-dq (``external/tmdb.py``).
 * **IMDb** — planned (rate-managed, pre-configured library).
 
-WHAT IS NOT HERE YET
---------------------
+THE OTHER CHASSIS LEGS
+----------------------
 R13 scopes the chassis as cache + rate limit + retry/backoff + serialization +
-secrets convention. Only the cache seam is extracted so far, because it was
-the only piece already written source-agnostically. Retry/backoff and endpoint
-failover currently live per-provider and differ in strength (see the register
-note); consolidating them is the next chassis increment, not this one.
+secrets convention. Retry/backoff + endpoint failover landed 2026-08-09 in
+``eidr_core.external.failover`` (extracted from eidr-wikidata's
+``_query_endpoints``; re-exported here). The rate-limit leg is the
+``delay_seconds`` pre-attempt pacing that travelled with it — a token-bucket
+pacer waits for the planned IMDb client, its first real consumer. Secrets
+convention lives in ``eidr_core.secrets_loader`` (R10); serialization is the
+fact-dict contract above.
 """
 from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-__all__ = ["FactCache", "NullFactCache", "DictFactCache", "Key", "Entry"]
+from .failover import (
+    FATAL,
+    NEXT_ENDPOINT,
+    OUTAGE,
+    RETRY,
+    call_with_failover,
+    classify_sparql_error,
+    endpoint_chain,
+)
+
+__all__ = [
+    "FactCache", "NullFactCache", "DictFactCache", "Key", "Entry",
+    # failover chassis (canonical home: eidr_core.external.failover)
+    "RETRY", "NEXT_ENDPOINT", "OUTAGE", "FATAL",
+    "call_with_failover", "classify_sparql_error", "endpoint_chain",
+]
 
 Key = tuple[str, str]          # (source, external_id)
 Entry = dict                   # {"status": str, "facts": dict}

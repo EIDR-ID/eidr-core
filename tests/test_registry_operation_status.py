@@ -15,6 +15,8 @@ hand-written to match the implementation.
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from eidr_core.registry import (
@@ -236,5 +238,5 @@ def test_dataclass_is_hashable_and_frozen():
     status = parse_operation_status(REJECTED)
     assert isinstance(status, OperationStatus)
     hash(status)
-    with pytest.raises(Exception):
+    with pytest.raises(dataclasses.FrozenInstanceError):
         status.code = 0

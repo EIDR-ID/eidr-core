@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
-version = "0.13.0"
+version = "0.13.1"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers
@@ -37,11 +37,45 @@ registry = ["eidr[client]>=0.1.0rc1"]
 # safety surfaces whose wrong answer is SILENT are pinned here instead of
 # in a consumer: tests/test_registry_operation_status.py (R5) and
 # tests/test_external_failover.py (R13).
-dev = ["pytest>=8.0"]
+# ruff/mypy are pinned EXACTLY, not floored: this package ships py.typed, so
+# consumers' type checkers read its real annotations (PEP 561) — the gate
+# below is the publisher's side of that contract (T4, handoff 2026-08-09).
+# Both tools add new checks in minor releases; an unpinned tool would turn
+# CI red with no code change, which is exactly the failure mode the gate
+# exists to prevent. Bump the pins deliberately, fixing what the new
+# versions flag in the same commit.
+dev = [
+    "pytest>=8.0",
+    "ruff==0.15.9",
+    "mypy==1.20.0",
+]
 # No `db` extra: eidr_core.db_schemas is stdlib-only (it reads packaged
 # manifests and takes a connection the caller already owns), and no other
 # module touches a driver — the external fact-cache seam is deliberately
 # driver-free. Consumers declare their own psycopg/psycopg2.
+
+[tool.ruff]
+line-length = 100
+# The requires-python floor, so pyupgrade never suggests syntax 3.10 lacks.
+target-version = "py310"
+
+[tool.ruff.lint]
+# Same selection as eidr-wikidata (the portfolio's other gated repo), so a
+# rule that passes in one repo means the same thing in the other.
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+# E702 (multiple statements per line, semicolon): the extracted modules
+# (bmr_io, compare) deliberately keep their source projects' compact
+# zip-surgery/scorer style — restyling extraction-preserved code would
+# churn diffs consumers track via @main for zero behavioral value.
+ignore = ["E702"]
+
+[tool.mypy]
+# The requires-python floor: annotations must hold on the oldest consumer
+# runtime (eidr-dq targets 3.10), not just the newest.
+python_version = "3.10"
+# Optional-extra imports (rapidfuzz, openpyxl, boto3, eidr) are absent in
+# the base install; the gate must not require installing every extra.
+ignore_missing_imports = true
 
 [tool.setuptools.packages.find]
 where = ["src"]

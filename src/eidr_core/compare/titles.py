@@ -7,9 +7,9 @@ as-fallback semantics. Consumed by eidr_core.compare.cmp_titles and
 BMR-Review's scorer — keep single-homed HERE (the local BMR-Review
 titles.py is a shim).
 
-Original module docstring follows.
-"""
-"""
+Original module docstring follows (merged into this one literal so the
+imports below are genuinely module-top).
+
 Title matching with episode-aware rules.
 
   * Part numbering is *distinguishing*: "Show, Part 1" vs "Show, Part 2"
@@ -26,7 +26,9 @@ non-episodic titles too); system-generated filtering is most relevant to
 episodes.
 """
 import re
+
 from rapidfuzz import fuzz
+
 from eidr_core.normalize import norm_title
 
 _ROMAN = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6, "vii": 7,
@@ -43,11 +45,15 @@ _NUM_TOKEN = (r"(?:[0-9]{1,2}(?:st|nd|rd|th)?|[ivx]{1,4}|"
               + "|".join(list(_SPELLED)[1:] + list(_ORDINAL)) + r")")
 
 # "part" in several languages (Teil = German, partie = French, etc.)
-_PART_WORD = r"(?:part|pt|teil|partie|parte|deel|del|dele|chapter|ch|chapitre|kapitel|capitulo|episode|episodio|episode|folge|avsnitt|osa|book|vol|volume)"
-_PART = re.compile(r"^(.*?)[\s,:;.\-]+" + _PART_WORD + r"\.?\s*(" + _NUM_TOKEN + r")\s*$", re.I)
+_PART_WORD = (r"(?:part|pt|teil|partie|parte|deel|del|dele|chapter|ch|chapitre"
+              r"|kapitel|capitulo|episode|episodio|episode|folge|avsnitt|osa"
+              r"|book|vol|volume)")
+_PART = re.compile(
+    r"^(.*?)[\s,:;.\-]+" + _PART_WORD + r"\.?\s*(" + _NUM_TOKEN + r")\s*$", re.I)
 # Nordic/postfix form: the number precedes the part word ("3. del", "2. Del",
 # "3 osa"). The ordinal dot after the digit is optional.
-_PART_POST = re.compile(r"^(.*?)[\s,:;.\-]+(" + _NUM_TOKEN + r")\.?\s*" + _PART_WORD + r"\s*$", re.I)
+_PART_POST = re.compile(
+    r"^(.*?)[\s,:;.\-]+(" + _NUM_TOKEN + r")\.?\s*" + _PART_WORD + r"\s*$", re.I)
 # Mid-title numbering: the part number sits between the base and a subtitle
 # ("Miserabili 2: Tempesta su Parigi", "Kampf um Rom II - Der Verrat"). Only
 # 1-2 digit or roman tokens qualify (years never match), and both a base and a
@@ -168,9 +174,7 @@ def select_titles(titles):
             return False
         if getattr(t, "system_generated", False):
             return False
-        if (getattr(t, "title_class", "") or "").strip().lower() == "internal":
-            return False
-        return True
+        return (getattr(t, "title_class", "") or "").strip().lower() != "internal"
     real = [t for t in titles if is_real(t)]
     if real:
         return real, False

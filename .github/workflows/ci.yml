@@ -35,5 +35,17 @@ jobs:
         # is unrelated to this repo's own correctness and would make CI
         # fail on the SDK's release cadence rather than eidr-core's.
 
+      # GATING, not advisory. eidr-core ships py.typed, so consumers' type
+      # checkers (eidr-wikidata's mypy today) read this package's real
+      # annotations — publishing a typed contract without verifying it means
+      # any push here can silently turn a consumer's CI red (T4, handoff
+      # 2026-08-09). Tool versions are pinned in the dev extra so a tool
+      # release can't fail this job without a code change.
+      - name: Lint (ruff)
+        run: ruff check src/ tests/ tools/
+
+      - name: Type check (mypy)
+        run: mypy src/eidr_core
+
       - name: Run tests
         run: pytest tests/ -q

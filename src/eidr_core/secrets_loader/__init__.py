@@ -34,8 +34,9 @@ import json
 import os
 import re
 import sys
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any, overload
 
 
 class SecretsError(RuntimeError):
@@ -46,6 +47,13 @@ def _truthy(val: str | None) -> bool:
     return str(val or "").strip().lower() in ("1", "true", "yes", "on")
 
 
+# Overloaded so a non-None default yields a non-Optional return — callers
+# passing a literal default (default_local_path, default_region, ...) hand
+# the result straight to Path()/load_aws(), which reject None.
+@overload
+def _first_env(names: Sequence[str], default: str) -> str: ...
+@overload
+def _first_env(names: Sequence[str], default: str | None = None) -> str | None: ...
 def _first_env(names: Sequence[str], default: str | None = None) -> str | None:
     for n in names:
         v = os.getenv(n)

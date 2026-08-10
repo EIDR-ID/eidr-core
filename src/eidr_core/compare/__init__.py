@@ -19,24 +19,33 @@ compare-spec.json). BMR-Review keeps thin re-export shims so its internal
 imports and the engine-tuning workflow are unchanged.
 """
 from dataclasses import dataclass
-from typing import Optional
+
 from rapidfuzz import fuzz
+
+from eidr_core.normalize import (
+    days_between,
+    norm_code,  # noqa: F401 — re-exported; BMR-Review's compare.py shim star-imports it
+    norm_country,
+    norm_lang,
+    norm_name,
+    norm_title,  # noqa: F401 — re-exported; BMR-Review's compare.py shim star-imports it
+    parse_date,
+    parse_minutes,
+)
 
 from . import _params as config
 from . import nonlinear
-from ._params import set_source as set_params  # public registration API
-from .titles import title_similarity, select_titles, parts_conflict
-from eidr_core.normalize import (norm_title, norm_name, norm_code, norm_lang,
-                        norm_country, parse_date, days_between, parse_minutes)
+from ._params import set_source as set_params  # noqa: F401 — public registration API, re-exported
+from .titles import parts_conflict, select_titles, title_similarity
 
 
 @dataclass
 class FieldResult:
     field: str
-    quality: Optional[float]
+    quality: float | None
     detail: str = ""
     conflict: int = 0
-    meta: dict = None
+    meta: dict | None = None
 
 
 def _fuzzy(a, b):
@@ -343,7 +352,8 @@ def cmp_distribution_number(a, b):
                            "dist differs but full release dates match exactly "
                            "(likely renumbering)")
     return FieldResult("distribution_number", 0.0,
-                       f"distribution number mismatch ({a.distribution_number} != {b.distribution_number})")
+                       f"distribution number mismatch "
+                       f"({a.distribution_number} != {b.distribution_number})")
 
 
 def cmp_house_sequence(a, b):
@@ -371,7 +381,7 @@ def cmp_end_date(a, b):
 
 
 # -------- alt ids (only negative signal) --------
-import re as _re
+
 # Opaque registry-internal id types (no cross-source meaning unless domain-scoped).
 _ALT_OPAQUE = {"proprietary", "baseline", "other", "eidr", ""}
 

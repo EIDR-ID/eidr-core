@@ -61,15 +61,15 @@ differ per consumer and belong above this layer.
 """
 from __future__ import annotations
 
+import contextlib
 import html
 import logging
 import os
 import re
-import shutil
 import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
-from typing import Iterable, Mapping, Optional, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 log = logging.getLogger(__name__)
 
@@ -102,14 +102,14 @@ def count_family(headers: dict[int, str], primary: str) -> int:
         if h == primary:
             best = max(best, 1)
         elif h.startswith(primary + " "):
-            try:
+            # Non-numeric suffix means "not a numbered copy of this family",
+            # not an error — skip it.
+            with contextlib.suppress(ValueError):
                 best = max(best, int(h[len(primary) + 1:]))
-            except ValueError:
-                pass
     return best
 
-def rightmost_in(headers: dict[int, str], members: list[str]) -> Optional[int]:
-    right: Optional[int] = None
+def rightmost_in(headers: dict[int, str], members: list[str]) -> int | None:
+    right: int | None = None
     for col, h in headers.items():
         for m in members:
             if h == m or h.startswith(m + " "):
@@ -209,7 +209,8 @@ def fix_shared_strings(xlsx_path: str) -> None:
                     return si[s]
                 idx = len(sl); si[s] = idx; sl.append(s); return idx
 
-            cell_re = re.compile(rb'(<c\b[^>]*\bt="inlineStr"[^>]*>)(\s*<is>.*?</is>\s*)(</c>)', re.DOTALL)
+            cell_re = re.compile(
+                rb'(<c\b[^>]*\bt="inlineStr"[^>]*>)(\s*<is>.*?</is>\s*)(</c>)', re.DOTALL)
             t_re    = re.compile(rb'<t(?:\s+[^>]*)?>(.*?)</t>', re.DOTALL)
             changed: dict[str, bytes] = {}
 
@@ -229,7 +230,12 @@ def fix_shared_strings(xlsx_path: str) -> None:
                         except Exception:
                             texts.append(html.unescape(tm.group(1).decode("utf-8", "replace")))
                     idx = _add("".join(texts)); total += 1
-                    return re.sub(rb't="inlineStr"', b't="s"', m.group(1), 1) + \
+                    # count MUST be a keyword: positional `count` is deprecated
+                    # since CPython 3.13 and slated to become a TypeError. On
+                    # 3.14 the positional form emitted a DeprecationWarning per
+                    # rewritten cell — 6,923 per eidr-wikidata test run (T1,
+                    # HANDOFF 2026-08-09).
+                    return re.sub(rb't="inlineStr"', b't="s"', m.group(1), count=1) + \
                            f"<v>{idx}</v>".encode() + m.group(3)
 
                 changed[part] = cell_re.sub(_sub, xml)
@@ -285,7 +291,7 @@ def fix_shared_strings(xlsx_path: str) -> None:
 def read_sheet(path: str, sheet_name: str, *,
                header_row: int = HEADER_ROW,
                data_start: int = DATA_START,
-               stop: Optional[str] = None,
+               stop: str | None = None,
                ) -> tuple[dict[int, str], list[dict[str, object]]]:
     """Read one BMR sheet: ``(headers, rows)``.
 
@@ -388,11 +394,11 @@ class RepeatPlan:
     carry one group even for families empty across the whole set.
     """
 
-    def __init__(self, minimums: Optional[Mapping[str, int]] = None):
+    def __init__(self, minimums: Mapping[str, int] | None = None):
         self.counts: dict[str, int] = {}
         self.minimums: dict[str, int] = dict(minimums or {})
 
-    def bump(self, family: str, n: Optional[int]) -> None:
+    def bump(self, family: str, n: int | None) -> None:
         if n is None:
             return
         self.counts[family] = max(self.counts.get(family, 0), int(n))

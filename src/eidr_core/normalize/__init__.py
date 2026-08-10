@@ -9,13 +9,13 @@ fuzzy comparison, not to be exhaustive.
 import re
 import unicodedata
 
-from .aliases import alias_title, alias_name
-
 # EIDR country code-set crosswalk (SU→SUHH, …), single-homed in eidr_core so
 # eidr-wikidata and BMR-Review share ONE map (register R1 / OVERLAPS.md 9a).
 # Exposed here as canon_country: uppercase-canonical, preserves "XX",
 # empty→"". Used by cmp_countries (via norm_country) and the Series gate.
 from eidr_core.codes import normalize_country_code as canon_country
+
+from .aliases import alias_name, alias_title
 
 # Leading articles to strip (extend per-language as needed).
 _ARTICLES = {

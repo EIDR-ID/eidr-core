@@ -91,7 +91,7 @@ never pay for the SDK import or the httpx transport.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 # Re-exported so callers get the factory and the verdict reader from one
 # import. Stdlib-only, so this costs nothing to consumers that never write
@@ -134,7 +134,7 @@ log = logging.getLogger(__name__)
 DEFAULT_REGISTRY = "sandbox2"
 
 
-def build_registry_credentials(secrets: Optional[dict] = None) -> "_SDKCredentials":
+def build_registry_credentials(secrets: dict | None = None) -> _SDKCredentials:
     """
     Build SDK ``Credentials`` from the project's loaded secrets dict
     (the same shape ``load_secrets`` returns), falling back to the
@@ -213,12 +213,14 @@ def build_registry_credentials(secrets: Optional[dict] = None) -> "_SDKCredentia
 def get_registry_client(
     *,
     registry: str = DEFAULT_REGISTRY,
-    credentials: Optional["_SDKCredentials"] = None,
-    secrets: Optional[dict] = None,
-    transport_config: Optional[Any] = None,
-    tracing: Optional[Any] = None,
+    credentials: _SDKCredentials | None = None,
+    secrets: dict | None = None,
+    transport_config: Any | None = None,
+    tracing: Any | None = None,
     enforce_superparty_gate: bool = True,
-) -> "_SDKClient":
+    # type-ignore: the SDK exports Client conditionally (the [client] extra),
+    # so mypy sees a variable, not a class, whenever `eidr` is installed.
+) -> _SDKClient:  # type: ignore[valid-type]
     """
     Construct a configured SDK ``Client`` ready for context-manager use.
 
@@ -255,7 +257,7 @@ def get_registry_client(
         ``ImportError`` if the SDK is not installed with the
         ``[client]`` extra (httpx).
     """
-    from eidr import Client, registries  # lazy
+    from eidr import Client  # lazy
 
     if credentials is None:
         credentials = build_registry_credentials(secrets)
@@ -268,7 +270,7 @@ def get_registry_client(
     if isinstance(registry, str) and not registry.startswith(("http://", "https://")):
         registry_target = registry.lower()
 
-    return Client(
+    return Client(  # type: ignore[operator]  # same conditional-export story as above
         registry=registry_target,
         credentials=credentials,
         transport_config=transport_config,

@@ -11,8 +11,8 @@ Symbols ('&', '+') are handled in normalize.py (-> "and") before tokenising, so
 they are dropped from the token maps here.
 """
 import csv
-import os
 import functools
+import os
 
 _DATA = os.path.join(os.path.dirname(__file__), "data", "word_alias.csv")
 

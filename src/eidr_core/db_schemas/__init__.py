@@ -21,13 +21,13 @@ query layer (register decision, reaffirmed 2026-08-03).
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+from functools import cache
 from importlib.resources import files
 
 DATABASES = ("eidr_mirror_db", "eidr_dq_db", "language_registry")
 
 
-@lru_cache(maxsize=None)
+@cache
 def load_manifest(database: str) -> dict:
     """Load a database's schema manifest. Raises KeyError for unknown names."""
     if database not in DATABASES:

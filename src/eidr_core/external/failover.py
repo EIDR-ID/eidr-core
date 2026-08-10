@@ -150,9 +150,7 @@ def is_bad_query_error(exc: Exception) -> bool:
         return True
     if "Invalid SPARQL query" in s:
         return True
-    if "Bad Request" in s and "SPARQL" in s:
-        return True
-    return False
+    return "Bad Request" in s and "SPARQL" in s
 
 
 def classify_sparql_error(exc: Exception) -> str:

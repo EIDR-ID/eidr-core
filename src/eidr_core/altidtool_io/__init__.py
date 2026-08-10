@@ -25,7 +25,8 @@ and its own columns) and is deliberately NOT unified here.
 """
 from __future__ import annotations
 
-from typing import Iterable, NamedTuple
+from collections.abc import Iterable
+from typing import NamedTuple
 
 __all__ = ["AltIdRow", "format_line", "write_lines", "parse_line"]
 

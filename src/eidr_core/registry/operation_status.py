@@ -56,9 +56,11 @@ working even if the SDK's own parsing changes underneath us.
 
 from __future__ import annotations
 
+import contextlib
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any, Iterator
+from typing import Any
 
 __all__ = [
     "CODE_SUCCESS",
@@ -183,10 +185,8 @@ def token_operation_status(token: Any) -> OperationStatus | None:
     reached one or the poll failed. Callers deciding whether to retry
     should treat it as "ask again later", not as either outcome.
     """
-    try:
+    with contextlib.suppress(Exception):  # see docstring: never fail the caller
         token.poll()
-    except Exception:  # noqa: BLE001 — see docstring: never fail the caller
-        pass
     resp = getattr(token, "last_response", None)
     return parse_operation_status(getattr(resp, "raw_body", None),
                                   getattr(token, "value", "") or "")

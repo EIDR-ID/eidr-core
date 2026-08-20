@@ -1,8 +1,8 @@
 {
  "$spec": {
   "name": "compare-spec",
-  "version": "2.1.0",
-  "updated": "2026-08-05",
+  "version": "2.3.0",
+  "updated": "2026-08-20",
   "doc": "Versioned runtime configuration of the unified match-candidate evaluation engine (eidr-core/specs/unified-scoring.md). THE portfolio's cross-tool tuning artifact, GENERATED from BMR-Review eidr_dedup_score/config.py by that repo's regen_compare_spec.py — config.py is the authoring surface (tune THERE, bump COMPARE_SPEC_VERSION, regenerate; direction inverted 2026-08-05). A version change is the cross-tool signal to regenerate golden-pair expectations. Curated rationale in compare-spec.md; full inline annotations live in config.py itself.",
   "loader": "eidr_core.compare.spec.load_spec",
   "consumers": [
@@ -168,6 +168,8 @@
    "version_language": 0.99,
    "edit_class": 0.99
   },
+  "CROSSTYPE_REVIEW_FLOOR": true,
+  "CROSSTYPE_TITLE_STRONG": 1.05,
   "CROSS_SEASON_SEASON_TOL": 1,
   "CROSS_SEASON_TITLE_SIM": 0.8,
   "CROSS_SEASON_YEAR_TOL": 1,
@@ -219,6 +221,7 @@
   "IMDB_OUTLIER_BELOW": 0.5,
   "NAME_MATCH_MIN": 0.8,
   "NL_MODIFIER": 0.75,
+  "NOMATCH_REVIEW_FLOOR": 25.0,
   "OUTPUT_KNOTS": [
    0.0,
    30.0,

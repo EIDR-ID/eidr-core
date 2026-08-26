@@ -27,8 +27,17 @@ duplicated.
 
 READER HALF (added 2026-08-06, register R3 tail):
 
-* ``read_sheet(path, sheet_name, ...)`` — streaming sheet read: header-row
-  map + one ``{header: value}`` dict per data row. Canonical semantics =
+* ``open_sheet(path, sheet_name, ...)`` — STREAMING context manager
+  yielding ``(headers, rows)``, where rows is a lazy iterator of
+  ``(row_number, {header: value})``. Contributed by BMRtoAltID 2026-08-26
+  for sheets too large to materialize (60k rows x 500+ columns). Emits
+  absolute sheet row numbers, which cannot be reconstructed downstream
+  once ``stop=None`` has skipped blanks and which any consumer reporting
+  a defect to a human needs.
+* ``read_sheet(path, sheet_name, ...)`` — the materializing form: a thin
+  ``list()`` over ``open_sheet``, so both share ONE implementation of the
+  header policy and the stop rules. Header-row map + one
+  ``{header: value}`` dict per data row. Canonical semantics =
   eidr-wikidata ``scripts/combine_bmr_sheets.py::_read_chunk`` (the only
   reader that was already built on this module's constants). The two other
   portfolio readers stop early instead of reading everything, so the stop
@@ -69,7 +78,7 @@ import re
 import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 
 log = logging.getLogger(__name__)
 
@@ -83,7 +92,8 @@ DATA_START = 4
 __all__ = ["HEADER_ROW", "DATA_START", "read_headers", "count_family",
            "rightmost_in", "expand_family", "transplant",
            "fix_shared_strings",
-           "read_sheet", "family_layout", "RepeatPlan", "pad_groups"]
+           "open_sheet", "read_sheet", "family_layout", "RepeatPlan",
+           "pad_groups"]
 
 
 def _header_map(values: Iterable) -> dict[int, str]:
@@ -332,30 +342,45 @@ def fix_shared_strings(xlsx_path: str) -> None:
 # Reader half (2026-08-06)
 # ---------------------------------------------------------------------------
 
-def read_sheet(path: str, sheet_name: str, *,
+@contextlib.contextmanager
+def open_sheet(path: str, sheet_name: str, *,
                header_row: int = HEADER_ROW,
                data_start: int = DATA_START,
                stop: str | None = None,
-               ) -> tuple[dict[int, str], list[dict[str, object]]]:
-    """Read one BMR sheet: ``(headers, rows)``.
+               ) -> Iterator[tuple[dict[int, str],
+                                   Iterator[tuple[int, dict[str, object]]]]]:
+    """Open one BMR sheet for STREAMING reads: ``(headers, rows)``.
+
+    Contributed by BMRtoAltID 2026-08-26 (`HANDOFF-bmr-io-streaming.md`),
+    whose production sheets reach 60k rows by 500+ columns — roughly 39M
+    dict entries if fully materialized, which is multi-GB before the
+    values themselves. ``read_sheet``'s materializing shape is right for
+    the chunked path it was seeded from and unusable for that one.
+
+    A context manager, because the workbook handle has to outlive the
+    header map: ``read_only`` mode holds an open file (and, for a zip64
+    sheet, a temp file) that must be released deterministically. On
+    Windows an unclosed handle keeps the .xlsx locked against the
+    operator's own Excel, so the ``with`` block is not a formality — a
+    bare generator would leave closing to garbage collection.
 
     ``headers`` is ``{1-based INTEGER column: header text}`` (trimmed,
-    blanks skipped, NO truncation at header gaps — spacer columns don't
-    hide the columns to their right). The integer key is a CONTRACT:
-    consumers recover sheet order with ``[h[c] for c in sorted(h)]``,
-    which column letters would break past Z (see ``_header_map``).
-    ``rows`` is one ``{header: value}``
-    dict per data row; blank cells are simply absent from the dict, so
-    the blank sentinel is the consumer's choice (``row.get(h)`` vs
-    ``row.get(h, "")``).
+    blanks skipped, NO truncation at header gaps) and is fully
+    materialized before the block body runs, so a consumer can plan its
+    column layout up front. The integer key is a CONTRACT — see
+    ``_header_map``.
 
-    ``stop`` selects the end-of-data rule (see module docstring). With
-    ``stop=None`` fully-blank rows are skipped, not terminal — chunked
-    BMR output carries trailing pre-allocated empty rows.
+    ``rows`` yields ``(row_number, {header: value})`` LAZILY and is valid
+    ONLY inside the ``with`` block. ``row_number`` is the sheet's own
+    1-based absolute row, so it JUMPS over rows ``stop=None`` skipped:
+    it cannot be reconstructed downstream, and a consumer reporting a
+    defect to a human must be able to name the row they see in Excel.
+    Blank cells are absent from the dict, so the blank sentinel is the
+    consumer's choice (``row.get(h)`` vs ``row.get(h, "")``).
 
-    Streaming ``read_only`` mode throughout: ``ws.cell(r, c)`` in
-    read-only mode is O(N) per access because openpyxl rescans the
-    worksheet stream each time; ``iter_rows`` walks it once.
+    ``stop`` selects the end-of-data rule (see module docstring) and is
+    validated BEFORE the workbook is opened, so a typo fails without
+    leaving a handle behind.
     """
     if stop not in (None, "blank_row", "blank_first_col"):
         raise ValueError(f"unknown stop rule: {stop!r}")
@@ -383,27 +408,58 @@ def read_sheet(path: str, sheet_name: str, *,
         n_cols = max(headers, default=0)
         headers_by_pos = [headers.get(i + 1) for i in range(n_cols)]
 
-        rows: list[dict[str, object]] = []
-        for row_vals in ws.iter_rows(min_row=data_start, values_only=True):
-            if stop == "blank_first_col":
-                first = row_vals[0] if row_vals else None
-                if first is None or (isinstance(first, str) and not first.strip()):
-                    break
-            row_dict: dict[str, object] = {}
-            for i, val in enumerate(row_vals[:n_cols]):
-                if val is None or val == "":
-                    continue
-                hdr = headers_by_pos[i]
-                if hdr:
-                    row_dict[hdr] = val
-            if not row_dict:
-                if stop == "blank_row":
-                    break
-                continue    # stop=None: blank row is skippable padding
-            rows.append(row_dict)
-        return headers, rows
+        def _rows() -> Iterator[tuple[int, dict[str, object]]]:
+            for offset, row_vals in enumerate(
+                    ws.iter_rows(min_row=data_start, values_only=True)):
+                row_no = data_start + offset
+                if stop == "blank_first_col":
+                    first = row_vals[0] if row_vals else None
+                    if first is None or (isinstance(first, str)
+                                         and not first.strip()):
+                        break
+                row_dict: dict[str, object] = {}
+                for i, val in enumerate(row_vals[:n_cols]):
+                    if val is None or val == "":
+                        continue
+                    hdr = headers_by_pos[i]
+                    if hdr:
+                        row_dict[hdr] = val
+                if not row_dict:
+                    if stop == "blank_row":
+                        break
+                    continue    # stop=None: blank row is skippable padding
+                yield row_no, row_dict
+
+        yield headers, _rows()
     finally:
         wb.close()
+
+
+def read_sheet(path: str, sheet_name: str, *,
+               header_row: int = HEADER_ROW,
+               data_start: int = DATA_START,
+               stop: str | None = None,
+               ) -> tuple[dict[int, str], list[dict[str, object]]]:
+    """Read one BMR sheet: ``(headers, rows)``, rows fully materialized.
+
+    Identical semantics to :func:`open_sheet` — a thin ``list()`` over
+    it, so the header policy and all three stop rules keep exactly ONE
+    implementation and the two entry points cannot drift — minus the row
+    numbers, which predate that call and no existing caller asked for
+    (adding them here would be a breaking change).
+
+    ``headers`` is ``{1-based INTEGER column: header text}``; the integer
+    key is a CONTRACT consumers sort on to recover sheet order (see
+    ``_header_map``). ``rows`` is one ``{header: value}`` dict per data
+    row, blank cells absent.
+
+    Prefer ``open_sheet`` when the sheet may be large enough that holding
+    every row costs more than the convenience is worth — a 60k-row,
+    500-column BMR sheet is multi-GB here.
+    """
+    with open_sheet(path, sheet_name, header_row=header_row,
+                    data_start=data_start, stop=stop) as (headers, rows):
+        return headers, [row for _row_no, row in rows]
 
 
 def family_layout(header_names: Iterable[str], members: Sequence[str],

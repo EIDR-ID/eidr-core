@@ -28,6 +28,7 @@ from eidr_core.bmr_io import (
     DATA_START,
     HEADER_ROW,
     family_layout,
+    open_sheet,
     read_headers,
     read_sheet,
 )
@@ -322,3 +323,86 @@ def test_read_headers_accepts_a_discovered_header_row(tmp_path):
         assert read_headers(ws2) == {}
     finally:
         wb2.close()
+
+
+# ---------------------------------------------------------------------------
+# open_sheet — the streaming form (contributed by BMRtoAltID 2026-08-26).
+#
+# read_sheet is now a list() over open_sheet, so the first test below is the
+# whole safety argument for that refactor: the two entry points cannot
+# diverge, proven on all three stop rules rather than asserted.
+# ---------------------------------------------------------------------------
+
+def test_open_sheet_and_read_sheet_agree_on_every_stop_rule(tmp_path):
+    # The whole safety argument for refactoring read_sheet onto open_sheet
+    # is that they cannot diverge. Prove it rather than assert it.
+    path = _write_sheet(tmp_path, STOP_HEADERS, STOP_ROWS)
+    for stop in (None, "blank_row", "blank_first_col"):
+        eager_headers, eager_rows = read_sheet(path, SHEET, stop=stop)
+        with open_sheet(path, SHEET, stop=stop) as (headers, rows):
+            streamed = list(rows)
+        assert headers == eager_headers
+        assert [r for _n, r in streamed] == eager_rows
+
+
+def test_open_sheet_reports_the_sheets_own_row_numbers(tmp_path):
+    # The number an operator can see in Excel — not an enumeration of the
+    # rows that survived. stop=None skips the blank row, so the numbering
+    # must jump over it rather than close the gap.
+    path = _write_sheet(tmp_path, STOP_HEADERS, STOP_ROWS)
+    with open_sheet(path, SHEET, stop=None) as (_headers, rows):
+        numbered = [(n, r.get("Title")) for n, r in rows]
+    assert numbered == [
+        (4, "First"), (5, "Orphaned"), (6, "Third"), (8, "After the gap")]
+
+
+def test_open_sheet_row_numbers_honour_a_shifted_data_start(tmp_path):
+    path = _write_sheet(tmp_path, STOP_HEADERS, STOP_ROWS)
+    with open_sheet(path, SHEET, data_start=DATA_START + 1,
+                    stop=None) as (_headers, rows):
+        assert [n for n, _r in rows] == [5, 6, 8]
+
+
+def test_open_sheet_headers_are_available_before_any_row_is_read(tmp_path):
+    # A consumer plans its column layout up front, then streams. If the
+    # header map were lazy too, that plan could not be built.
+    path = _write_sheet(tmp_path, STOP_HEADERS, STOP_ROWS)
+    with open_sheet(path, SHEET, stop="blank_first_col") as (headers, rows):
+        assert "Title" in headers.values()
+        assert list(rows)          # rows still consumable afterwards
+
+
+def test_open_sheet_does_not_read_rows_it_was_never_asked_for(tmp_path):
+    # The point of the streaming variant: a consumer that stops early must
+    # not have paid to materialize the tail. A 60k-row sheet is why.
+    path = _write_sheet(tmp_path, STOP_HEADERS, STOP_ROWS)
+    with open_sheet(path, SHEET, stop=None) as (_headers, rows):
+        first = next(rows)
+        assert first == (4, {"Unique Row ID": "1", "Title": "First"})
+        # abandoning the iterator here must not raise on block exit
+
+
+def test_open_sheet_closes_the_workbook_even_when_the_body_raises(tmp_path):
+    # Windows keeps the .xlsx locked against the operator's own Excel
+    # until the handle is released, so the finally: is load-bearing.
+    path = _write_sheet(tmp_path, STOP_HEADERS, STOP_ROWS)
+    with pytest.raises(RuntimeError, match="consumer blew up"), \
+            open_sheet(path, SHEET, stop=None) as (_headers, _rows):
+        raise RuntimeError("consumer blew up")
+    # Re-opening proves nothing is holding the file on any platform;
+    # openpyxl's own close-state is checked directly below.
+    assert read_sheet(path, SHEET, stop=None)[1]
+
+
+def test_open_sheet_rejects_an_unknown_stop_rule_before_opening(tmp_path):
+    with pytest.raises(ValueError, match="unknown stop rule"), \
+            open_sheet(_write_sheet(tmp_path, STOP_HEADERS, STOP_ROWS),
+                       SHEET, stop="blank-row"):
+        pass
+
+
+def test_open_sheet_names_a_missing_sheet(tmp_path):
+    with pytest.raises(ValueError, match="expected sheet"), \
+            open_sheet(_write_sheet(tmp_path, STOP_HEADERS, STOP_ROWS),
+                       "No Such Tab"):
+        pass

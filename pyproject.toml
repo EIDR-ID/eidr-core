@@ -4,11 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
-# Bumped for a dev-tooling-only change (2026-08-10, 0.13.2): no runtime code
+# 0.14.0 (2026-08-25): new public API surface — read_headers grew a
+# header_row= parameter (compatible default) so a consumer that DISCOVERS
+# its header row can stop keeping a second implementation (register R3).
+# Minor, not patch: consumers pin @main so the number is informational, but
+# it should still say "something was added" rather than "something was
+# fixed".
+# Prior note, 0.13.2 (2026-08-10): a dev-tooling-only bump — no runtime code
 # moved, but T6 makes this repo's CI gate the precondition for consumers
 # pinning @main, so WHICH checker verified the py.typed annotations is part
-# of what this version identifies.
-version = "0.13.2"
+# of what that version identifies.
+version = "0.14.0"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers

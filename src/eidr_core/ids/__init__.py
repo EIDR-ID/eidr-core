@@ -23,17 +23,19 @@ answer to that class is: one implementation, centrally tested.
 
 WHAT IS DELIBERATELY NOT HERE
 -----------------------------
-**Party IDs (``10.5237/``) are NOT validated.** The proposal suggested
-covering them "same checksum over a different shape". That was tested
-against the only two samples in the portfolio
-(``10.5237/9DD9-E249``, ``10.5237/2FE2-24F2``, both in
-BulkMatchRegister's test fixtures) on the obvious reading — last character
-is the check — and BOTH failed. Either the shape differs, the checksum is
-applied over different input, or those fixtures are synthetic. Shipping a
-guess here would recreate precisely the failure this module exists to
-prevent, so party validation waits for confirmed real vectors. Until
-then, callers must not infer that a party ID passing ``fault() is None``
-means anything — it will raise on the prefix instead.
+**Party IDs (``10.5237/``) are NOT validated. DEFERRED by the operator
+(2026-08-26) to the command-line tools work — do not re-litigate it here
+in the meantime.** The original proposal suggested covering them "same
+checksum over a different shape". That was tested against the only two
+samples in the portfolio (``10.5237/9DD9-E249``, ``10.5237/2FE2-24F2``,
+both in BulkMatchRegister's test fixtures) on the obvious reading — last
+character is the check — and BOTH failed. Either the shape differs, the
+checksum is applied over different input, or those fixtures are
+synthetic. Shipping a guess here would recreate precisely the failure
+this module exists to prevent. What it needs is confirmed real party-ID
+vectors, which the CLI work is expected to supply. Until then a party ID
+fails ``fault()`` as a *malformed content ID* — callers must not read
+that as a verdict about the party ID itself.
 
 TEST VECTORS
 ------------

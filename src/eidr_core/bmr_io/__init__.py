@@ -86,15 +86,47 @@ __all__ = ["HEADER_ROW", "DATA_START", "read_headers", "count_family",
            "read_sheet", "family_layout", "RepeatPlan", "pad_groups"]
 
 
-def read_headers(ws) -> dict[int, str]:
+def _header_map(values: Iterable) -> dict[int, str]:
+    """THE header-row policy, in one place: ``{1-based column: header}``.
+
+    Blank and whitespace-only cells are skipped but do NOT stop the scan,
+    and surviving columns keep their TRUE indices — a spacer must never
+    hide, or renumber, the columns to its right. That single rule is the
+    whole reason the shared reader exists (register R3: XML_to_JSON's two
+    hand-rolled scans each broke at the first blank cell).
+
+    Takes raw values rather than a worksheet because the two callers
+    reach the row differently for a real reason — ``read_headers`` random-
+    accesses a live worksheet, ``read_sheet`` streams in read-only mode
+    where ``ws.cell`` is O(N) per access. Only the ACCESS differs; the
+    policy is identical, so it lives here rather than in both.
+    """
     out: dict[int, str] = {}
-    for c in range(1, ws.max_column + 1):
-        v = ws.cell(HEADER_ROW, c).value
-        if v is not None:
-            s = str(v).strip()
-            if s:
-                out[c] = s
+    for col_idx, v in enumerate(values, 1):
+        if v is None:
+            continue
+        s = str(v).strip()
+        if s:
+            out[col_idx] = s
     return out
+
+
+def read_headers(ws, header_row: int = HEADER_ROW) -> dict[int, str]:
+    """Header map ``{1-based column: header text}`` from a live worksheet.
+
+    ``header_row`` defaults to the template's row 3. It is a parameter
+    because a consumer may DISCOVER the header row instead of assuming it
+    — BMR-Review reads workbooks that have been round-tripped through
+    review and locates row 3 by searching for ``Unique Row ID``. Without
+    this argument that consumer could not adopt the shared reader at all,
+    which is how it came to keep its own copy (register R3, 2026-08-25).
+
+    For a path rather than an open worksheet, use ``read_sheet``, which
+    also returns the data rows and streams instead of random-accessing.
+    """
+    return _header_map(
+        ws.cell(header_row, c).value for c in range(1, ws.max_column + 1)
+    )
 
 def count_family(headers: dict[int, str], primary: str) -> int:
     best = 0
@@ -328,12 +360,9 @@ def read_sheet(path: str, sheet_name: str, *,
         headers: dict[int, str] = {}
         for row_vals in ws.iter_rows(min_row=header_row, max_row=header_row,
                                      values_only=True):
-            for col_idx, v in enumerate(row_vals, 1):
-                if v is None:
-                    continue
-                s = str(v).strip()
-                if s:
-                    headers[col_idx] = s
+            # Same policy as read_headers, shared via _header_map — only
+            # the row ACCESS differs (streaming here, random-access there).
+            headers = _header_map(row_vals)
             break
 
         n_cols = max(headers, default=0)

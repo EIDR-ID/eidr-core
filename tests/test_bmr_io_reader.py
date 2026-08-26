@@ -24,7 +24,13 @@ from __future__ import annotations
 
 import pytest
 
-from eidr_core.bmr_io import DATA_START, HEADER_ROW, family_layout, read_sheet
+from eidr_core.bmr_io import (
+    DATA_START,
+    HEADER_ROW,
+    family_layout,
+    read_headers,
+    read_sheet,
+)
 
 # openpyxl is the `bmr` extra — the reader half is the only part of bmr_io
 # that needs it, so a base install legitimately cannot run these.
@@ -224,3 +230,63 @@ def test_missing_sheet_names_what_it_found(tmp_path):
     with pytest.raises(ValueError, match="expected sheet"):
         read_sheet(_write_sheet(tmp_path, STOP_HEADERS, STOP_ROWS),
                    "No Such Tab")
+
+
+# ---------------------------------------------------------------------------
+# One header policy, two entry points (reconciled 2026-08-25).
+#
+# `read_headers` (live worksheet, random access) and `read_sheet` (path,
+# streaming read-only) reach the header row differently for a real
+# performance reason, but must agree on what a header IS. They duplicated
+# that policy until both were routed through `_header_map`; these pin the
+# agreement so the copies cannot re-diverge silently.
+# ---------------------------------------------------------------------------
+
+def test_both_entry_points_return_the_same_header_map(tmp_path):
+    hdrs = ["Unique Row ID", "Title", None, "  Padded  ", "", "Release Date"]
+    path = _write_sheet(tmp_path, hdrs, [["1", "A", None, "x", None, "2020"]])
+
+    from_sheet, _ = read_sheet(path, SHEET)
+    wb = openpyxl.load_workbook(path)          # live worksheet, not read-only
+    try:
+        from_ws = read_headers(wb[SHEET])
+    finally:
+        wb.close()
+
+    assert from_ws == from_sheet
+    # ...and both apply the policy: trimmed, blanks skipped, true indices.
+    assert from_ws == {1: "Unique Row ID", 2: "Title", 4: "Padded",
+                       6: "Release Date"}
+
+
+def test_read_headers_accepts_a_discovered_header_row(tmp_path):
+    """The parameter that lets BMR-Review adopt the shared reader.
+
+    Its workbooks come back from review with the header row no longer
+    reliably at row 3, so it locates the row by searching for a known
+    column. Before this argument existed the shared reader simply could
+    not serve that caller, which is why a second implementation survived.
+    """
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = SHEET
+    # Header row pushed to row 5 by two inserted banner rows.
+    for col, val in enumerate(["Unique Row ID", None, "Title"], 1):
+        if val:
+            ws.cell(5, col).value = val
+    p = str(tmp_path / "shifted.xlsx")
+    wb.save(p)
+
+    wb2 = openpyxl.load_workbook(p)
+    try:
+        ws2 = wb2[SHEET]
+        found = next(r for r in range(1, ws2.max_row + 1)
+                     if any(ws2.cell(r, c).value == "Unique Row ID"
+                            for c in range(1, ws2.max_column + 1)))
+        assert found == 5
+        assert read_headers(ws2, found) == {1: "Unique Row ID", 3: "Title"}
+        # The default still points at the template's row 3, which is empty
+        # here — the parameter widens the contract without changing it.
+        assert read_headers(ws2) == {}
+    finally:
+        wb2.close()

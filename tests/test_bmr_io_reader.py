@@ -259,6 +259,38 @@ def test_both_entry_points_return_the_same_header_map(tmp_path):
                        6: "Release Date"}
 
 
+def test_header_order_is_sheet_order_past_column_z(tmp_path):
+    """The integer-key contract, asserted the way consumers rely on it.
+
+    Both XML_to_JSON call sites recover sheet order with
+    ``[m[c] for c in sorted(m)]``. That identity holds only because the
+    keys are integers: as column LETTERS, ``'AA'`` sorts before ``'B'``
+    and everything past Z is silently reordered — values follow their
+    misplaced headers, presenting as a data-mapping bug in the consumer
+    with nothing pointing back at bmr_io. Stock templates reach 602
+    columns, so this is well past hypothetical.
+
+    Asserted against an independently constructed expectation rather than
+    anything derived from the reader, so it fails on scrambling rather
+    than agreeing with it.
+    """
+    names = [f"Col {i:03d}" for i in range(1, 61)]   # 60 cols: A..BH
+    path = _write_sheet(tmp_path, names, [[f"v{i:03d}" for i in range(1, 61)]])
+
+    headers, rows = read_sheet(path, SHEET)
+    assert [headers[c] for c in sorted(headers)] == names
+    assert sorted(headers) == list(range(1, 61))     # ints, contiguous
+
+    wb = openpyxl.load_workbook(path)
+    try:
+        from_ws = read_headers(wb[SHEET])
+    finally:
+        wb.close()
+    assert [from_ws[c] for c in sorted(from_ws)] == names
+    # Values still track their own headers past Z.
+    assert rows[0]["Col 060"] == "v060"
+
+
 def test_read_headers_accepts_a_discovered_header_row(tmp_path):
     """The parameter that lets BMR-Review adopt the shared reader.
 

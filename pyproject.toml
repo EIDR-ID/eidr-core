@@ -4,6 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
+# 0.15.0 (2026-08-26): new MODULE — eidr_core.ids (EIDR Content ID syntax +
+# ISO 7064 Mod 37,36 check character), accepted from BMR-Review over R13's
+# second-consumer rule because the shape is externally specified and a wrong
+# implementation fails silently against real data. Register decision log.
 # 0.14.0 (2026-08-25): new public API surface — read_headers grew a
 # header_row= parameter (compatible default) so a consumer that DISCOVERS
 # its header row can stop keeping a second implementation (register R3).
@@ -14,7 +18,7 @@ name = "eidr-core"
 # moved, but T6 makes this repo's CI gate the precondition for consumers
 # pinning @main, so WHICH checker verified the py.typed annotations is part
 # of what that version identifies.
-version = "0.14.0"
+version = "0.15.0"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers

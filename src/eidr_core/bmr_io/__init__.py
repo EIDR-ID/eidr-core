@@ -89,6 +89,16 @@ __all__ = ["HEADER_ROW", "DATA_START", "read_headers", "count_family",
 def _header_map(values: Iterable) -> dict[int, str]:
     """THE header-row policy, in one place: ``{1-based column: header}``.
 
+    **CONTRACT — the key is an INTEGER column index, never a column
+    letter.** Consumers order the inventory with
+    ``[m[c] for c in sorted(m)]`` to recover sheet order; that identity
+    holds only for integer keys. Letter keys would sort ``'AA'`` before
+    ``'B'``, silently scrambling every column past Z — and stock BMR
+    templates run to 602 columns, so this is not a hypothetical edge.
+    Raised by XML_to_JSON 2026-08-25 (both its call sites depend on it);
+    pinned by ``test_header_order_is_sheet_order_past_column_z``. Do not
+    "modernize" this to openpyxl's own cell addressing.
+
     Blank and whitespace-only cells are skipped but do NOT stop the scan,
     and surviving columns keep their TRUE indices — a spacer must never
     hide, or renumber, the columns to its right. That single rule is the
@@ -112,7 +122,9 @@ def _header_map(values: Iterable) -> dict[int, str]:
 
 
 def read_headers(ws, header_row: int = HEADER_ROW) -> dict[int, str]:
-    """Header map ``{1-based column: header text}`` from a live worksheet.
+    """Header map ``{1-based INTEGER column: header text}`` from a live
+    worksheet. The integer key is a CONTRACT consumers sort on to recover
+    sheet order — see ``_header_map``.
 
     ``header_row`` defaults to the template's row 3. It is a parameter
     because a consumer may DISCOVER the header row instead of assuming it
@@ -327,9 +339,12 @@ def read_sheet(path: str, sheet_name: str, *,
                ) -> tuple[dict[int, str], list[dict[str, object]]]:
     """Read one BMR sheet: ``(headers, rows)``.
 
-    ``headers`` is ``{1-based column: header text}`` (trimmed, blanks
-    skipped, NO truncation at header gaps — spacer columns don't hide
-    the columns to their right). ``rows`` is one ``{header: value}``
+    ``headers`` is ``{1-based INTEGER column: header text}`` (trimmed,
+    blanks skipped, NO truncation at header gaps — spacer columns don't
+    hide the columns to their right). The integer key is a CONTRACT:
+    consumers recover sheet order with ``[h[c] for c in sorted(h)]``,
+    which column letters would break past Z (see ``_header_map``).
+    ``rows`` is one ``{header: value}``
     dict per data row; blank cells are simply absent from the dict, so
     the blank sentinel is the consumer's choice (``row.get(h)`` vs
     ``row.get(h, "")``).

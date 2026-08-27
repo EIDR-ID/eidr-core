@@ -240,3 +240,39 @@ def test_dataclass_is_hashable_and_frozen():
     hash(status)
     with pytest.raises(dataclasses.FrozenInstanceError):
         status.code = 0
+
+
+# ---------------------------------------------------------------------------
+# get_registry_client(writable=...) — raised by eidr-dq 2026-08-27.
+#
+# eidr-dq is read-only against the registry by design and previously passed
+# writable=False when it built the Registry itself. Adopting the factory lost
+# that assertion, turning a guarantee the SDK enforces into a convention the
+# next reader has to re-verify. These pin the ARGUMENT CONTRACT without
+# needing the SDK installed: the guard rejects target shapes that cannot
+# carry the flag, and it does so BEFORE the lazy SDK import.
+# ---------------------------------------------------------------------------
+
+def test_writable_is_rejected_on_a_named_target():
+    from eidr_core.registry import get_registry_client
+    with pytest.raises(ValueError, match="only to a URL registry target"):
+        get_registry_client(registry="sandbox2", writable=False)
+
+
+def test_writable_is_rejected_rather_than_silently_ignored():
+    # The whole point of the argument is to make a safety assertion. Dropping
+    # it on an unsupported target shape would leave the caller believing a
+    # guarantee they do not have -- the exact failure this removes.
+    from eidr_core.registry import get_registry_client
+    with pytest.raises(ValueError):
+        get_registry_client(registry="production", writable=True)
+
+
+def test_omitting_writable_does_not_reach_the_guard():
+    # Default None must leave every existing call site byte-identical. With
+    # no SDK installed the call fails at the lazy import, NOT at the guard --
+    # proving the guard is not on the default path.
+    from eidr_core.registry import get_registry_client
+    with pytest.raises((ImportError, Exception)) as ei:
+        get_registry_client(registry="sandbox2")
+    assert "only to a URL registry target" not in str(ei.value)

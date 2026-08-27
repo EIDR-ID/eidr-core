@@ -4,6 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
+# 0.17.0 (2026-08-27): additive, both raised by eidr-dq while adopting its
+# OPEN_TASKS T1/T2 -- get_registry_client gains writable= (and declares the
+# Registry pass-through that already worked but was undeclared), and the
+# failover signature matching is now case-insensitive. No existing call site
+# changes.
 # 0.16.0 (2026-08-26): bmr_io.open_sheet — the STREAMING reader, contributed
 # by BMRtoAltID for sheets too large to materialize (60k rows x 500+ columns).
 # read_sheet is now a list() over it, so both share one implementation.
@@ -25,7 +30,7 @@ name = "eidr-core"
 # moved, but T6 makes this repo's CI gate the precondition for consumers
 # pinning @main, so WHICH checker verified the py.typed annotations is part
 # of what that version identifies.
-version = "0.16.0"
+version = "0.17.0"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers

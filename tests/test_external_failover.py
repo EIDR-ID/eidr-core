@@ -169,3 +169,40 @@ def test_empty_chain_returns_none_triple():
 ])
 def test_classify_sparql_error(msg, verdict):
     assert classify_sparql_error(RuntimeError(msg)) == verdict
+
+
+# --- case-insensitivity (raised by eidr-dq, 2026-08-27) --------------------
+# The two OUTAGE_SIGNATURES were transcribed from different positions in one
+# observed message, so they disagree about case. Under case-sensitive
+# matching a capitalised variant misses both and degrades to the "429"
+# substring check -- the caller then burns its full retry budget per
+# endpoint re-confirming an outage the memo exists to skip. Silent: the run
+# completes, just slower and with less coverage.
+
+@pytest.mark.parametrize("msg", [
+    "WDQS Outage in progress",
+    "WDQS OUTAGE",
+    "active wdqs outage",                       # the observed casing
+    "AGGRESSIVELY RATE-LIMITING to 1 req / min",
+    "aggressively rate-limiting",
+])
+def test_outage_signatures_match_regardless_of_case(msg):
+    assert classify_sparql_error(RuntimeError(msg)) == OUTAGE
+
+
+@pytest.mark.parametrize("msg", [
+    "QueryBadFormed", "querybadformed", "QUERYBADFORMED",
+    "Invalid SPARQL query", "invalid sparql query",
+    "Bad Request: SPARQL parse failure", "bad request: sparql parse failure",
+])
+def test_bad_query_signatures_match_regardless_of_case(msg):
+    assert classify_sparql_error(RuntimeError(msg)) == NEXT_ENDPOINT
+
+
+def test_case_folding_did_not_break_the_precedence_order():
+    # An outage message containing "429" must still classify OUTAGE, not
+    # RETRY -- the ordering this module depends on, re-checked after the
+    # fold because both branches now lower-case their input.
+    exc = RuntimeError("HTTP 429: Aggressively rate-limiting to 1 req / min "
+                       "- this rule was created during active WDQS Outage")
+    assert classify_sparql_error(exc) == OUTAGE

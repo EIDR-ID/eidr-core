@@ -212,12 +212,13 @@ def build_registry_credentials(secrets: dict | None = None) -> _SDKCredentials:
 
 def get_registry_client(
     *,
-    registry: str = DEFAULT_REGISTRY,
+    registry: str | Any = DEFAULT_REGISTRY,
     credentials: _SDKCredentials | None = None,
     secrets: dict | None = None,
     transport_config: Any | None = None,
     tracing: Any | None = None,
     enforce_superparty_gate: bool = True,
+    writable: bool | None = None,
     # type-ignore: the SDK exports Client conditionally (the [client] extra),
     # so mypy sees a variable, not a class, whenever `eidr` is installed.
 ) -> _SDKClient:  # type: ignore[valid-type]
@@ -228,7 +229,28 @@ def get_registry_client(
         registry: SDK registry selector. ``"sandbox2"`` (default),
             ``"sandbox1"``, ``"production"``, or a custom URL. The
             SDK's ``registries`` module enumerates the known
-            endpoints.
+            endpoints. A fully-built SDK ``Registry`` instance is also
+            accepted and passed straight through — that has always
+            worked at runtime, but was not DECLARED until 2026-08-27,
+            so a consumer with a gating mypy could not use it. Use it
+            as the escape hatch for any target attribute this factory
+            does not model.
+        writable: When not None, assert whether the target may be
+            written to. Applies only when ``registry`` is a URL
+            string: a NAMED target's writability is the SDK's to
+            decide, and a caller who passed a ``Registry`` has
+            already set it themselves. Both of those raise rather
+            than silently ignoring the argument.
+
+            This one attribute is modelled explicitly, rather than
+            left to the ``Registry`` escape hatch, because the write
+            gate is precisely what this module exists to centralize
+            (target selection, credentials, write gate — one place
+            portfolio-wide). ``writable=False`` turns "this program
+            never writes" from a convention the next reader has to
+            verify into an assertion the SDK enforces. Requested by
+            eidr-dq 2026-08-27, which is read-only by design and lost
+            that assertion when it adopted this factory.
         credentials: Optional pre-built ``Credentials``. When None,
             built from ``secrets`` via ``build_registry_credentials``
             (which falls back to ``Credentials.load()`` if no
@@ -257,6 +279,24 @@ def get_registry_client(
         ``ImportError`` if the SDK is not installed with the
         ``[client]`` extra (httpx).
     """
+    # Validate arguments BEFORE the lazy SDK import and before any other
+    # work, so a bad call fails on the argument rather than on a missing
+    # optional dependency. Same discipline as bmr_io.open_sheet's stop rule.
+    #
+    # Raise rather than ignore: a caller passing writable= is making a
+    # safety assertion, and silently dropping it on a target shape that
+    # cannot carry one would leave them believing a guarantee they do not
+    # have — the exact failure mode this argument exists to remove.
+    if writable is not None and not (
+        isinstance(registry, str)
+        and registry.startswith(("http://", "https://"))
+    ):
+        raise ValueError(
+            "writable= applies only to a URL registry target; got "
+            f"{registry!r}. A named target's writability is the SDK's to "
+            "decide, and a Registry instance already carries its own."
+        )
+
     from eidr import Client  # lazy
 
     if credentials is None:
@@ -267,8 +307,19 @@ def get_registry_client(
     # the input for the short-name path so call sites can spell it
     # however they like.
     registry_target: Any = registry
-    if isinstance(registry, str) and not registry.startswith(("http://", "https://")):
+    is_url = isinstance(registry, str) and registry.startswith(("http://", "https://"))
+    if isinstance(registry, str) and not is_url:
         registry_target = registry.lower()
+
+    if writable is not None:
+        from eidr import Registry  # lazy, same as Client
+
+        registry_target = Registry(  # type: ignore[operator]  # conditional export
+            name="CUSTOM",
+            url=registry,
+            writable=writable,
+            description="Configured via eidr_core.registry.get_registry_client",
+        )
 
     return Client(  # type: ignore[operator]  # same conditional-export story as above
         registry=registry_target,

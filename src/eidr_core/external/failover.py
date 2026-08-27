@@ -132,9 +132,21 @@ TRANSIENT_HTTP_MARKERS = ("429", "500", "502", "503", "504")
 
 
 def is_outage_error(exc: Exception) -> bool:
-    """True if the exception string carries a known WDQS-outage signature."""
-    s = str(exc)
-    return any(sig in s for sig in OUTAGE_SIGNATURES)
+    """True if the exception string carries a known WDQS-outage signature.
+
+    Matching is CASE-INSENSITIVE (2026-08-27, raised by eidr-dq). The two
+    signatures above were transcribed from different positions in one
+    observed message, so they disagree with each other about case —
+    ``wdqs outage`` lower, ``Aggressively rate-limiting`` capitalised.
+    Under case-sensitive matching, a `WDQS outage` at the start of a
+    sentence, or a proxy that title-cases the body, misses both: the
+    classifier falls through to the "429" substring check and the caller
+    burns its whole retry budget per endpoint re-confirming an outage the
+    memo exists to skip. The run still completes, just slower and with
+    less coverage — a silent-miss shape, which is what this module is for.
+    """
+    s = str(exc).lower()
+    return any(sig.lower() in s for sig in OUTAGE_SIGNATURES)
 
 
 def is_bad_query_error(exc: Exception) -> bool:
@@ -144,13 +156,21 @@ def is_bad_query_error(exc: Exception) -> bool:
     Non-retriable — but the NEXT endpoint may have a more permissive parser
     (WDQS predeclares wd/wdt/p/ps/pq; QLever requires the declarations), so
     the right verdict is NEXT_ENDPOINT, not FATAL.
+
+    Also case-insensitive, for the same reason as ``is_outage_error``.
+    eidr-dq raised this as a judgement call — ``QueryBadFormed`` is a
+    Python class name and arguably case-sensitive, while the other two are
+    endpoint prose. Folded anyway: lower-casing still matches the class
+    name exactly, and no plausible message contains "querybadformed"
+    meaning something else, so there is no false-positive to trade against
+    the demonstrated false-negative.
     """
-    s = str(exc)
-    if "QueryBadFormed" in s:
+    s = str(exc).lower()
+    if "querybadformed" in s:
         return True
-    if "Invalid SPARQL query" in s:
+    if "invalid sparql query" in s:
         return True
-    return "Bad Request" in s and "SPARQL" in s
+    return "bad request" in s and "sparql" in s
 
 
 def classify_sparql_error(exc: Exception) -> str:

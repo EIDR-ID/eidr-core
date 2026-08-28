@@ -276,3 +276,84 @@ def test_omitting_writable_does_not_reach_the_guard():
     with pytest.raises((ImportError, Exception)) as ei:
         get_registry_client(registry="sandbox2")
     assert "only to a URL registry target" not in str(ei.value)
+
+
+def test_writable_success_path_constructs_a_registry(monkeypatch):
+    """The HAPPY path — the one the guard short-circuits past.
+
+    Why this exists (eidr-dq, 2026-08-28). The three tests above cover the
+    REJECTION path, which returns before any SDK import, so `writable=` was
+    dead on arrival in 0.17.0 and fully "tested": the real path imported
+    `Registry` from `eidr` (top level) where it actually lives in
+    `eidr.registries`, and nothing exercised it.
+
+    The generalisable lesson, worth more than the fix: **a guard that
+    short-circuits before the risky operation also short-circuits the test
+    that would have exercised it.** When the cheap-to-test path and the real
+    path diverge at a guard, the real path needs its own coverage.
+
+    Fakes the SDK so this pins the IMPORT PATH and the constructor call
+    without needing `eidr[client]` installed — which CI does not have.
+    """
+    import sys
+    import types
+
+    built = {}
+
+    class _FakeRegistry:
+        def __init__(self, **kw):
+            built.update(kw)
+
+    class _FakeClient:
+        def __init__(self, **kw):
+            self.kw = kw
+
+    fake_eidr = types.ModuleType("eidr")
+    fake_eidr.Client = _FakeClient
+    # Deliberately NOT setting fake_eidr.Registry: if the code regresses to
+    # `from eidr import Registry` this test fails, which is the point.
+    fake_registries = types.ModuleType("eidr.registries")
+    fake_registries.Registry = _FakeRegistry
+    # `from eidr.registries import X` resolves the submodule as an ATTRIBUTE
+    # of the parent package; sys.modules alone is not enough.
+    fake_eidr.registries = fake_registries
+
+    monkeypatch.setitem(sys.modules, "eidr", fake_eidr)
+    monkeypatch.setitem(sys.modules, "eidr.registries", fake_registries)
+
+    from eidr_core.registry import get_registry_client
+
+    client = get_registry_client(
+        registry="https://resolve.eidr.org/EIDR",
+        credentials=object(),
+        writable=False,
+    )
+
+    assert built["writable"] is False
+    assert built["url"] == "https://resolve.eidr.org/EIDR"
+    assert isinstance(client.kw["registry"], _FakeRegistry)
+
+
+def test_writable_true_is_carried_through(monkeypatch):
+    import sys
+    import types
+
+    built = {}
+
+    class _FakeRegistry:
+        def __init__(self, **kw):
+            built.update(kw)
+
+    fake_eidr = types.ModuleType("eidr")
+    fake_eidr.Client = lambda **kw: kw
+    fake_registries = types.ModuleType("eidr.registries")
+    fake_registries.Registry = _FakeRegistry
+    fake_eidr.registries = fake_registries
+    monkeypatch.setitem(sys.modules, "eidr", fake_eidr)
+    monkeypatch.setitem(sys.modules, "eidr.registries", fake_registries)
+
+    from eidr_core.registry import get_registry_client
+
+    get_registry_client(registry="https://x/EIDR", credentials=object(),
+                        writable=True)
+    assert built["writable"] is True

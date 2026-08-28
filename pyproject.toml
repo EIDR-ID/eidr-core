@@ -4,6 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
+# 0.17.1 (2026-08-28): FIX -- 0.17.0's writable= was dead on arrival. It
+# imported Registry from `eidr` (top level) where it actually lives in
+# `eidr.registries`; Client and Credentials ARE top-level, which is the trap.
+# Found by eidr-dq. The 3 tests missed it because the guard short-circuits
+# before the import, so only the rejection path was covered.
 # 0.17.0 (2026-08-27): additive, both raised by eidr-dq while adopting its
 # OPEN_TASKS T1/T2 -- get_registry_client gains writable= (and declares the
 # Registry pass-through that already worked but was undeclared), and the
@@ -30,7 +35,7 @@ name = "eidr-core"
 # moved, but T6 makes this repo's CI gate the precondition for consumers
 # pinning @main, so WHICH checker verified the py.typed annotations is part
 # of what that version identifies.
-version = "0.17.0"
+version = "0.17.1"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers
@@ -57,7 +62,12 @@ bmr = ["openpyxl>=3.1"]
 # eidr_core.registry is the portfolio's SDK factory — it imports `eidr` lazily
 # inside get_registry_client(), so only consumers that actually talk to the
 # registry API need this extra.
-registry = ["eidr[client]>=0.1.0rc1"]
+# Floor raised to 1.1.2 (2026-08-28): earlier releases report a REJECTED
+# async write as PENDING -- the defect that made operation_status necessary
+# (register R5). 1.1.2 is on PyPI. The seam still stands: the three-way
+# success / failed-with-reason / no-verdict-yet distinction is registry
+# protocol, not a workaround for the bug.
+registry = ["eidr[client]>=1.1.2"]
 # Test runner. eidr-core's own test suite is deliberately thin — spec-driven
 # modules are verified by the siblings' conformance tests (CLAUDE.md) — but
 # safety surfaces whose wrong answer is SILENT are pinned here instead of

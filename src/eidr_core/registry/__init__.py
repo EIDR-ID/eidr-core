@@ -312,7 +312,14 @@ def get_registry_client(
         registry_target = registry.lower()
 
     if writable is not None:
-        from eidr import Registry  # lazy, same as Client
+        # NOT a top-level export, unlike Client and Credentials. That
+        # inconsistency in the SDK's own surface is the whole trap: this line
+        # was originally written `from eidr import Registry` by analogy with
+        # the imports above, which made writable= dead on arrival in 0.17.0
+        # (found by eidr-dq the same day). The next lazy SDK import added
+        # here will reach for `from eidr import X` for the same reason —
+        # check the SDK's __init__ before assuming.
+        from eidr.registries import Registry  # lazy
 
         registry_target = Registry(  # type: ignore[operator]  # conditional export
             name="CUSTOM",

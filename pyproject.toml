@@ -4,6 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
+# 0.20.2 (2026-08-30): Compilation is NOT a child (tree root: entries, no
+# Parent ID). CHILD_TYPES closes the world; a parent supplied for a
+# non-child type is IGNORED in both adapters. TitleConstructionError now
+# carries .partial/.provenance so a caller that proceeds does not re-derive
+# inheritance through a second code path.
 # 0.20.1 (2026-08-30): FIX two residual adapter divergences found by audit --
 # the object adapter inherited titles only for the three NAMED child types
 # (a Compilation child got the title through one shape and not the other),
@@ -62,7 +67,7 @@ name = "eidr-core"
 # moved, but T6 makes this repo's CI gate the precondition for consumers
 # pinning @main, so WHICH checker verified the py.typed annotations is part
 # of what that version identifies.
-version = "0.20.1"
+version = "0.20.2"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers

@@ -545,22 +545,57 @@ def test_has_user_supplied_title(titles, expected):
 # 2026-08-30 audit findings, pinned.
 # ---------------------------------------------------------------------------
 
-def test_an_unanticipated_child_type_inherits_titles_in_both_shapes():
-    """The Compilation divergence.
+def test_compilation_is_not_a_child_and_a_supplied_parent_is_ignored():
+    """Operator, 2026-08-30, correcting the previous version of this test.
 
-    The object adapter keyed title inheritance on the three NAMED types
-    (Edit/Clip/Manifestation) while the JSON adapter keyed on "not
-    Season/Episode" -- so a Compilation child inherited its parent's title
-    through one shape and not the other. The policy is the field policy:
-    ResourceName inherits unless exempt, whatever the type is called.
+    An earlier audit used Compilation as an example of an "unanticipated
+    child type" and asserted it INHERITS. Wrong premise: Compilation sits at
+    the registration tree root -- it has entries, but no Parent ID -- so it
+    is not a child record at all. The child records are exactly CHILD_TYPES.
+    Rule 1 is enforced in the module: a parent supplied for a non-child type
+    is IGNORED, identically in both shapes, so a caller mistake cannot
+    produce inheritance the registry would never perform.
     """
     json_full, json_prov = build_full_base(
-        {}, {"ResourceName": [{"Title": "The Parent"}]}, "Compilation")
-    rec_full = build_full_record(_Rec(creation_type="Compilation"),
+        {"Mode": "Audio"},
+        {"ResourceName": [{"Title": "The Parent"}], "Mode": "AudioVisual"},
+        "Compilation")
+    assert json_full == {"Mode": "Audio"}
+    assert "inherited" not in json_prov.values()
+
+    rec_full = build_full_record(_Rec(creation_type="Compilation", mode="Audio"),
                                  _parent_rec(), "Compilation")
-    assert json_full["ResourceName"][0]["Title"] == "The Parent"
-    assert rec_full.titles and rec_full.titles[0].text == "The Series"
-    assert json_prov["ResourceName"] == provenance(rec_full)["ResourceName"] == "inherited"
+    assert rec_full.mode == "Audio"
+    assert rec_full.titles == []
+    assert "inherited" not in provenance(rec_full).values()
+
+
+def test_child_types_is_the_closed_world():
+    from eidr_core.inheritance import CHILD_TYPES, TITLE_INHERITING_TYPES
+    assert {"Season", "Episode", "Edit", "Clip", "Manifestation"} == CHILD_TYPES
+    assert "Compilation" not in CHILD_TYPES
+    # The three verbatim-inheriting types are exactly the non-exempt children.
+    assert CHILD_TYPES - {"Season", "Episode"} == TITLE_INHERITING_TYPES
+
+
+def test_title_failure_carries_the_partial_result_in_both_shapes():
+    """A caller that proceeds past TitleConstructionError must not re-derive
+    inheritance through a second code path -- that second path is the exact
+    hazard this module removes. So the exception hands over the work done:
+    every inheritable field applied, no title."""
+    with pytest.raises(TitleConstructionError) as ei:
+        build_full_base({}, {"Mode": "AudioVisual"}, "Season")
+    assert ei.value.partial["Mode"] == "AudioVisual"
+    assert "ResourceName" not in ei.value.partial
+    assert ei.value.provenance["Mode"] == "inherited"
+
+    with pytest.raises(TitleConstructionError) as ei2:
+        build_full_record(_Rec(creation_type="Season"),
+                          _Rec(creation_type="Series", mode="AudioVisual"),
+                          "Season")
+    assert ei2.value.partial.mode == "AudioVisual"
+    assert ei2.value.partial.titles == []
+    assert provenance(ei2.value.partial)["Mode"] == "inherited"
 
 
 def test_a_kept_system_generated_title_is_not_stamped_self_defined():

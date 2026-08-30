@@ -5,8 +5,12 @@ portfolio may reimplement, reinterpret or locally extend them.
 
   1. If the record is NOT a child record, inheritance does not apply.
      Self-Defined and Full are identical. Stop.
-     A record is a child iff it HAS a parent, so the caller's decision not to
-     supply one IS this rule. Callers must not pass a parent for a non-child.
+     The child records are EXACTLY Season, Episode, Edit, Clip and
+     Manifestation (:data:`CHILD_TYPES`). Compilation is NOT a child -- it
+     sits at the registration tree root; it has entries, but no Parent ID.
+     Both adapters enforce this: for a non-child creation type a supplied
+     parent is IGNORED and Self is returned as Full, so a caller mistake
+     cannot produce inheritance the registry would never perform.
 
   2. If the record is a Season or Episode supplied WITHOUT a user-provided
      ResourceName (primary title), generate one from the record's own data
@@ -124,11 +128,23 @@ class TitleConstructionError(ValueError):
     It is a distinct type so a batch caller can catch it per record and skip
     the row with a reason, rather than choosing between aborting the run and
     not knowing.
+
+    The exception carries the work already done, so a caller that chooses to
+    proceed does not re-derive inheritance through a second code path (the
+    exact hazard this module removes):
+
+    * ``partial`` -- the full record/base with every inheritable field
+      applied and NO title;
+    * ``provenance`` -- the per-field map for that partial result.
     """
+
+    partial: Any = None
+    provenance: dict | None = None
 
 
 __all__ = [
     "INHERITABLE_FIELDS",
+    "CHILD_TYPES",
     "TitleConstructionError",
     "NEVER_INHERITED",
     "TITLE_EXEMPT_TYPES",
@@ -172,12 +188,20 @@ NEVER_INHERITED: frozenset[str] = frozenset({
     # Compilation). Handled structurally rather than by name.
 })
 
+# The ONLY creation types that inherit at all. Compilation is deliberately
+# absent: it sits at the registration tree root -- it has entries, but no
+# Parent ID -- so it is not a child record (operator, 2026-08-30, correcting
+# an audit note that used it as an example of an "unanticipated child type").
+CHILD_TYPES: frozenset[str] = frozenset({
+    "Season", "Episode", "Edit", "Clip", "Manifestation",
+})
+
 # Season and Episode do NOT inherit the parent's title — a system-generated
-# one is constructed instead. Every OTHER child type inherits it verbatim,
-# which is ordinary field inheritance. TITLE_INHERITING_TYPES names the three
-# child types that exist in practice and is kept as documentation/export, but
-# NO code branches on it: the branch is "not exempt", so an unanticipated
-# creation type behaves identically through both adapters.
+# one is constructed instead. The other three child types inherit it
+# verbatim, which is ordinary field inheritance. With CHILD_TYPES closed,
+# TITLE_INHERITING_TYPES is exactly CHILD_TYPES - TITLE_EXEMPT_TYPES; kept as
+# a documented export, but code branches on the exemption, never on this
+# set.
 TITLE_EXEMPT_TYPES: frozenset[str] = frozenset({"Season", "Episode"})
 TITLE_INHERITING_TYPES: frozenset[str] = frozenset({"Edit", "Clip", "Manifestation"})
 
@@ -331,11 +355,6 @@ def build_full_base(
     ``'system'``. The caller owns ``ExtraObjectMetadata``: it is
     creation-type-specific and never inherited, so it is not touched here.
     """
-    # RULE 1 — "if the record is not a child record, inheritance does not
-    # apply; Self Defined and Full are identical." A record is a child iff it
-    # HAS a parent, so the caller's decision not to supply one IS the rule.
-    # Callers must not pass a parent for a non-child record; XML_to_JSON's
-    # `if parent_id:` and BMR-Review's parent resolution both encode this.
     extra = extra or {}
     full: dict = copy.deepcopy(self_base or {})
     # A system-generated ResourceName is not "self" -- the submitter did not
@@ -346,7 +365,11 @@ def build_full_base(
         and (f != "ResourceName" or has_user_supplied_title(v))
     }
 
-    if not parent_base:
+    # RULE 1 -- childness is TYPE-defined. For a non-child creation type a
+    # supplied parent is IGNORED: the registry performs no inheritance for a
+    # Compilation (tree root: entries, no Parent ID) or any other root type,
+    # so neither does this. Self IS Full.
+    if creation_type not in CHILD_TYPES or not parent_base:
         return full, prov
 
     for field in INHERITABLE_FIELDS:
@@ -405,7 +428,7 @@ def build_full_base(
         if not built:
             # RULE 2 says this is impossible. Reaching it means the parent has
             # no title, or the child has neither a number nor a release date.
-            raise TitleConstructionError(
+            exc = TitleConstructionError(
                 f"{creation_type} has no user-supplied ResourceName and no "
                 f"generated title could be built: parent title="
                 f"{_best_title(parent_base)!r}, "
@@ -415,6 +438,10 @@ def build_full_base(
                 "Leaving the child untitled would silently drop the "
                 "heaviest-weighted comparison field."
             )
+            # Field inheritance has already run; hand it over so a caller
+            # that proceeds does not re-derive it through a second path.
+            exc.partial, exc.provenance = full, dict(prov)
+            raise exc
         text, title_class = built
         full["ResourceName"] = [{
             "Title": text,
@@ -516,7 +543,9 @@ def build_full_record(
                 element.self_defined = not getattr(
                     element, "system_generated", False)
 
-    if parent_full is None:
+    # RULE 1 -- see build_full_base: for a non-child type a supplied parent
+    # is ignored. Self IS Full.
+    if ctype not in CHILD_TYPES or parent_full is None:
         _attach(full, prov)
         return full
 
@@ -578,7 +607,7 @@ def _apply_title(full: Any, parent_full: Any, ctype: str, prov: dict) -> None:
         if not built:
             # Same rule, same failure, same exception as build_full_base -- the
             # two adapters must not differ even on the error path.
-            raise TitleConstructionError(
+            exc = TitleConstructionError(
                 f"{ctype} has no user-supplied title and no generated title "
                 f"could be built: parent title="
                 f"{_best_record_title(parent_full)!r}, "
@@ -587,6 +616,9 @@ def _apply_title(full: Any, parent_full: Any, ctype: str, prov: dict) -> None:
                 f"{getattr(full, 'distribution_number', None)!r}, "
                 f"release_date={getattr(full, 'release_date', None)!r}."
             )
+            _attach(full, prov)
+            exc.partial, exc.provenance = full, dict(prov)
+            raise exc
         text, title_class = built
         made = _clone_title(parent_full, text, title_class)
         if made is not None:

@@ -1,0 +1,316 @@
+"""Full-record construction — the specification, and the defects it closes.
+
+Every implementation that existed before this module was wrong in some way
+(see the module docstring), so these tests are written against the SCHEMA
+and the operator's rules, not against either prior implementation. Where a
+test pins a defect, it names it.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+import pytest
+
+from eidr_core.inheritance import (
+    INHERITABLE_FIELDS,
+    NEVER_INHERITED,
+    build_full_base,
+    build_full_record,
+    provenance,
+    system_generated_title,
+)
+
+# --- the field policy -------------------------------------------------------
+
+def test_administrators_is_never_inheritable():
+    """XML_to_JSON's defect 1, pinned.
+
+    The schema comments the exclusion on the field itself: "Administrators
+    isn't inherited because it contains the registrant". A child that
+    inherits it asserts it was registered by whoever registered its parent
+    — and BMR-Review's match-audit reads Registrant to decide which member
+    to notify about a mis-assigned ID.
+    """
+    assert "Administrators" in NEVER_INHERITED
+    assert "Administrators" not in INHERITABLE_FIELDS
+
+
+@pytest.mark.parametrize("f", ["ID", "AlternateID", "Description", "RegistrantExtra"])
+def test_the_rest_of_the_never_inherited_set(f):
+    assert f in NEVER_INHERITED and f not in INHERITABLE_FIELDS
+
+
+@pytest.mark.parametrize("f", [
+    "StructuralType", "Mode", "ReferentType", "ResourceName",
+    "AlternateResourceName", "OriginalLanguage", "VersionLanguage",
+    "AssociatedOrg", "ReleaseDate", "CountryOfOrigin", "Status",
+    "ApproximateLength", "Credits",
+])
+def test_the_schema_inheritable_set_is_complete(f):
+    # XML_to_JSON carried only 6 of these 13; the 7 it lacked are the reason
+    # this list is asserted in full rather than spot-checked.
+    assert f in INHERITABLE_FIELDS
+
+
+def test_the_two_sets_do_not_overlap():
+    assert not (INHERITABLE_FIELDS & NEVER_INHERITED)
+
+
+# --- system-generated titles ------------------------------------------------
+
+@pytest.mark.parametrize("ctype,kw,expected,klass", [
+    ("Season", {"sequence_number": "6"}, "30 Something: Season 6", "series numeric"),
+    ("Season", {"release_date": "2006"}, "30 Something [2006]", "series numeric"),
+    ("Episode", {"distribution_number": "1"}, "30 Something: Episode 1", "season numeric"),
+    ("Episode", {"release_date": "2023-04-07"}, "30 Something [2023-04-07]", "season numeric"),
+])
+def test_all_four_registry_patterns(ctype, kw, expected, klass):
+    assert system_generated_title("30 Something", ctype, **kw) == (expected, klass)
+
+
+def test_the_number_wins_over_the_date():
+    # The date form is the FALLBACK, not an alternative.
+    assert system_generated_title(
+        "S", "Season", sequence_number="2", release_date="1999",
+    ) == ("S: Season 2", "series numeric")
+
+
+def test_the_date_fallback_is_the_defect_that_left_children_untitled():
+    """XML_to_JSON's defect 2, pinned.
+
+    Its `_construct_child_title` implemented only the numbered rows and
+    returned None otherwise, so a Season with no Sequence Number got NO
+    title. An untitled child drops the field the de-dup engine weights most
+    heavily (70 Basic / 40 Episode), so a genuine duplicate loses its
+    strongest signal.
+    """
+    assert system_generated_title("S", "Season", release_date="2006") is not None
+    assert system_generated_title("S", "Episode", release_date="2006") is not None
+
+
+def test_no_number_and_no_date_yields_nothing():
+    assert system_generated_title("S", "Season") is None
+    assert system_generated_title("", "Season", sequence_number="1") is None
+
+
+def test_types_that_get_no_constructed_title():
+    for ctype in ("Edit", "Clip", "Manifestation", "Basic", "Series"):
+        assert system_generated_title("S", ctype, sequence_number="1") is None
+
+
+# --- shape 1: registry JSON -------------------------------------------------
+
+PARENT = {
+    "ResourceName": [{"Title": "The Series", "TitleClass": "resource name"}],
+    "Mode": "AudioVisual",
+    "ReferentType": "Series",
+    "CountryOfOrigin": ["US"],
+    "ReleaseDate": "2001",
+    "Administrators": {"Registrant": "10.5237/PARENT-PARTY"},
+    "AlternateID": [{"AltID": "tt0000001"}],
+    "Description": "parent description",
+}
+
+
+def test_json_child_inherits_the_allowed_fields():
+    full, prov = build_full_base({"StructuralType": "Abstraction"}, PARENT, "Edit")
+    assert full["Mode"] == "AudioVisual"
+    assert full["CountryOfOrigin"] == ["US"]
+    assert prov["Mode"] == "inherited"
+    assert prov["StructuralType"] == "self"
+
+
+def test_json_child_does_not_inherit_administrators_altid_or_description():
+    full, _ = build_full_base({}, PARENT, "Edit")
+    for forbidden in ("Administrators", "AlternateID", "Description"):
+        assert forbidden not in full, f"{forbidden} must not be inherited"
+
+
+def test_json_self_defined_values_are_never_overwritten():
+    full, prov = build_full_base({"Mode": "Audio"}, PARENT, "Edit")
+    assert full["Mode"] == "Audio"
+    assert prov["Mode"] == "self"
+
+
+def test_json_edit_inherits_the_parent_title_verbatim():
+    full, prov = build_full_base({}, PARENT, "Edit")
+    assert full["ResourceName"][0]["Title"] == "The Series"
+    assert prov["ResourceName"] == "inherited"
+
+
+def test_json_season_gets_a_constructed_title_not_the_parents():
+    full, prov = build_full_base({}, PARENT, "Season",
+                                 extra={"SequenceNumber": "6"})
+    assert full["ResourceName"] == [{
+        "Title": "The Series: Season 6",
+        "TitleClass": "series numeric",
+        "SystemGenerated": "true",
+    }]
+    assert prov["ResourceName"] == "system"
+
+
+def test_json_season_without_a_number_falls_back_to_the_date():
+    full, _ = build_full_base({}, PARENT, "Season",
+                              extra={"ReleaseDate": "2006"})
+    assert full["ResourceName"][0]["Title"] == "The Series [2006]"
+
+
+def test_json_season_date_fallback_can_come_from_the_inherited_release_date():
+    # PARENT supplies ReleaseDate 2001; the child gave neither number nor date.
+    full, _ = build_full_base({}, PARENT, "Season")
+    assert full["ResourceName"][0]["Title"] == "The Series [2001]"
+
+
+def test_json_no_parent_returns_self_unchanged():
+    self_base = {"Mode": "Audio"}
+    full, prov = build_full_base(self_base, None, "Season")
+    assert full == self_base
+    assert prov == {"Mode": "self"}
+
+
+def test_json_build_does_not_mutate_its_inputs():
+    self_base = {"Mode": "Audio"}
+    parent = dict(PARENT)
+    build_full_base(self_base, parent, "Edit")
+    assert self_base == {"Mode": "Audio"}
+    assert parent == PARENT
+
+
+def test_json_inherited_containers_are_copied_not_aliased():
+    full, _ = build_full_base({}, PARENT, "Edit")
+    full["CountryOfOrigin"].append("FR")
+    assert PARENT["CountryOfOrigin"] == ["US"], "parent was mutated through an alias"
+
+
+def test_json_zero_is_not_treated_as_absent():
+    # A real ApproximateLength of 0 must not be overwritten by the parent's.
+    full, prov = build_full_base({"ApproximateLength": 0},
+                                 {"ApproximateLength": 120}, "Edit")
+    assert full["ApproximateLength"] == 0
+    assert prov["ApproximateLength"] == "self"
+
+
+# --- shape 2: record objects ------------------------------------------------
+
+@dataclass
+class _Title:
+    text: str
+    lang: str | None = None
+    title_class: str | None = None
+    system_generated: bool = False
+    self_defined: bool = True
+    is_resource: bool = False
+
+
+@dataclass
+class _Rec:
+    creation_type: str = "Basic"
+    structural_type: str | None = None
+    mode: str | None = None
+    referent_type: str | None = None
+    release_date: str | None = None
+    length_minutes: float | None = None
+    sequence_number: str | None = None
+    distribution_number: str | None = None
+    titles: list = field(default_factory=list)
+    countries: list = field(default_factory=list)
+    original_languages: list = field(default_factory=list)
+    version_languages: list = field(default_factory=list)
+    assoc_orgs: list = field(default_factory=list)
+    directors: list = field(default_factory=list)
+    actors: list = field(default_factory=list)
+    alt_ids: list = field(default_factory=list)
+
+
+def _parent_rec():
+    return _Rec(creation_type="Series", mode="AudioVisual",
+                referent_type="Series", release_date="2001",
+                length_minutes=45.0, countries=["US"],
+                directors=[_Title(text="A Director")],
+                titles=[_Title(text="The Series", is_resource=True)])
+
+
+def test_record_inherits_scalars_the_old_paths_disagreed_about():
+    """BMR-Review had TWO paths that disagreed: reconstruct_full inherited
+    mode/referent_type but not release_date; inherit.materialize the
+    reverse. One record scored differently depending on which built it.
+    All three are inherited here."""
+    full = build_full_record(_Rec(creation_type="Edit"), _parent_rec(), "Edit")
+    assert full.mode == "AudioVisual"
+    assert full.referent_type == "Series"
+    assert full.release_date == "2001"
+    prov = provenance(full)
+    assert prov["Mode"] == prov["ReferentType"] == prov["ReleaseDate"] == "inherited"
+
+
+def test_record_provenance_covers_scalars_the_model_cannot_flag():
+    # The whole point of the map: CanonicalRecord has no self_defined flag on
+    # release_date or length_minutes.
+    prov = provenance(build_full_record(_Rec(creation_type="Edit"),
+                                        _parent_rec(), "Edit"))
+    assert prov["ReleaseDate"] == "inherited"
+    assert prov["ApproximateLength"] == "inherited"
+
+
+def test_record_self_defined_wins_and_is_reported_as_self():
+    child = _Rec(creation_type="Edit", mode="Audio")
+    prov = provenance(build_full_record(child, _parent_rec(), "Edit"))
+    assert prov["Mode"] == "self"
+
+
+def test_record_inherited_elements_are_marked_not_self_defined():
+    full = build_full_record(_Rec(creation_type="Edit"), _parent_rec(), "Edit")
+    assert full.directors[0].self_defined is False
+
+
+def test_record_season_gets_a_constructed_system_generated_title():
+    child = _Rec(creation_type="Season", sequence_number="6")
+    full = build_full_record(child, _parent_rec(), "Season")
+    assert [t.text for t in full.titles] == ["The Series: Season 6"]
+    assert full.titles[0].system_generated is True
+    assert full.titles[0].self_defined is False
+    assert provenance(full)["ResourceName"] == "system"
+
+
+def test_record_episode_falls_back_to_the_date():
+    child = _Rec(creation_type="Episode", release_date="2023-04-07")
+    full = build_full_record(child, _parent_rec(), "Episode")
+    assert full.titles[0].text == "The Series [2023-04-07]"
+
+
+def test_record_a_child_that_supplied_its_own_title_keeps_it():
+    child = _Rec(creation_type="Season", sequence_number="6",
+                 titles=[_Title(text="Given Title", is_resource=True)])
+    full = build_full_record(child, _parent_rec(), "Season")
+    assert full.titles[0].text == "Given Title"
+    assert provenance(full)["ResourceName"] == "self"
+
+
+def test_record_edit_inherits_the_parent_title():
+    full = build_full_record(_Rec(creation_type="Edit"), _parent_rec(), "Edit")
+    assert full.titles[0].text == "The Series"
+    assert full.titles[0].self_defined is False
+    assert provenance(full)["ResourceName"] == "inherited"
+
+
+def test_record_build_does_not_mutate_the_input():
+    child = _Rec(creation_type="Edit")
+    build_full_record(child, _parent_rec(), "Edit")
+    assert child.mode is None and child.titles == []
+
+
+def test_record_no_parent_is_safe():
+    full = build_full_record(_Rec(creation_type="Season"), None, "Season")
+    assert full.mode is None
+    assert provenance(full) == {}
+
+
+def test_provenance_of_a_record_we_did_not_build_is_empty_not_wrong():
+    # Absence must read as "unknown", never as "self-defined".
+    assert provenance(_Rec()) == {}
+
+
+def test_creation_type_defaults_to_the_records_own():
+    child = _Rec(creation_type="Season", sequence_number="2")
+    full = build_full_record(child, _parent_rec())     # no explicit ctype
+    assert full.titles[0].text == "The Series: Season 2"

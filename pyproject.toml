@@ -4,6 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
+# 0.18.0 (2026-08-29): new MODULE -- eidr_core.inheritance. Full-record
+# construction (what a child inherits from its parent + the four
+# system-generated title patterns), accepted from BMR-Review with XML_to_JSON
+# as the reference implementation. A SPECIFICATION from the EIDR schema's
+# inheritedBaseObjectInfoGroup, not a convenience: all three prior
+# implementations were wrong in different ways. Two shape adapters, one
+# policy; eidr_core imports neither consumer's model.
 # 0.17.1 (2026-08-28): FIX -- 0.17.0's writable= was dead on arrival. It
 # imported Registry from `eidr` (top level) where it actually lives in
 # `eidr.registries`; Client and Credentials ARE top-level, which is the trap.
@@ -35,7 +42,7 @@ name = "eidr-core"
 # moved, but T6 makes this repo's CI gate the precondition for consumers
 # pinning @main, so WHICH checker verified the py.typed annotations is part
 # of what that version identifies.
-version = "0.17.1"
+version = "0.18.0"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers

@@ -173,8 +173,11 @@ NEVER_INHERITED: frozenset[str] = frozenset({
 })
 
 # Season and Episode do NOT inherit the parent's title — a system-generated
-# one is constructed instead. Edit, Clip and Manifestation DO inherit it
-# verbatim, which is ordinary inheritance and needs no special case.
+# one is constructed instead. Every OTHER child type inherits it verbatim,
+# which is ordinary field inheritance. TITLE_INHERITING_TYPES names the three
+# child types that exist in practice and is kept as documentation/export, but
+# NO code branches on it: the branch is "not exempt", so an unanticipated
+# creation type behaves identically through both adapters.
 TITLE_EXEMPT_TYPES: frozenset[str] = frozenset({"Season", "Episode"})
 TITLE_INHERITING_TYPES: frozenset[str] = frozenset({"Edit", "Clip", "Manifestation"})
 
@@ -500,13 +503,18 @@ def build_full_record(
     if has_user_supplied_title(getattr(full, "titles", None)):
         prov["ResourceName"] = "self"
 
-    # Everything the submitter supplied is self-defined, by definition.
+    # Everything the submitter supplied is self-defined -- EXCEPT an element
+    # already flagged system_generated, which by definition the submitter did
+    # not supply. Stamping those True produced contradictory flags
+    # (system_generated=True, self_defined=True) on the no-parent path, and
+    # BMR-Review's inherited-discount rule reads both flags.
     for attr in ("titles", "directors", "actors", "countries",
                  "original_languages", "version_languages", "assoc_orgs",
                  "alt_ids"):
         for element in getattr(full, attr, None) or []:
             if hasattr(element, "self_defined"):
-                element.self_defined = True
+                element.self_defined = not getattr(
+                    element, "system_generated", False)
 
     if parent_full is None:
         _attach(full, prov)
@@ -586,7 +594,14 @@ def _apply_title(full: Any, parent_full: Any, ctype: str, prov: dict) -> None:
             prov["ResourceName"] = "system"
         return
 
-    if ctype in TITLE_INHERITING_TYPES and not has_user_supplied_title(titles):
+    # Inherit for EVERY non-exempt type, not only the three named ones. The
+    # policy is the field policy: ResourceName is inheritable, and the ONLY
+    # exemption is Season/Episode (which construct instead). Until 2026-08-30
+    # this branch keyed on TITLE_INHERITING_TYPES, so a child of any other
+    # type (e.g. Compilation) inherited its parent's title through the JSON
+    # adapter but NOT through this one -- the exact cross-adapter divergence
+    # this module exists to prevent, caught by a cross-shape probe.
+    if ctype not in TITLE_EXEMPT_TYPES and not has_user_supplied_title(titles):
         parent_titles = getattr(parent_full, "titles", None) or []
         if parent_titles:
             inherited = copy.deepcopy(parent_titles)

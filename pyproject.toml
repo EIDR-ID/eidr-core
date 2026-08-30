@@ -4,6 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
+# 0.20.1 (2026-08-30): FIX two residual adapter divergences found by audit --
+# the object adapter inherited titles only for the three NAMED child types
+# (a Compilation child got the title through one shape and not the other),
+# and a kept system-generated title was stamped self_defined=True. Both
+# adapters now behave identically for any creation type, pinned cross-shape.
 # 0.20.0 (2026-08-30): POLICY CORRECTIONS from the operator. (a)
 # AlternateResourceName is NOT inheritable -- only the primary ResourceName
 # is; the set is 12 fields, not 13. (b) What BLOCKS inheritance is a
@@ -57,7 +62,7 @@ name = "eidr-core"
 # moved, but T6 makes this repo's CI gate the precondition for consumers
 # pinning @main, so WHICH checker verified the py.typed annotations is part
 # of what that version identifies.
-version = "0.20.0"
+version = "0.20.1"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers

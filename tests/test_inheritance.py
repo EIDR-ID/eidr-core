@@ -539,3 +539,41 @@ def test_both_adapters_agree_on_the_system_generated_case():
 ])
 def test_has_user_supplied_title(titles, expected):
     assert has_user_supplied_title(titles) is expected
+
+
+# ---------------------------------------------------------------------------
+# 2026-08-30 audit findings, pinned.
+# ---------------------------------------------------------------------------
+
+def test_an_unanticipated_child_type_inherits_titles_in_both_shapes():
+    """The Compilation divergence.
+
+    The object adapter keyed title inheritance on the three NAMED types
+    (Edit/Clip/Manifestation) while the JSON adapter keyed on "not
+    Season/Episode" -- so a Compilation child inherited its parent's title
+    through one shape and not the other. The policy is the field policy:
+    ResourceName inherits unless exempt, whatever the type is called.
+    """
+    json_full, json_prov = build_full_base(
+        {}, {"ResourceName": [{"Title": "The Parent"}]}, "Compilation")
+    rec_full = build_full_record(_Rec(creation_type="Compilation"),
+                                 _parent_rec(), "Compilation")
+    assert json_full["ResourceName"][0]["Title"] == "The Parent"
+    assert rec_full.titles and rec_full.titles[0].text == "The Series"
+    assert json_prov["ResourceName"] == provenance(rec_full)["ResourceName"] == "inherited"
+
+
+def test_a_kept_system_generated_title_is_not_stamped_self_defined():
+    """Contradictory flags, pinned.
+
+    On the no-parent path a system-generated input title survives -- and the
+    blanket "submitter supplied it" stamp used to mark it self_defined=True
+    while system_generated stayed True. Both flags are read downstream
+    (BMR-Review's inherited-discount rule), so they must not contradict.
+    """
+    child = _Rec(creation_type="Season",
+                 titles=[_Title(text="Old Gen", is_resource=True,
+                                system_generated=True)])
+    full = build_full_record(child, None, "Season")
+    assert full.titles[0].system_generated is True
+    assert full.titles[0].self_defined is False

@@ -46,6 +46,30 @@ the reasoning, not just the number.
   the denominator (`ALWAYS_APPLICABLE` keeps release_date in regardless);
   calibrated per creation type onto the shared bands (<30 Reject, 30–<80
   Review, ≥80 Accept).
+* **What counts as a COMMON Alt ID** (operator ruling, 2026-08-30) -- the
+  definition both the match and the conflict paths apply, and the one thing
+  in this document a consumer may not relax:
+  * the **Kind** matches: `id_type` AND the FULL domain.
+    `themoviedb.org/movie` and `themoviedb.org/tv` are different sources and
+    may legitimately reuse the same number.
+  * the **Value** matches, compared case-insensitively.
+  * the **relation** is identity: missing, null, empty, or `IsSameAs`. Any
+    other relation (`IsDerivedFrom`, `IsPartOf`, `Deprecated`, ...) says the
+    identifier names a DIFFERENT work, so it is evidence of nothing in
+    either direction -- neither a match nor a conflict. Entries failing this
+    are dropped per ENTRY, not per source, so one derived-work identifier
+    cannot suppress a legitimate match under the same source.
+
+  A **Family ID is not an Alt ID**; only third-party identifiers registered
+  as AlternateID count. ShortDOIs are skipped -- a ShortDOI aliases the EIDR
+  ID itself, so matching on one is circular.
+
+  The relation clause went unenforced on the MATCH path until 2026-08-30
+  (`rel_ok` was computed and consulted only for conflicts), so a shared
+  Kind+Value scored a full match whatever the relation said. Because the
+  same `matches` count feeds the alt-ID bonus and
+  `ALT_CORROBORATION_STRONG_MIN`, a non-identity relation could release the
+  unverified-alt-id and part-number Accept caps and lift a pair into Accept.
 * **Alt-ID conflicts** are the only metadata-internal negative signal. The
   penalty is shaped so a SINGLE uncorroborated conflict (a registrant's
   mistyped IMDb id) costs a modest slice while accumulating conflicts compound

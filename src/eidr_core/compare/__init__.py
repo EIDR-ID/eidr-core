@@ -422,6 +422,26 @@ def alt_source(a):
 
 
 def cmp_alt_ids(a, b):
+    """Compare third-party identifiers; a shared one is identity evidence.
+
+    A **common Alt ID** requires all three of these (operator ruling,
+    2026-08-30). They are the definition; nothing here may relax them:
+
+    * the **Kind** matches -- that is the ``id_type`` AND the full domain.
+      ``themoviedb.org/movie`` and ``themoviedb.org/tv`` are different
+      sources and may legitimately reuse the same number.
+    * the **Value** matches, compared case-insensitively.
+    * the **relation** is identity: missing, null, empty, or ``IsSameAs``.
+      Any other relation (``IsDerivedFrom``, ``IsPartOf``, ...) says the
+      identifier names a DIFFERENT work, so it is not evidence that these
+      two records are the same one.
+
+    **A Family ID is not an Alt ID.** Only third-party identifiers
+    registered as AlternateID count here.
+
+    ShortDOIs are skipped: a ShortDOI is an alias of the EIDR ID itself, not
+    a third-party identifier, so matching on one is circular.
+    """
     def rel_ok(r):
         return r is None or str(r).strip().lower() in ("", "issameas")
 
@@ -430,23 +450,36 @@ def cmp_alt_ids(a, b):
                 or str(getattr(x, "domain", "") or "").strip().lower() == "shortdoi")
     from collections import defaultdict
     av = defaultdict(set); bv = defaultdict(set)
-    av_rel = defaultdict(lambda: True); bv_rel = defaultdict(lambda: True)
-    for x in a.alt_ids:
-        if is_shortdoi(x):                       # ShortDOI = alias of the EIDR id; ignore
-            continue
-        s = alt_source(x)
-        if s is None:                            # opaque registry id; not cross-source
-            continue
-        av[s].add((s, str(x.value).strip().casefold()))
-        av_rel[s] &= rel_ok(x.relation)
-    for x in b.alt_ids:
-        if is_shortdoi(x):
-            continue
-        s = alt_source(x)
-        if s is None:
-            continue
-        bv[s].add((s, str(x.value).strip().casefold()))
-        bv_rel[s] &= rel_ok(x.relation)
+
+    def collect(rec, into):
+        for x in rec.alt_ids:
+            if is_shortdoi(x):                   # ShortDOI = alias of the EIDR id; ignore
+                continue
+            s = alt_source(x)
+            if s is None:                        # opaque registry id; not cross-source
+                continue
+            # THE RELATION GATE (operator ruling; see the docstring). An entry
+            # whose relation is not identity names a DIFFERENT work, so it is
+            # not a candidate for commonality and is dropped here -- before it
+            # can produce either a match or a conflict.
+            #
+            # Filtered per ENTRY, deliberately. Until 2026-08-30 the relation
+            # was accumulated into a per-SOURCE boolean that the match branch
+            # never consulted, so a shared Kind+Value scored 1.0 even when the
+            # relation said IsDerivedFrom or IsPartOf (reported by BMR-Review:
+            # 58 of 62,646 shared pairs, and the same `matches` count drives
+            # the alt-ID bonus and ALT_CORROBORATION_STRONG_MIN, so a
+            # non-identity relation could lift a pair to Accept). Simply
+            # consulting that per-source flag in the match branch would have
+            # traded the false positive for a worse false NEGATIVE: one
+            # IsDerivedFrom entry would poison every legitimate IsSameAs match
+            # under the same source. Per-entry filtering has neither failure.
+            if not rel_ok(x.relation):
+                continue
+            into[s].add((s, str(x.value).strip().casefold()))
+
+    collect(a, av)
+    collect(b, bv)
     shared = set(av) & set(bv)
     if not shared:
         return FieldResult("alt_id", None, "no shared source", meta={"matches": 0})
@@ -459,7 +492,9 @@ def cmp_alt_ids(a, b):
         # gives no path (a bare "themoviedb.org" aligns with either).
         if {v for _f, v in av[k]} & {v for _f, v in bv[k]}:
             qs.append(1.0)
-        elif av_rel[k] and bv_rel[k]:
+        else:
+            # Both sides name this source with identity relations (anything
+            # else never reached `av`/`bv`) and the values disagree.
             conflicts += 1
     q = nonlinear.accumulate(qs) if qs else None
     return FieldResult("alt_id", q, f"match={len(qs)} conflict={conflicts}",

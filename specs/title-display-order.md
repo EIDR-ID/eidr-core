@@ -1,10 +1,11 @@
 # Title Display Ordering — handoff for the API Shim project
 
 **Audience:** the API Shim team (a separate project from the EIDR portfolio
-tools). **Why you:** the matching system does not sort title entries — it presents them in
-the order the API Shim delivers them. So the Shim must emit titles already in
-the display order below; every downstream review surface (the matching system, the
-De-Duplication Review UI) then shows them consistently.
+tools). **Why you:** the upstream matching system does not sort title
+entries — it presents them in the order the API Shim delivers them. So the
+Shim must emit titles already in the display order below; every downstream
+review surface (that system, the De-Duplication Review UI) then shows them
+consistently.
 **Source of truth:** `normalized-record.md` §4.1, ratified by the operator
 2026-07-29. Sibling document: `altid-display-order.md` (the Alternate ID
 equivalent).

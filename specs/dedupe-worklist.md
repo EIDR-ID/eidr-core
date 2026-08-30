@@ -1,12 +1,18 @@
-# De-Dupe Work-List & Results File Formats (SPEC v1)
+# De-Dupe Work-List & Results File Formats (SPEC v2)
 
-**Status:** v1 — **producer LANDED 2026-07-28**: `BMR-Review/run_worklist.py`
-emits this format from a post-the matching system BMR sheet (same inputs and scoring pass as
+**v2 (2026-08-30) — BREAKING field rename.** The two candidate-context
+fields carrying the upstream matcher's own verdict are now
+``upstream_bucket`` and ``upstream_score``. Producers and consumers must
+change together; until both ends adopt, a reader should accept either name.
+Everything else in this document is unchanged from v1.
+
+**Status:** v1 notes below still apply — **producer LANDED 2026-07-28**: `BMR-Review/run_worklist.py`
+emits this format from a post-matching BMR sheet (same inputs and scoring pass as
 `run_assessment.py`, so work list and assessment always agree; per-candidate
 payloads are built inside `evaluate_case` itself). v1 producer notes:
 `enqueued_at` = generation timestamp (the sheet carries no enqueue times;
 Shim mode will supply real ones); `upstream_bucket` = null with an optional
-`upstream_score` field instead (the sheet carries the matching system scores, not bucket
+`upstream_score` field instead (the sheet carries upstream scores, not bucket
 labels) — the UI may sort on it within the null bucket; lookup-failed
 candidates carry `"unresolved": true` and no `scoring`; record views
 currently follow BMR-Review `render_record` (canonical class-ranked titles ✓;
@@ -59,7 +65,7 @@ One line per reviewable transaction:
 
 ```json
 {"type": "transaction",
- "transaction_id": "…",                  // the matching system/Shim transaction id (or synthetic for backfill)
+ "transaction_id": "…",                  // upstream/Shim transaction id (or synthetic for backfill)
  "enqueued_at": "…",                     // ISO-8601; drives FIFO + aging buckets
  "submitting_party": "10.5237/…",
  "submitted": { <record view> },          // §5

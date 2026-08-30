@@ -34,7 +34,7 @@ BMR-Review git history, commit `17574c4` and earlier).
 
 ## Key empirical rationale (curated from the original config.py)
 
-These numbers were tuned against ~1,371 human decisions and observed the matching system
+These numbers were tuned against ~1,371 human decisions and observed upstream matcher
 outcomes; the reasoning matters more than the values. When re-tuning, revisit
 the reasoning, not just the number.
 

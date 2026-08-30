@@ -7,7 +7,7 @@ constrained, type-scoped impact and MUST be preserved as the organizing
 structure of `compare-spec.json`. Migration (§6) may proceed; step 1 starts
 after the parallel BMR-Review tuning thread has ingested the coordination
 notes in BMR-Review's CLAUDE.md.
-**Problem:** BMR-Review and De-Dupe UI evaluate the same thing — the matching system-generated
+**Problem:** BMR-Review and De-Dupe UI evaluate the same thing — upstream-generated
 match candidates against EIDR records — with two independently designed scoring
 engines. The operator wants ONE approach so accuracy work in either tool
 benefits both.
@@ -18,7 +18,7 @@ benefits both.
 
 | | BMR-Review (`eidr_dedup_score`) | De-Dupe UI (spec v1.4.5) |
 |---|---|---|
-| Job emphasis | Batch adjudication: Accept / Review / Reject, auto-accept safety | Interactive review: rank candidates in a the matching system bucket, per-field glyphs |
+| Job emphasis | Batch adjudication: Accept / Review / Reject, auto-accept safety | Interactive review: rank candidates in an upstream bucket, per-field glyphs |
 | Field comparison | Continuous quality q ∈ [0, 1+bonus]: fuzzy titles, greedy alignment, precision-aware date half-lives, duration abs/relative credit, epoch-date handling | Four discrete states — identical / similar / mismatch / neutral — per named rule with normalization flags |
 | Aggregation | Weighted average of per-field qualities over fields present on both sides; per-creation-type weights + calibration thresholds onto shared bands (<30 Reject, 30–<80 Review, ≥80 Accept) | Baseline 50 + additive weights per fired rule, − penalties, clamp 0–100 |
 | Guards | Large learned library: alt-ID conflict shaping, Accept-corroboration, Series format-sale gate, supplemental short-form, early-cinema profile, part numbers, cross-season/cross-type, epoch dates, inherited-field discount, IMDb reconciliation | None (deliberately simple) |

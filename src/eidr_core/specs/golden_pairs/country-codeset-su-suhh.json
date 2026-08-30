@@ -1,7 +1,7 @@
 {
   "id": "country-codeset-su-suhh",
   "added": "2026-07-29",
-  "why": "The original operator-reported pain (register Phase 1.1): the matching system pairs a record coded SU against a candidate coded SUHH — the SAME country (USSR) in two EIDR code sets (alpha-2 transitional vs ISO 3166-3 alpha-4). The country comparator must treat them as an exact match via the eidr_core.codes crosswalk, never as a mismatch. Regressed once (2026-07-27 cross-thread rebuild); pinned forever here.",
+  "why": "The original operator-reported pain (register Phase 1.1): The matching system pairs a record coded SU against a candidate coded SUHH — the SAME country (USSR) in two EIDR code sets (alpha-2 transitional vs ISO 3166-3 alpha-4). The country comparator must treat them as an exact match via the eidr_core.codes crosswalk, never as a mismatch. Regressed once (2026-07-27 cross-thread rebuild); pinned forever here.",
   "submitted": {
     "creation_type": "Basic",
     "titles": [

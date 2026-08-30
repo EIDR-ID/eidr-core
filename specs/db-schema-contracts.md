@@ -52,7 +52,7 @@ type + nullability, date version, provenance), `schema.sql` (normalized
    2026-08-03 now that the generated contract + dump tool replace the manual
    workflow; recoverable from MCP git history). **The manual-update workflow
    is replaced by running the dump tool.**
-3. **Reader list includes match-audit** (§7.5) — folded into BMR-Review; its
+3. **Reader list includes the match-audit reader** (§7.5) — folded into BMR-Review; its
    audit path reads the mirror through the same package, so BMR-Review's
    assertion covers it.
 4. **MySQL export kit: out of scope** (§7.4).

@@ -70,8 +70,8 @@ wrong, in different ways:
 * XML_to_JSON inherited ``Administrators``, which the schema forbids
   *because it carries the Registrant* — so a child asserted it was
   registered by whoever registered its parent. Not cosmetic: BMR-Review's
-  match-audit reads Registrant to decide **which member to notify** about a
-  mis-assigned ID.
+  match-audit reads Registrant to decide **which member to notify** about
+  a mis-assigned ID.
 * XML_to_JSON implemented only the two NUMBERED title patterns, so a Season
   with no Sequence Number or an Episode with no Distribution Number got no
   system-generated title at all — and an untitled child drops the field

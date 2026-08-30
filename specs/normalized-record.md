@@ -189,7 +189,8 @@ check, which deliberately does NOT track these region-level rules).
 4. §3: Parent applies to all child records; sequence numbers scoped to
    Season (`SeasonInfo/SequenceNumber`) and Episode
    (`EpisodeInfo/SequenceInfo/md:DistributionNumber`); the Conversion Table
-   is the field authority; the matching system evaluates StarSchema-column fields only.
+   is the field authority; the matching system evaluates StarSchema-column
+   fields only.
 
 ## 7. Engine gaps surfaced by §4.1 (for the next BMR engine cycle)
 

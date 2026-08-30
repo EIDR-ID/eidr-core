@@ -74,6 +74,7 @@ __all__ = [
     "NEVER_INHERITED",
     "TITLE_EXEMPT_TYPES",
     "TITLE_INHERITING_TYPES",
+    "is_absent",
     "RECORD_ATTRS",
     "system_generated_title",
     "build_full_base",
@@ -175,10 +176,22 @@ def _text(value: Any) -> str:
     return "" if value is None else str(value).strip()
 
 
-def _is_empty(value: Any) -> bool:
-    """Absent for inheritance purposes: None, empty string, empty container.
+def is_absent(value: Any) -> bool:
+    """THE emptiness rule: is this value absent for inheritance purposes?
 
-    ``0`` and ``False`` are NOT empty — a real ``ApproximateLength`` of 0 or
+    Public because it is POLICY, not a helper. "If the self-defined record
+    does not provide a value, it is inherited" (operator, 2026-08-30) turns
+    entirely on what "does not provide" means, and getting it wrong breaks the
+    rule in BOTH directions -- a plain truthiness test replaces a self-defined
+    ``0`` with the parent's value AND declines to inherit a legitimate ``0``.
+
+    Exported 2026-08-30 because XML_to_JSON hit exactly that and had to COPY
+    the logic: it was private and not in ``__all__``, and importing another
+    package's underscore name is worse than a documented copy. A rule that a
+    consumer must reimplement to obey is not single-homed.
+
+    None, empty string, whitespace-only string, empty container.
+    ``0`` and ``False`` are NOT absent -- a real ``ApproximateLength`` of 0 or
     a real ``False`` flag must not be overwritten by the parent's value.
     """
     if value is None:
@@ -188,6 +201,11 @@ def _is_empty(value: Any) -> bool:
     if isinstance(value, (list, tuple, set, dict)):
         return len(value) == 0
     return False
+
+
+# Internal alias: the module's own call sites read better with the short name,
+# and renaming ~10 uses would churn a diff consumers track via @main.
+_is_empty = is_absent
 
 
 # ---------------------------------------------------------------------------
@@ -237,12 +255,38 @@ def build_full_base(
         full[field] = copy.deepcopy(pv)
         prov[field] = "inherited"
 
-    if creation_type in TITLE_EXEMPT_TYPES:
+    # A submitted title is never replaced by a generated one. This is the SAME
+    # rule the field loop above applies -- "if the self-defined record does not
+    # provide a value, it is inherited/generated; if it does, that value stands"
+    # (operator, 2026-08-30) -- and until 2026-08-30 this block was the single
+    # place the module broke it, on the thirteenth of thirteen fields.
+    #
+    # The consequence was not theoretical: XML_to_JSON shipped exactly this
+    # defect on 2026-08-24 and the reported symptom was an export in which
+    # every child came back with a system-generated title, the operator's real
+    # ones discarded. It also made `provenance` lie -- reporting `system` for a
+    # field the submitter had populated -- which BMR-Review's next tuning cycle
+    # reads to treat self and inherited values differently.
+    if creation_type in TITLE_EXEMPT_TYPES and _is_empty(full.get("ResourceName")):
         built = system_generated_title(
             _best_title(parent_base),
             creation_type,
             sequence_number=extra.get("SequenceNumber"),
             distribution_number=extra.get("DistributionNumber"),
+            # EXTRA FIRST, deliberately -- and this is NOT the same order
+            # XML_to_JSON's local adapter uses (it reads the record block
+            # first). Flagged by that repo 2026-08-30 as a known difference;
+            # aligning to their order was tried and is WRONG. By the time this
+            # runs, `full["ReleaseDate"]` may itself have been INHERITED from
+            # the parent a few lines above, so record-first lets an inherited
+            # value silently outrank an explicit argument the caller passed
+            # for this very purpose. `extra` is the caller saying "use this
+            # date for the title"; nothing should outrank it.
+            #
+            # Unobservable in XML_to_JSON today (its `extra_info` is a
+            # SeasonInfo/EpisodeInfo block and never carries ReleaseDate), so
+            # adoption is safe -- but it is a real difference, and this is the
+            # order to keep.
             release_date=extra.get("ReleaseDate") or full.get("ReleaseDate"),
         )
         if built:

@@ -89,13 +89,31 @@ def cmp_titles(a, b):
     b_use, b_fb = select_titles(b.titles)
     a_raw = [t.text for t in a_use if t.text]
     b_raw = [t.text for t in b_use if t.text]
-    if not a_raw or not b_raw or a_fb or b_fb:
-        # No real (non-system-generated, non-internal) title on one or both sides.
-        # A system-generated title is derived from the series/season/episode
-        # structure that is ALREADY compared via parent/family/distribution
-        # number, so scoring it would double-count -- and a titleless record gets
-        # a system title in the registry. Drop the title from the average rather
-        # than counting it as a 0 (which would swamp the weight-50 episode title).
+    if not a_raw or not b_raw or (a_fb and b_fb):
+        # Drop the title only when BOTH sides fall back, or one has no text.
+        #
+        # Operator ruling 2026-08-30, raised by BMR-Review: "If BOTH a
+        # submitted record and a candidate have system-generated titles, you
+        # ignore the titles entirely ... There is nothing in the title that
+        # isn't derived from the record metadata. The only time you USE a
+        # system-generated title is when one of the records has a
+        # system-generated title but the other has a user-supplied title.
+        # Then it must be used (and will likely be quite different.)"
+        #
+        # The both-sides justification is unchanged and still sound: a
+        # generated title restates series/season/episode structure that
+        # parent/family/distribution number already compare, so scoring it
+        # double-counts. That argument does NOT extend to the one-sided case,
+        # where the other side carries information the structure does not --
+        # and a real title beside a generated one is usually VERY different,
+        # which is exactly the discriminating signal. Until 2026-08-30 the
+        # test was `or`, so that signal was discarded.
+        #
+        # Deliberately parent-UNAWARE, at BMR-Review's request: the "only when
+        # they share a common parent" half of the ruling is already handled by
+        # its scorer._inherited_discount, which drops a field both records
+        # inherited from the SAME parent. Keeping that here would duplicate the
+        # rule and make the comparator depend on more than its two arguments.
         why = ("no real title to compare" if (not a_raw or not b_raw)
                else "system-generated titles only - ignored")
         return FieldResult("title", None, why, meta={})

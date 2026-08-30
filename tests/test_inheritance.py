@@ -16,6 +16,7 @@ from eidr_core.inheritance import (
     NEVER_INHERITED,
     build_full_base,
     build_full_record,
+    is_absent,
     provenance,
     system_generated_title,
 )
@@ -159,6 +160,22 @@ def test_json_season_date_fallback_can_come_from_the_inherited_release_date():
     # PARENT supplies ReleaseDate 2001; the child gave neither number nor date.
     full, _ = build_full_base({}, PARENT, "Season")
     assert full["ResourceName"][0]["Title"] == "The Series [2001]"
+
+
+def test_an_explicit_extra_date_outranks_an_inherited_one():
+    """Precedence, pinned after trying it the other way round.
+
+    XML_to_JSON flagged that the two adapters resolve this in opposite
+    orders and offered consistency as optional. Aligning to record-first
+    was tried and is wrong: by the time the title is built, the record's
+    ReleaseDate may itself have been INHERITED from the parent, so
+    record-first lets an inherited value outrank an argument the caller
+    passed specifically to build this title. PARENT carries 2001; the
+    caller says 2006; the caller wins.
+    """
+    full, _ = build_full_base({}, PARENT, "Season",
+                              extra={"ReleaseDate": "2006"})
+    assert full["ResourceName"][0]["Title"] == "The Series [2006]"
 
 
 def test_json_no_parent_returns_self_unchanged():
@@ -314,3 +331,78 @@ def test_creation_type_defaults_to_the_records_own():
     child = _Rec(creation_type="Season", sequence_number="2")
     full = build_full_record(child, _parent_rec())     # no explicit ctype
     assert full.titles[0].text == "The Series: Season 2"
+
+
+# ---------------------------------------------------------------------------
+# The one rule, applied to the thirteenth field too (raised by XML_to_JSON,
+# operator ruling 2026-08-30).
+#
+# "If the self-defined record does not provide a title, then it is
+# system-generated ... If a record has a user-supplied title, then it must
+# never be replaced with a system-generated title. (Just as user-supplied data
+# must never be replaced with inherited data.)"
+#
+# The JSON adapter honoured that for twelve fields and broke it on the
+# thirteenth: `build_full_base` overwrote a submitted ResourceName
+# unconditionally, while `build_full_record` guarded it. Two adapters in ONE
+# file disagreeing is the exact failure the module docstring cites as its
+# reason to exist. It went unnoticed because only the object shape had a test
+# -- so both shapes are pinned here now.
+# ---------------------------------------------------------------------------
+
+def test_json_a_child_that_supplied_its_own_title_keeps_it():
+    full, prov = build_full_base(
+        {"ResourceName": [{"Title": "My Hand-Written Season Title"}]},
+        PARENT, "Season", extra={"SequenceNumber": "6"})
+    assert full["ResourceName"][0]["Title"] == "My Hand-Written Season Title"
+    assert prov["ResourceName"] == "self"
+
+
+def test_json_an_empty_title_list_still_counts_as_absent():
+    # The emptiness rule, not truthiness: [] means "not provided".
+    full, prov = build_full_base({"ResourceName": []}, PARENT, "Season",
+                                 extra={"SequenceNumber": "6"})
+    assert full["ResourceName"][0]["Title"] == "The Series: Season 6"
+    assert prov["ResourceName"] == "system"
+
+
+def test_both_adapters_agree_on_a_supplied_title():
+    """The divergence itself, asserted across shapes.
+
+    Neither adapter's own test can catch this -- only comparing them can.
+    """
+    json_full, json_prov = build_full_base(
+        {"ResourceName": [{"Title": "Mine"}]}, PARENT, "Season",
+        extra={"SequenceNumber": "6"})
+    rec = _Rec(creation_type="Season", sequence_number="6",
+               titles=[_Title(text="Mine", is_resource=True)])
+    rec_full = build_full_record(rec, _parent_rec(), "Season")
+
+    assert json_full["ResourceName"][0]["Title"] == rec_full.titles[0].text == "Mine"
+    assert json_prov["ResourceName"] == provenance(rec_full)["ResourceName"] == "self"
+
+
+def test_both_adapters_agree_on_generating_when_none_supplied():
+    json_full, json_prov = build_full_base({}, PARENT, "Season",
+                                           extra={"SequenceNumber": "6"})
+    rec_full = build_full_record(_Rec(creation_type="Season",
+                                      sequence_number="6"),
+                                 _parent_rec(), "Season")
+    assert json_full["ResourceName"][0]["Title"] == rec_full.titles[0].text
+    assert json_prov["ResourceName"] == provenance(rec_full)["ResourceName"] == "system"
+
+
+# --- is_absent is public policy, not a helper ------------------------------
+
+@pytest.mark.parametrize("value", [None, "", "   ", [], {}, ()])
+def test_absent_values(value):
+    assert is_absent(value) is True
+
+
+@pytest.mark.parametrize("value", [0, False, 0.0, "x", [0], {"a": 1}])
+def test_present_values_including_falsy_ones(value):
+    # The reason this is exported: a plain truthiness test breaks the rule in
+    # BOTH directions on 0 -- replacing a self-defined 0, and refusing to
+    # inherit a legitimate one. XML_to_JSON had to copy the logic because it
+    # was private.
+    assert is_absent(value) is False

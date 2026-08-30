@@ -30,6 +30,23 @@ portfolio may reimplement, reinterpret or locally extend them.
      provided, so it is replaced by the parent's real title (Edit / Clip /
      Manifestation) or regenerated (Season / Episode).
 
+  ORDER. Title generation (rule 2) runs BEFORE field inheritance (rule 3).
+  The generated title uses the parent's title plus data guaranteed to be in
+  the CHILD record; inheritance then fills every inheritable field the child
+  still lacks; and the generated title, being data in the field, blocks
+  ResourceName inheritance for Season/Episode.
+
+  The order is load-bearing, not stylistic. Inheriting first lets a child
+  with no number reach the release-date pattern through a date it just took
+  from its parent -- so every sibling under one parent generates the SAME
+  string ("The Series [2006]"). The date pattern exists to tell siblings
+  apart, so that is a false de-dup signal manufactured by the module whose
+  job is to make children comparable. A Season or Episode with no number and
+  no date of its own therefore RAISES; it does not borrow one.
+  (Operator ruling 2026-08-30, reported by XML_to_JSON -- which had asked for
+  the inherited-date behaviour a day earlier, after reading a docstring here
+  that asserted it was intended. The docstring was wrong.)
+
 Rules 2 and 3 are ONE rule with two applications: a user-supplied value is
 never replaced -- not by an inherited one, not by a generated one. Everything
 else is fair game.
@@ -205,10 +222,6 @@ CHILD_TYPES: frozenset[str] = frozenset({
 TITLE_EXEMPT_TYPES: frozenset[str] = frozenset({"Season", "Episode"})
 TITLE_INHERITING_TYPES: frozenset[str] = frozenset({"Edit", "Clip", "Manifestation"})
 
-# Only ResourceName is inheritable, so only it needs the Season/Episode
-# exemption; AlternateResourceName is excluded by NEVER_INHERITED already.
-_TITLE_FIELDS = ("ResourceName",)
-
 
 def system_generated_title(
     parent_title: str,
@@ -372,36 +385,21 @@ def build_full_base(
     if creation_type not in CHILD_TYPES or not parent_base:
         return full, prov
 
-    for field in INHERITABLE_FIELDS:
-        if field in NEVER_INHERITED:
-            continue                                    # belt and braces
-        if field in _TITLE_FIELDS and creation_type in TITLE_EXEMPT_TYPES:
-            continue                                    # constructed below
-        if field == "ResourceName":
-            # Only a USER-SUPPLIED title blocks; a system-generated one is
-            # replaced by the parent's real title.
-            if has_user_supplied_title(full.get(field)):
-                continue
-        elif not _is_empty(full.get(field)):
-            continue                                    # child asserted its own
-        pv = parent_base.get(field)
-        if _is_empty(pv):
-            continue
-        full[field] = copy.deepcopy(pv)
-        prov[field] = "inherited"
-
-    # A submitted title is never replaced by a generated one. This is the SAME
-    # rule the field loop above applies -- "if the self-defined record does not
-    # provide a value, it is inherited/generated; if it does, that value stands"
-    # (operator, 2026-08-30) -- and until 2026-08-30 this block was the single
-    # place the module broke it, on the thirteenth of thirteen fields.
+    # ORDER: TITLE GENERATION RUNS BEFORE FIELD INHERITANCE (operator ruling
+    # 2026-08-30). The generated title uses the parent's title plus data
+    # GUARANTEED to be in the child record; inheritance then fills whatever
+    # the child still lacks, and the title just written counts as data, so it
+    # blocks ResourceName inheritance for Season/Episode.
     #
-    # The consequence was not theoretical: XML_to_JSON shipped exactly this
-    # defect on 2026-08-24 and the reported symptom was an export in which
-    # every child came back with a system-generated title, the operator's real
-    # ones discarded. It also made `provenance` lie -- reporting `system` for a
-    # field the submitter had populated -- which BMR-Review's next tuning cycle
-    # reads to treat self and inherited values differently.
+    # This is not a refactor. Until 2026-08-30 the loop ran first, so a
+    # Season/Episode with no number could reach the release-date pattern via a
+    # date it had just INHERITED -- making every sibling under one parent
+    # generate the identical title ("The Series [2006]"), a false de-dup
+    # signal manufactured by the module whose job is to make children
+    # comparable. Reported by XML_to_JSON, which had itself asked for the old
+    # behaviour after reading a docstring that asserted it was intended.
+    title_error: TitleConstructionError | None = None
+    generated_title = False
     if (creation_type in TITLE_EXEMPT_TYPES
             and not has_user_supplied_title(full.get("ResourceName"))):
         built = system_generated_title(
@@ -409,46 +407,66 @@ def build_full_base(
             creation_type,
             sequence_number=extra.get("SequenceNumber"),
             distribution_number=extra.get("DistributionNumber"),
-            # EXTRA FIRST, deliberately -- and this is NOT the same order
-            # XML_to_JSON's local adapter uses (it reads the record block
-            # first). Flagged by that repo 2026-08-30 as a known difference;
-            # aligning to their order was tried and is WRONG. By the time this
-            # runs, `full["ReleaseDate"]` may itself have been INHERITED from
-            # the parent a few lines above, so record-first lets an inherited
-            # value silently outrank an explicit argument the caller passed
-            # for this very purpose. `extra` is the caller saying "use this
-            # date for the title"; nothing should outrank it.
-            #
-            # Unobservable in XML_to_JSON today (its `extra_info` is a
-            # SeasonInfo/EpisodeInfo block and never carries ReleaseDate), so
-            # adoption is safe -- but it is a real difference, and this is the
-            # order to keep.
+            # `full` has not been through the loop yet, so this is the child's
+            # OWN date -- which is the point of generating first. `extra`
+            # still wins: it is the caller saying "use this date for the
+            # title", and nothing should outrank that.
             release_date=extra.get("ReleaseDate") or full.get("ReleaseDate"),
         )
-        if not built:
+        if built:
+            text, title_class = built
+            full["ResourceName"] = [{
+                "Title": text,
+                "TitleClass": title_class,
+                "SystemGenerated": "true",
+            }]
+            prov["ResourceName"] = "system"
+            generated_title = True
+        else:
             # RULE 2 says this is impossible. Reaching it means the parent has
-            # no title, or the child has neither a number nor a release date.
-            exc = TitleConstructionError(
+            # no title, or the child has neither a number nor a release date
+            # OF ITS OWN. Deliberately not raised here: inheritance still has
+            # to run so `exc.partial` hands back a fully-inherited base, which
+            # XML_to_JSON's fallback handler depends on. Raised at the end.
+            title_error = TitleConstructionError(
                 f"{creation_type} has no user-supplied ResourceName and no "
                 f"generated title could be built: parent title="
                 f"{_best_title(parent_base)!r}, "
                 f"sequence_number={extra.get('SequenceNumber')!r}, "
                 f"distribution_number={extra.get('DistributionNumber')!r}, "
-                f"release_date={extra.get('ReleaseDate') or full.get('ReleaseDate')!r}. "
+                f"release_date="
+                f"{extra.get('ReleaseDate') or full.get('ReleaseDate')!r}. "
                 "Leaving the child untitled would silently drop the "
                 "heaviest-weighted comparison field."
             )
-            # Field inheritance has already run; hand it over so a caller
-            # that proceeds does not re-derive it through a second path.
-            exc.partial, exc.provenance = full, dict(prov)
-            raise exc
-        text, title_class = built
-        full["ResourceName"] = [{
-            "Title": text,
-            "TitleClass": title_class,
-            "SystemGenerated": "true",
-        }]
-        prov["ResourceName"] = "system"
+
+    for field in INHERITABLE_FIELDS:
+        if field in NEVER_INHERITED:
+            continue                                    # belt and braces
+        if field == "ResourceName":
+            # A title generated moments ago is data in the field and blocks,
+            # exactly as a submitted one does. A system-generated title the
+            # record ARRIVED with does not block: it is not the submitter's,
+            # so it was regenerated above, or is replaced by the parent's real
+            # title here, rather than outliving a corrected parent.
+            if generated_title or has_user_supplied_title(full.get(field)):
+                continue
+        elif not _is_empty(full.get(field)):
+            continue
+        pv = parent_base.get(field)
+        if _is_empty(pv):
+            continue
+        full[field] = copy.deepcopy(pv)
+        prov[field] = "inherited"
+
+    if title_error is not None:
+        # Inheritance has now run, so hand over a COMPLETE base: a caller that
+        # proceeds must not have to re-derive it through a second path. Note
+        # the child did pick up the parent's ResourceName in the loop above --
+        # the best available fallback, and why this is a `partial` rather than
+        # a bare failure.
+        title_error.partial, title_error.provenance = full, dict(prov)
+        raise title_error
 
     return full, prov
 
@@ -549,6 +567,12 @@ def build_full_record(
         _attach(full, prov)
         return full
 
+    # Title BEFORE inheritance -- see the matching comment in
+    # build_full_base. Doing it here means `full.release_date` is still the
+    # child's OWN date, and the title written below is data that the loop
+    # then treats as blocking, exactly as a submitted title would be.
+    title_error = _apply_title(full, parent_full, ctype, prov)
+
     for field, attr in attrs.items():
         if field not in INHERITABLE_FIELDS or field in NEVER_INHERITED:
             continue
@@ -580,23 +604,37 @@ def build_full_record(
         setattr(full, attr, inherited)
         prov.setdefault("Credits", "inherited")
 
-    _apply_title(full, parent_full, ctype, prov)
     _attach(full, prov)
+    if title_error is not None:
+        # Inheritance has run, so the partial is complete -- including the
+        # parent's title, picked up by the loop above because generation left
+        # the field empty. Same contract as build_full_base.
+        title_error.partial, title_error.provenance = full, dict(prov)
+        raise title_error
     return full
 
 
-def _apply_title(full: Any, parent_full: Any, ctype: str, prov: dict) -> None:
-    """Season/Episode get a constructed title; Edit/Clip/Manifestation inherit."""
+def _apply_title(
+    full: Any, parent_full: Any, ctype: str, prov: dict,
+) -> TitleConstructionError | None:
+    """Season/Episode get a constructed title; other child types inherit one.
+
+    Runs BEFORE field inheritance (operator ruling 2026-08-30), so the record
+    still carries only its own data. RETURNS a TitleConstructionError rather
+    than raising it: the caller has to finish inheriting before the error goes
+    out, or `exc.partial` would hand back a base that is missing every
+    inherited field.
+    """
     titles = getattr(full, "titles", None)
     if titles is None:
-        return
+        return None
 
     if ctype in TITLE_EXEMPT_TYPES:
         # A USER-SUPPLIED title is kept. A system-generated one is not the
         # submitter's and is regenerated, so a changed parent title
         # propagates instead of leaving a stale derived string.
         if has_user_supplied_title(titles):
-            return
+            return None
         built = system_generated_title(
             _best_record_title(parent_full),
             ctype,
@@ -616,15 +654,13 @@ def _apply_title(full: Any, parent_full: Any, ctype: str, prov: dict) -> None:
                 f"{getattr(full, 'distribution_number', None)!r}, "
                 f"release_date={getattr(full, 'release_date', None)!r}."
             )
-            _attach(full, prov)
-            exc.partial, exc.provenance = full, dict(prov)
-            raise exc
+            return exc
         text, title_class = built
         made = _clone_title(parent_full, text, title_class)
         if made is not None:
             full.titles = [made]
             prov["ResourceName"] = "system"
-        return
+        return None
 
     # Inherit for EVERY non-exempt type, not only the three named ones. The
     # policy is the field policy: ResourceName is inheritable, and the ONLY
@@ -642,6 +678,7 @@ def _apply_title(full: Any, parent_full: Any, ctype: str, prov: dict) -> None:
                     element.self_defined = False
             full.titles = inherited
             prov["ResourceName"] = "inherited"
+    return None
 
 
 def _best_record_title(rec: Any) -> str:

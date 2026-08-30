@@ -179,10 +179,80 @@ def test_json_season_without_a_number_falls_back_to_the_date():
     assert full["ResourceName"][0]["Title"] == "The Series [2006]"
 
 
-def test_json_season_date_fallback_can_come_from_the_inherited_release_date():
-    # PARENT supplies ReleaseDate 2001; the child gave neither number nor date.
-    full, _ = build_full_base({}, PARENT, "Season")
-    assert full["ResourceName"][0]["Title"] == "The Series [2001]"
+def test_a_child_with_no_number_and_no_date_of_its_own_raises_not_borrows():
+    """The date fallback may NOT be reached through an INHERITED date.
+
+    Operator ruling 2026-08-30: titles are generated BEFORE inheritance, from
+    data guaranteed present in the child. This test asserted the opposite
+    until that ruling, and the old behaviour was wrong on its own terms --
+    the date pattern exists to tell SIBLINGS apart, so sourcing the date from
+    the shared parent makes every sibling collide on one string: a false
+    de-dup signal produced by the module meant to make children comparable.
+
+    PARENT carries ReleaseDate 2001; this child gives neither number nor date.
+    """
+    with pytest.raises(TitleConstructionError) as caught:
+        build_full_base({}, PARENT, "Season")
+    exc = caught.value
+
+    # RULE 2 fails loudly rather than leaving a child untitled -- but the
+    # partial is COMPLETE. Inheritance still ran before the raise, so a caller
+    # that proceeds need not re-derive it through a second path, and
+    # ResourceName fell back to the parent's real title rather than staying
+    # empty. XML_to_JSON's fallback handler depends on exactly this.
+    assert exc.partial["ResourceName"] == PARENT["ResourceName"]
+    assert exc.provenance["ResourceName"] == "inherited"
+    assert exc.partial["ReleaseDate"] == PARENT["ReleaseDate"]
+    assert exc.partial["Mode"] == PARENT["Mode"]
+
+
+def test_both_shapes_agree_that_an_inherited_date_cannot_title_a_child():
+    """The ordering must hold in BOTH adapters.
+
+    This is the probe the previous cycle lacked. Both adapters generated
+    AFTER inheriting, so they agreed with each other: every cross-shape
+    determinism test passed while both were wrong, which is how the defect
+    survived to be reported by a consumer instead of caught here. Reverting
+    either adapter alone now reddens this.
+    """
+    with pytest.raises(TitleConstructionError):
+        build_full_base({}, PARENT, "Season")
+    with pytest.raises(TitleConstructionError):
+        build_full_record(_Rec(creation_type="Season"), _parent_rec(),
+                          creation_type="Season")
+
+
+def test_a_childs_own_date_still_titles_it():
+    """The date pattern is untouched when the date is the child's OWN."""
+    full, _ = build_full_base({"ReleaseDate": "2006"}, PARENT, "Season")
+    assert full["ResourceName"][0]["Title"] == "The Series [2006]"
+
+    rec = build_full_record(_Rec(creation_type="Season", release_date="2006"),
+                            _parent_rec(), creation_type="Season")
+    assert rec.titles[0].text == "The Series [2006]"
+
+
+def test_a_generated_title_blocks_inheriting_the_parents_title():
+    """Ordering consequence: the generated title is data, so it blocks.
+
+    Season 2 keeps "The Series: Season 2" -- the field loop, reaching
+    ResourceName afterwards, must not overwrite it with the parent's title.
+    """
+    full, prov = build_full_base({}, PARENT, "Season",
+                                 extra={"SequenceNumber": "2"})
+    assert full["ResourceName"][0]["Title"] == "The Series: Season 2"
+    assert prov["ResourceName"] == "system"
+
+
+def test_siblings_with_numbers_do_not_collide():
+    """The point of the ruling, stated as a test."""
+    made = {
+        n: build_full_base(
+            {}, PARENT, "Season", extra={"SequenceNumber": n},
+        )[0]["ResourceName"][0]["Title"]
+        for n in ("1", "2", "3")
+    }
+    assert len(set(made.values())) == 3
 
 
 def test_an_explicit_extra_date_outranks_an_inherited_one():

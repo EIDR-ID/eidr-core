@@ -399,7 +399,6 @@ def build_full_base(
     # comparable. Reported by XML_to_JSON, which had itself asked for the old
     # behaviour after reading a docstring that asserted it was intended.
     title_error: TitleConstructionError | None = None
-    generated_title = False
     if (creation_type in TITLE_EXEMPT_TYPES
             and not has_user_supplied_title(full.get("ResourceName"))):
         built = system_generated_title(
@@ -421,13 +420,13 @@ def build_full_base(
                 "SystemGenerated": "true",
             }]
             prov["ResourceName"] = "system"
-            generated_title = True
         else:
             # RULE 2 says this is impossible. Reaching it means the parent has
             # no title, or the child has neither a number nor a release date
             # OF ITS OWN. Deliberately not raised here: inheritance still has
-            # to run so `exc.partial` hands back a fully-inherited base, which
-            # XML_to_JSON's fallback handler depends on. Raised at the end.
+            # to run so `exc.partial` hands back a base complete in every
+            # OTHER field, which XML_to_JSON's fallback handler depends on.
+            # Raised at the end.
             title_error = TitleConstructionError(
                 f"{creation_type} has no user-supplied ResourceName and no "
                 f"generated title could be built: parent title="
@@ -444,12 +443,23 @@ def build_full_base(
         if field in NEVER_INHERITED:
             continue                                    # belt and braces
         if field == "ResourceName":
-            # A title generated moments ago is data in the field and blocks,
-            # exactly as a submitted one does. A system-generated title the
-            # record ARRIVED with does not block: it is not the submitter's,
-            # so it was regenerated above, or is replaced by the parent's real
-            # title here, rather than outliving a corrected parent.
-            if generated_title or has_user_supplied_title(full.get(field)):
+            # Season/Episode NEVER inherit a title. Theirs is user-supplied or
+            # generated above -- and if generation FAILED, untitled is the
+            # correct outcome, NOT the parent's title. Copying that in gives
+            # the child a Full title byte-identical to its parent's (a false
+            # parent-child duplicate for the de-dup engine) carrying the
+            # parent's SystemGenerated="false", asserting a human-supplied
+            # title nobody supplied. XML_to_JSON pinned that leak in a test;
+            # eidr-core briefly reintroduced it on 2026-08-30 by deleting this
+            # exemption as "covered by the general blocking rule" -- which
+            # holds only when generation SUCCEEDS.
+            if creation_type in TITLE_EXEMPT_TYPES:
+                continue
+            # Other child types DO inherit one, and only a user-supplied title
+            # blocks: a system-generated one is not the submitter's, so it is
+            # replaced by the parent's real title rather than outliving a
+            # corrected parent.
+            if has_user_supplied_title(full.get(field)):
                 continue
         elif not _is_empty(full.get(field)):
             continue
@@ -460,11 +470,11 @@ def build_full_base(
         prov[field] = "inherited"
 
     if title_error is not None:
-        # Inheritance has now run, so hand over a COMPLETE base: a caller that
-        # proceeds must not have to re-derive it through a second path. Note
-        # the child did pick up the parent's ResourceName in the loop above --
-        # the best available fallback, and why this is a `partial` rather than
-        # a bare failure.
+        # Inheritance has now run, so hand over a base complete in every
+        # field EXCEPT the title -- which is exactly why it is a `partial`.
+        # The caller need not re-derive the inherited fields through a second
+        # path, and does not silently receive the parent's title standing in
+        # for the one that could not be built.
         title_error.partial, title_error.provenance = full, dict(prov)
         raise title_error
 

@@ -195,15 +195,23 @@ def test_a_child_with_no_number_and_no_date_of_its_own_raises_not_borrows():
         build_full_base({}, PARENT, "Season")
     exc = caught.value
 
-    # RULE 2 fails loudly rather than leaving a child untitled -- but the
-    # partial is COMPLETE. Inheritance still ran before the raise, so a caller
-    # that proceeds need not re-derive it through a second path, and
-    # ResourceName fell back to the parent's real title rather than staying
-    # empty. XML_to_JSON's fallback handler depends on exactly this.
-    assert exc.partial["ResourceName"] == PARENT["ResourceName"]
-    assert exc.provenance["ResourceName"] == "inherited"
+    # RULE 2 fails loudly rather than leaving a child untitled -- and the
+    # partial is complete in every field EXCEPT the title, which is why it is
+    # a `partial`. Inheritance still ran before the raise, so a caller that
+    # proceeds need not re-derive it through a second path. XML_to_JSON's
+    # fallback handler depends on exactly this.
     assert exc.partial["ReleaseDate"] == PARENT["ReleaseDate"]
     assert exc.partial["Mode"] == PARENT["Mode"]
+    assert exc.provenance["ReleaseDate"] == "inherited"
+
+    # The title is ABSENT, never the parent's. Copying the parent's title in
+    # would give the child a Full title byte-identical to its own parent's --
+    # a false parent-child duplicate for the de-dup engine -- carrying the
+    # parent's SystemGenerated="false" and so asserting a human-supplied
+    # title nobody supplied. XML_to_JSON pinned this leak; eidr-core
+    # reintroduced it for one commit on 2026-08-30 and its test caught it.
+    assert "ResourceName" not in exc.partial
+    assert "ResourceName" not in exc.provenance
 
 
 def test_both_shapes_agree_that_an_inherited_date_cannot_title_a_child():

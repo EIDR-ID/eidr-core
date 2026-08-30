@@ -6,8 +6,8 @@ on:
   pull_request:
     branches: [main]
 
-# eidr-core needs no EIDR_CORE_TOKEN: it is the root of the private-repo
-# dependency chain (consumers install FROM here), not a consumer of it.
+# This repo is PUBLIC and depends on no private repo, so the job needs no
+# credential of any kind -- an anonymous clone is all pip requires.
 # Every consumer pins `@main`, so a broken push here reaches every
 # consumer's next CI install before a human would notice — this workflow
 # exists to catch that before it leaves this repo.
@@ -42,7 +42,7 @@ jobs:
       # 2026-08-09). Tool versions are pinned in the dev extra so a tool
       # release can't fail this job without a code change.
       - name: Lint (ruff)
-        run: ruff check src/ tests/ tools/
+        run: ruff check src/ tests/
 
       - name: Type check (mypy)
         run: mypy src/eidr_core

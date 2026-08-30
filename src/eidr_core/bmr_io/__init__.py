@@ -79,6 +79,8 @@ import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
 from collections.abc import Iterable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -93,7 +95,9 @@ __all__ = ["HEADER_ROW", "DATA_START", "read_headers", "count_family",
            "rightmost_in", "expand_family", "transplant",
            "fix_shared_strings",
            "open_sheet", "read_sheet", "family_layout", "RepeatPlan",
-           "pad_groups"]
+           "pad_groups"
+           "ROW_ID_COLUMN", "PARENT_COLUMN", "ASSIGNED_ID_COLUMN",
+           "ParentRef", "index_rows", "resolve_parent", "parent_chain"]
 
 
 def _header_map(values: Iterable) -> dict[int, str]:
@@ -541,3 +545,153 @@ def pad_groups(items: Sequence, count: int, width: int,
         else:
             out.extend([fill] * width)
     return out
+
+# ---------------------------------------------------------------------------
+# Parent references: "Parent EIDR/Row ID" holds EITHER an EIDR ID or a Row ID
+# ---------------------------------------------------------------------------
+#
+# The BMR column is named `Parent EIDR/Row ID` and its own sheet description
+# says so: "Usually, the Row ID of the work's Parent record, or the Parent's
+# EIDR ID if the Parent is not included as a row in the spreadsheet."
+#
+# A consumer that treats the cell as an EIDR ID gets a child with no
+# resolvable parent, and the damage is not limited to a missing parent link:
+#
+#   * no parent means no inheritance and no generated title, so a Season with
+#     a Season No. comes out UNTITLED -- dropping the field the de-dup engine
+#     weights most heavily;
+#   * the family gate then reports "different Family ID (not the same series)"
+#     and rejects candidates that ARE the same series.
+#
+# Observed 2026-09-03 on row N0008 of PV_EIDR_Episodic_SAMPLE_1000-2: parent
+# cell "S0007", a row whose Assigned EIDR ID is
+# 10.5240/1FB4-801D-C016-5F48-86E6-9 -- the same parent the candidate carries.
+# The pair was same-series and was rejected as a different family.
+#
+# Lives here rather than in either consumer because BMR-sheet semantics are
+# this module's job and BOTH record builders need it (BMR-Review and
+# XML_to_JSON), which is the portfolio's second-consumer rule.
+
+ROW_ID_COLUMN = "Unique Row ID"
+PARENT_COLUMN = "Parent EIDR/Row ID"
+ASSIGNED_ID_COLUMN = "Assigned EIDR ID"
+
+
+@dataclass(frozen=True)
+class ParentRef:
+    """What a child row's parent cell resolved to.
+
+    ``eidr_id``   the parent's EIDR ID, if one is known.
+    ``row``       the parent's row in THIS sheet, if the reference named one.
+    ``raw``       the cell as written, for diagnostics.
+    ``unresolved`` the cell named a row that is not in the sheet.
+
+    A parent row with no ``Assigned EIDR ID`` yet is normal, not an error: a
+    new Series registered alongside its Seasons has no ID until the registry
+    assigns one. Such a ref has ``row`` set and ``eidr_id`` None, and the
+    caller should build the parent's record FROM THAT ROW.
+    """
+
+    raw: str = ""
+    eidr_id: str | None = None
+    row: Mapping[str, Any] | None = None
+    unresolved: bool = False
+
+    def __bool__(self) -> bool:
+        """True when the reference led somewhere usable."""
+        return bool(self.eidr_id) or self.row is not None
+
+
+def index_rows(rows: Iterable[Mapping[str, Any]],
+               row_id_column: str = ROW_ID_COLUMN) -> dict[str, Mapping[str, Any]]:
+    """Index sheet rows by Row ID, so parent references can be looked up.
+
+    Row IDs are compared case-insensitively after stripping: sheets are
+    hand-edited and "s0007" must find "S0007". A duplicate Row ID keeps the
+    FIRST occurrence -- a later row cannot silently capture children that
+    already point at the earlier one.
+    """
+    out: dict[str, Mapping[str, Any]] = {}
+    for row in rows:
+        rid = row.get(row_id_column)
+        key = str(rid).strip().casefold() if rid is not None else ""
+        if key and key not in out:
+            out[key] = row
+    return out
+
+
+def resolve_parent(row: Mapping[str, Any],
+                   index: Mapping[str, Mapping[str, Any]],
+                   *,
+                   parent_column: str = PARENT_COLUMN,
+                   assigned_id_column: str = ASSIGNED_ID_COLUMN) -> ParentRef:
+    """Resolve one child row's parent cell into a :class:`ParentRef`.
+
+    An EIDR ID is used as-is. Anything else is treated as a Row ID and looked
+    up in *index* (build it with :func:`index_rows`). The discrimination is
+    :func:`eidr_core.ids.is_valid_eidr_id`, not a prefix test, so a mistyped
+    ID with a bad check character is reported as an unresolved reference
+    rather than silently passed downstream as a parent that cannot exist.
+    """
+    from ..ids import is_valid_eidr_id
+
+    raw_value = row.get(parent_column)
+    raw = str(raw_value).strip() if raw_value is not None else ""
+    if not raw:
+        return ParentRef()
+
+    if is_valid_eidr_id(raw):
+        return ParentRef(raw=raw, eidr_id=raw)
+
+    parent_row = index.get(raw.casefold())
+    if parent_row is None:
+        return ParentRef(raw=raw, unresolved=True)
+
+    assigned = parent_row.get(assigned_id_column)
+    assigned = str(assigned).strip() if assigned is not None else ""
+    return ParentRef(raw=raw,
+                     eidr_id=assigned if is_valid_eidr_id(assigned) else None,
+                     row=parent_row)
+
+
+def parent_chain(row: Mapping[str, Any],
+                 index: Mapping[str, Mapping[str, Any]],
+                 *,
+                 parent_column: str = PARENT_COLUMN,
+                 assigned_id_column: str = ASSIGNED_ID_COLUMN,
+                 row_id_column: str = ROW_ID_COLUMN,
+                 max_depth: int = 16) -> list[ParentRef]:
+    """Walk a row's ancestry within the sheet, nearest parent first.
+
+    An Episode may point at a Season row which points at a Series row, and
+    none of them need have an EIDR ID yet, so a consumer building a child's
+    full record may have to build the whole chain. Stops at the first ref
+    that leaves the sheet (an EIDR ID, or an unresolved reference) -- that
+    one is included, since it is where the caller picks up.
+
+    A sheet is hand-edited, so a cycle is a real possibility rather than a
+    theoretical one; it terminates the walk instead of hanging. *max_depth*
+    is a second belt against a pathological sheet.
+    """
+    chain: list[ParentRef] = []
+    seen: set[str] = set()
+    rid = row.get(row_id_column)
+    if rid is not None and str(rid).strip():
+        seen.add(str(rid).strip().casefold())
+
+    current = row
+    for _ in range(max_depth):
+        ref = resolve_parent(current, index,
+                             parent_column=parent_column,
+                             assigned_id_column=assigned_id_column)
+        if not ref.raw:
+            break
+        chain.append(ref)
+        if ref.row is None:              # left the sheet: EIDR ID or dangling
+            break
+        key = ref.raw.casefold()
+        if key in seen:                  # cycle
+            break
+        seen.add(key)
+        current = ref.row
+    return chain

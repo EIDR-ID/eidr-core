@@ -17,6 +17,7 @@ from eidr_core.inheritance import (
     TitleConstructionError,
     build_full_base,
     build_full_record,
+    has_user_supplied_title,
     is_absent,
     provenance,
     system_generated_title,
@@ -37,21 +38,42 @@ def test_administrators_is_never_inheritable():
     assert "Administrators" not in INHERITABLE_FIELDS
 
 
-@pytest.mark.parametrize("f", ["ID", "AlternateID", "Description", "RegistrantExtra"])
+@pytest.mark.parametrize("f", ["ID", "AlternateID", "Description",
+                               "RegistrantExtra", "AlternateResourceName"])
 def test_the_rest_of_the_never_inherited_set(f):
     assert f in NEVER_INHERITED and f not in INHERITABLE_FIELDS
 
 
 @pytest.mark.parametrize("f", [
     "StructuralType", "Mode", "ReferentType", "ResourceName",
-    "AlternateResourceName", "OriginalLanguage", "VersionLanguage",
+    "OriginalLanguage", "VersionLanguage",
     "AssociatedOrg", "ReleaseDate", "CountryOfOrigin", "Status",
     "ApproximateLength", "Credits",
 ])
-def test_the_schema_inheritable_set_is_complete(f):
-    # XML_to_JSON carried only 6 of these 13; the 7 it lacked are the reason
-    # this list is asserted in full rather than spot-checked.
+def test_the_inheritable_set_is_complete(f):
+    # Asserted in full rather than spot-checked: XML_to_JSON carried only 6
+    # of these, and the ones it lacked were the defect.
     assert f in INHERITABLE_FIELDS
+
+
+def test_the_inheritable_set_has_exactly_twelve_fields():
+    # A count, so ADDING one is as loud as removing one. It was 13 until
+    # 2026-08-30, when the operator corrected AlternateResourceName out.
+    assert len(INHERITABLE_FIELDS) == 12
+
+
+def test_only_the_primary_title_inherits():
+    """Operator, 2026-08-30, correcting the schema summary this was seeded from.
+
+    A child does not acquire its parent's ALTERNATE titles -- only the
+    primary one.
+    """
+    assert "ResourceName" in INHERITABLE_FIELDS
+    assert "AlternateResourceName" not in INHERITABLE_FIELDS
+    full, _ = build_full_base(
+        {}, {"ResourceName": [{"Title": "P"}],
+             "AlternateResourceName": [{"Title": "P Alt"}]}, "Edit")
+    assert "AlternateResourceName" not in full
 
 
 def test_the_two_sets_do_not_overlap():
@@ -453,3 +475,67 @@ def test_non_child_types_never_raise():
     # title simply means no title to inherit.
     full, _ = build_full_base({}, {"Mode": "A"}, "Edit")
     assert "ResourceName" not in full
+
+
+# ---------------------------------------------------------------------------
+# What BLOCKS is a USER-SUPPLIED value (operator, 2026-08-30): "only Resource
+# Name can be inherited (if it is not provided or system-generated)".
+#
+# A system-generated title is not the submitter's, so it must not block --
+# otherwise a stale derived string outlives a corrected parent title.
+# ---------------------------------------------------------------------------
+
+_GEN = [{"Title": "Old Generated", "SystemGenerated": "true"}]
+_REAL = [{"Title": "Real Title"}]
+
+
+def test_json_a_system_generated_title_does_not_block_inheritance():
+    full, prov = build_full_base({"ResourceName": _GEN}, PARENT, "Edit")
+    assert full["ResourceName"][0]["Title"] == "The Series"
+    assert prov["ResourceName"] == "inherited"
+
+
+def test_json_a_system_generated_title_is_regenerated_for_a_season():
+    full, prov = build_full_base({"ResourceName": _GEN}, PARENT, "Season",
+                                 extra={"SequenceNumber": "6"})
+    assert full["ResourceName"][0]["Title"] == "The Series: Season 6"
+    assert prov["ResourceName"] == "system"
+
+
+def test_json_a_user_supplied_title_still_blocks_both():
+    for ctype, extra in (("Edit", {}), ("Season", {"SequenceNumber": "6"})):
+        full, prov = build_full_base({"ResourceName": _REAL}, PARENT, ctype,
+                                     extra=extra)
+        assert full["ResourceName"][0]["Title"] == "Real Title"
+        assert prov["ResourceName"] == "self"
+
+
+def test_record_a_system_generated_title_does_not_block():
+    child = _Rec(creation_type="Edit",
+                 titles=[_Title(text="Old Generated", is_resource=True,
+                                system_generated=True)])
+    full = build_full_record(child, _parent_rec(), "Edit")
+    assert full.titles[0].text == "The Series"
+    assert provenance(full)["ResourceName"] == "inherited"
+
+
+def test_both_adapters_agree_on_the_system_generated_case():
+    json_full, json_prov = build_full_base({"ResourceName": _GEN}, PARENT, "Edit")
+    rec_full = build_full_record(
+        _Rec(creation_type="Edit",
+             titles=[_Title(text="Old Generated", is_resource=True,
+                            system_generated=True)]),
+        _parent_rec(), "Edit")
+    assert json_full["ResourceName"][0]["Title"] == rec_full.titles[0].text
+    assert json_prov["ResourceName"] == provenance(rec_full)["ResourceName"]
+
+
+@pytest.mark.parametrize("titles,expected", [
+    (None, False), ([], False),
+    ([{"Title": "x"}], True),
+    ([{"Title": "x", "SystemGenerated": "true"}], False),
+    ([{"Title": "x", "SystemGenerated": "false"}], True),
+    ([{"Title": "g", "SystemGenerated": "true"}, {"Title": "r"}], True),
+])
+def test_has_user_supplied_title(titles, expected):
+    assert has_user_supplied_title(titles) is expected

@@ -18,8 +18,17 @@ portfolio may reimplement, reinterpret or locally extend them.
      values (if any). If it already has data in that field, that blocks
      inheritance for that field.
 
-Rules 2 and 3 are ONE rule with two applications: a self-supplied value is
-never replaced -- not by an inherited one, not by a generated one.
+     Of the two title fields ONLY ``ResourceName`` is inheritable.
+     ``AlternateResourceName`` is never inherited (operator, 2026-08-30).
+
+     What blocks is a USER-SUPPLIED value. A **system-generated**
+     ``ResourceName`` does NOT block -- it is not something the submitter
+     provided, so it is replaced by the parent's real title (Edit / Clip /
+     Manifestation) or regenerated (Season / Episode).
+
+Rules 2 and 3 are ONE rule with two applications: a user-supplied value is
+never replaced -- not by an inherited one, not by a generated one. Everything
+else is fair game.
 
 INHERITANCE IS DETERMINISTIC. The same starting record must produce the same
 full record through every code path in every program. That is why this module
@@ -125,6 +134,7 @@ __all__ = [
     "TITLE_EXEMPT_TYPES",
     "TITLE_INHERITING_TYPES",
     "is_absent",
+    "has_user_supplied_title",
     "RECORD_ATTRS",
     "system_generated_title",
     "build_full_base",
@@ -139,7 +149,7 @@ __all__ = [
 
 INHERITABLE_FIELDS: frozenset[str] = frozenset({
     "StructuralType", "Mode", "ReferentType",
-    "ResourceName", "AlternateResourceName",
+    "ResourceName",                      # AlternateResourceName is NOT here
     "OriginalLanguage", "VersionLanguage",
     "AssociatedOrg", "ReleaseDate", "CountryOfOrigin",
     "Status", "ApproximateLength", "Credits",
@@ -151,6 +161,10 @@ NEVER_INHERITED: frozenset[str] = frozenset({
     "ID",              # identity
     "Administrators",  # carries the Registrant — schema comments the exclusion
     "AlternateID",     # a parent's alt IDs are not the child's
+    # A child does not acquire its parent's alternate titles. Only the
+    # PRIMARY title inherits (operator ruling 2026-08-30, correcting the
+    # schema summary this module was seeded from, which listed both).
+    "AlternateResourceName",
     "Description",
     "RegistrantExtra",
     # ...plus everything in ExtraObjectMetadata: all creation-type-specific
@@ -164,7 +178,9 @@ NEVER_INHERITED: frozenset[str] = frozenset({
 TITLE_EXEMPT_TYPES: frozenset[str] = frozenset({"Season", "Episode"})
 TITLE_INHERITING_TYPES: frozenset[str] = frozenset({"Edit", "Clip", "Manifestation"})
 
-_TITLE_FIELDS = ("ResourceName", "AlternateResourceName")
+# Only ResourceName is inheritable, so only it needs the Season/Episode
+# exemption; AlternateResourceName is excluded by NEVER_INHERITED already.
+_TITLE_FIELDS = ("ResourceName",)
 
 
 def system_generated_title(
@@ -224,6 +240,35 @@ def system_generated_title(
 
 def _text(value: Any) -> str:
     return "" if value is None else str(value).strip()
+
+
+def has_user_supplied_title(titles: Any) -> bool:
+    """Does this ResourceName value carry a title the SUBMITTER provided?
+
+    Only a user-supplied title blocks inheritance or regeneration. A
+    system-generated one does not: the registry produced it, not the
+    submitter, so replacing it with the parent's real title (Edit / Clip /
+    Manifestation) or regenerating it (Season / Episode) is correct rather
+    than destructive. Operator, 2026-08-30 -- "only Resource Name can be
+    inherited (if it is not provided or system-generated)".
+
+    Accepts either shape: registry-JSON title dicts (``SystemGenerated`` is
+    the string ``"true"``) or record objects with a ``system_generated``
+    attribute. Anything unrecognised counts as user-supplied, because the
+    safe error is to PRESERVE a title rather than overwrite one.
+    """
+    if is_absent(titles):
+        return False
+    items = titles if isinstance(titles, (list, tuple)) else [titles]
+    for item in items:
+        if isinstance(item, dict):
+            flag = item.get("SystemGenerated")
+            generated = str(flag).strip().lower() == "true"
+        else:
+            generated = bool(getattr(item, "system_generated", False))
+        if not generated:
+            return True          # at least one real title -> blocks
+    return False
 
 
 def is_absent(value: Any) -> bool:
@@ -290,8 +335,12 @@ def build_full_base(
     # `if parent_id:` and BMR-Review's parent resolution both encode this.
     extra = extra or {}
     full: dict = copy.deepcopy(self_base or {})
+    # A system-generated ResourceName is not "self" -- the submitter did not
+    # supply it. Left unset here; the construction block below marks it.
     prov: dict[str, str] = {
-        f: "self" for f, v in full.items() if not _is_empty(v)
+        f: "self" for f, v in full.items()
+        if not _is_empty(v)
+        and (f != "ResourceName" or has_user_supplied_title(v))
     }
 
     if not parent_base:
@@ -302,7 +351,12 @@ def build_full_base(
             continue                                    # belt and braces
         if field in _TITLE_FIELDS and creation_type in TITLE_EXEMPT_TYPES:
             continue                                    # constructed below
-        if not _is_empty(full.get(field)):
+        if field == "ResourceName":
+            # Only a USER-SUPPLIED title blocks; a system-generated one is
+            # replaced by the parent's real title.
+            if has_user_supplied_title(full.get(field)):
+                continue
+        elif not _is_empty(full.get(field)):
             continue                                    # child asserted its own
         pv = parent_base.get(field)
         if _is_empty(pv):
@@ -322,7 +376,8 @@ def build_full_base(
     # ones discarded. It also made `provenance` lie -- reporting `system` for a
     # field the submitter had populated -- which BMR-Review's next tuning cycle
     # reads to treat self and inherited values differently.
-    if creation_type in TITLE_EXEMPT_TYPES and _is_empty(full.get("ResourceName")):
+    if (creation_type in TITLE_EXEMPT_TYPES
+            and not has_user_supplied_title(full.get("ResourceName"))):
         built = system_generated_title(
             _best_title(parent_base),
             creation_type,
@@ -442,7 +497,7 @@ def build_full_record(
     for attr in _CREDIT_ATTRS:
         if hasattr(full, attr) and not _is_empty(getattr(full, attr)):
             prov["Credits"] = "self"
-    if not _is_empty(getattr(full, "titles", None)):
+    if has_user_supplied_title(getattr(full, "titles", None)):
         prov["ResourceName"] = "self"
 
     # Everything the submitter supplied is self-defined, by definition.
@@ -500,9 +555,10 @@ def _apply_title(full: Any, parent_full: Any, ctype: str, prov: dict) -> None:
         return
 
     if ctype in TITLE_EXEMPT_TYPES:
-        # A child that supplied its own title keeps it. The constructed form
-        # is what the registry generates when none was given.
-        if titles:
+        # A USER-SUPPLIED title is kept. A system-generated one is not the
+        # submitter's and is regenerated, so a changed parent title
+        # propagates instead of leaving a stale derived string.
+        if has_user_supplied_title(titles):
             return
         built = system_generated_title(
             _best_record_title(parent_full),
@@ -530,7 +586,7 @@ def _apply_title(full: Any, parent_full: Any, ctype: str, prov: dict) -> None:
             prov["ResourceName"] = "system"
         return
 
-    if ctype in TITLE_INHERITING_TYPES and not titles:
+    if ctype in TITLE_INHERITING_TYPES and not has_user_supplied_title(titles):
         parent_titles = getattr(parent_full, "titles", None) or []
         if parent_titles:
             inherited = copy.deepcopy(parent_titles)

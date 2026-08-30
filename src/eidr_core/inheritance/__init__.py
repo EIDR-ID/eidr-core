@@ -1,5 +1,33 @@
 """Full-record construction: what a child inherits from its parent.
 
+THE RULES (operator, 2026-08-30). These are the authority. Nothing in the
+portfolio may reimplement, reinterpret or locally extend them.
+
+  1. If the record is NOT a child record, inheritance does not apply.
+     Self-Defined and Full are identical. Stop.
+     A record is a child iff it HAS a parent, so the caller's decision not to
+     supply one IS this rule. Callers must not pass a parent for a non-child.
+
+  2. If the record is a Season or Episode supplied WITHOUT a user-provided
+     ResourceName (primary title), generate one from the record's own data
+     plus the parent's title. The parent always has a title and the child
+     always has what the pattern needs -- so failure is a DATA defect and
+     raises :class:`TitleConstructionError`, never a silent untitled child.
+
+  3. If the record has no data in an inheritable field, copy the parent's
+     values (if any). If it already has data in that field, that blocks
+     inheritance for that field.
+
+Rules 2 and 3 are ONE rule with two applications: a self-supplied value is
+never replaced -- not by an inherited one, not by a generated one.
+
+INHERITANCE IS DETERMINISTIC. The same starting record must produce the same
+full record through every code path in every program. That is why this module
+exists and why no consumer keeps a parallel implementation: as of 2026-08-30
+XML_to_JSON's exporter, BMR-Review's ``inherit.materialize`` and its
+``mirror.reconstruct_full`` all delegate here, and each repo carries a test
+asserting its paths agree.
+
 A child record (Season, Episode, Edit, Clip, Manifestation) carries only
 *self-defined* metadata. The record the registry actually holds is that plus
 everything inherited from the parent's FULL record. Comparing a sparse
@@ -69,8 +97,30 @@ import contextlib
 import copy
 from typing import Any
 
+
+class TitleConstructionError(ValueError):
+    """A Season/Episode needed a generated title and the data could not make one.
+
+    The operator's rule states this cannot happen: "The parent record will
+    always have a title and the current record will always have the data
+    necessary to generate a title." So reaching this is a DATA defect, not a
+    normal branch.
+
+    It is an exception rather than a silent ``None`` because the silent form
+    is a known, expensive bug: an untitled child drops the field the de-dup
+    engine weights most heavily (70 Basic / 40 Episode), so a genuine
+    duplicate loses its strongest signal and is missed. XML_to_JSON shipped
+    exactly that shape in August 2026.
+
+    It is a distinct type so a batch caller can catch it per record and skip
+    the row with a reason, rather than choosing between aborting the run and
+    not knowing.
+    """
+
+
 __all__ = [
     "INHERITABLE_FIELDS",
+    "TitleConstructionError",
     "NEVER_INHERITED",
     "TITLE_EXEMPT_TYPES",
     "TITLE_INHERITING_TYPES",
@@ -233,6 +283,11 @@ def build_full_base(
     ``'system'``. The caller owns ``ExtraObjectMetadata``: it is
     creation-type-specific and never inherited, so it is not touched here.
     """
+    # RULE 1 — "if the record is not a child record, inheritance does not
+    # apply; Self Defined and Full are identical." A record is a child iff it
+    # HAS a parent, so the caller's decision not to supply one IS the rule.
+    # Callers must not pass a parent for a non-child record; XML_to_JSON's
+    # `if parent_id:` and BMR-Review's parent resolution both encode this.
     extra = extra or {}
     full: dict = copy.deepcopy(self_base or {})
     prov: dict[str, str] = {
@@ -289,14 +344,26 @@ def build_full_base(
             # order to keep.
             release_date=extra.get("ReleaseDate") or full.get("ReleaseDate"),
         )
-        if built:
-            text, title_class = built
-            full["ResourceName"] = [{
-                "Title": text,
-                "TitleClass": title_class,
-                "SystemGenerated": "true",
-            }]
-            prov["ResourceName"] = "system"
+        if not built:
+            # RULE 2 says this is impossible. Reaching it means the parent has
+            # no title, or the child has neither a number nor a release date.
+            raise TitleConstructionError(
+                f"{creation_type} has no user-supplied ResourceName and no "
+                f"generated title could be built: parent title="
+                f"{_best_title(parent_base)!r}, "
+                f"sequence_number={extra.get('SequenceNumber')!r}, "
+                f"distribution_number={extra.get('DistributionNumber')!r}, "
+                f"release_date={extra.get('ReleaseDate') or full.get('ReleaseDate')!r}. "
+                "Leaving the child untitled would silently drop the "
+                "heaviest-weighted comparison field."
+            )
+        text, title_class = built
+        full["ResourceName"] = [{
+            "Title": text,
+            "TitleClass": title_class,
+            "SystemGenerated": "true",
+        }]
+        prov["ResourceName"] = "system"
 
     return full, prov
 
@@ -444,12 +511,23 @@ def _apply_title(full: Any, parent_full: Any, ctype: str, prov: dict) -> None:
             distribution_number=getattr(full, "distribution_number", None),
             release_date=getattr(full, "release_date", None),
         )
-        if built:
-            text, title_class = built
-            made = _clone_title(parent_full, text, title_class)
-            if made is not None:
-                full.titles = [made]
-                prov["ResourceName"] = "system"
+        if not built:
+            # Same rule, same failure, same exception as build_full_base -- the
+            # two adapters must not differ even on the error path.
+            raise TitleConstructionError(
+                f"{ctype} has no user-supplied title and no generated title "
+                f"could be built: parent title="
+                f"{_best_record_title(parent_full)!r}, "
+                f"sequence_number={getattr(full, 'sequence_number', None)!r}, "
+                f"distribution_number="
+                f"{getattr(full, 'distribution_number', None)!r}, "
+                f"release_date={getattr(full, 'release_date', None)!r}."
+            )
+        text, title_class = built
+        made = _clone_title(parent_full, text, title_class)
+        if made is not None:
+            full.titles = [made]
+            prov["ResourceName"] = "system"
         return
 
     if ctype in TITLE_INHERITING_TYPES and not titles:

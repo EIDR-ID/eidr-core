@@ -14,6 +14,7 @@ import pytest
 from eidr_core.inheritance import (
     INHERITABLE_FIELDS,
     NEVER_INHERITED,
+    TitleConstructionError,
     build_full_base,
     build_full_record,
     is_absent,
@@ -406,3 +407,49 @@ def test_present_values_including_falsy_ones(value):
     # inherit a legitimate one. XML_to_JSON had to copy the logic because it
     # was private.
     assert is_absent(value) is False
+
+
+# ---------------------------------------------------------------------------
+# Rule 2 is a GUARANTEE, so violating it is an error, not a quiet no-op.
+#
+# "The parent record will always have a title and the current record will
+# always have the data necessary to generate a title" (operator, 2026-08-30).
+# Returning None there would leave the child untitled, which drops the
+# heaviest-weighted comparison field -- the exact silent failure XML_to_JSON
+# shipped. Both adapters raise the SAME exception so they cannot differ even
+# when the data is bad.
+# ---------------------------------------------------------------------------
+
+def test_json_untitleable_season_raises_rather_than_silently_untitled():
+    with pytest.raises(TitleConstructionError, match="no user-supplied"):
+        build_full_base({}, {"Mode": "AudioVisual"}, "Season")   # parent has no title
+
+
+def test_record_untitleable_season_raises_the_same_way():
+    parent = _Rec(creation_type="Series")                        # no titles
+    with pytest.raises(TitleConstructionError):
+        build_full_record(_Rec(creation_type="Season"), parent, "Season")
+
+
+def test_both_adapters_raise_on_the_same_bad_input():
+    """Determinism extends to the error path."""
+    with pytest.raises(TitleConstructionError):
+        build_full_base({}, {"Mode": "A"}, "Episode")
+    with pytest.raises(TitleConstructionError):
+        build_full_record(_Rec(creation_type="Episode"),
+                          _Rec(creation_type="Season"), "Episode")
+
+
+def test_a_supplied_title_means_no_construction_and_no_raise():
+    # The guarantee only applies when a title must be GENERATED.
+    full, prov = build_full_base({"ResourceName": [{"Title": "Mine"}]},
+                                 {"Mode": "A"}, "Season")
+    assert full["ResourceName"][0]["Title"] == "Mine"
+    assert prov["ResourceName"] == "self"
+
+
+def test_non_child_types_never_raise():
+    # Edit/Clip/Manifestation inherit rather than generate; a parent with no
+    # title simply means no title to inherit.
+    full, _ = build_full_base({}, {"Mode": "A"}, "Edit")
+    assert "ResourceName" not in full

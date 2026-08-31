@@ -279,9 +279,32 @@ def date_profile(a_ct, b_ct):
 
 
 def _profile_year_quality(profile, gap):
-    credits = profile.get("year_gap_credit") or {}
+    """Quality for a year-level gap from a profile's table, or ``None``.
+
+    Keys are normalised to ``int`` before lookup. A profile authored in
+    Python may key by integer; the SAME profile read back from
+    compare-spec.json is keyed by STRING, because JSON object keys are
+    strings and nothing else. Both must behave identically, or the tuning
+    surface means one thing to this engine and another to every consumer
+    that loads the versioned artifact -- including the De-Dupe UI's
+    JavaScript engine, which can only ever see the JSON shape.
+
+    Without the normalisation the string form fails ``gap in credits``
+    silently, returns None, and the caller falls back to the legacy
+    exponential -- so the profile would appear to be configured and have no
+    effect. And ``max()`` over string keys compares lexicographically, so a
+    table with a gap of 10 would treat "2" as its largest key and apply the
+    floor to everything above 2.
+    """
+    raw = profile.get("year_gap_credit") or {}
+    credits = {}
+    for key, value in raw.items():
+        try:
+            credits[int(key)] = float(value)
+        except (TypeError, ValueError):
+            continue
     if gap in credits:
-        return float(credits[gap])
+        return credits[gap]
     if credits and gap > max(credits):
         return float(profile.get("year_gap_floor", 0.0))
     return None

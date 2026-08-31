@@ -134,3 +134,73 @@ def test_a_config_without_profiles_keeps_the_legacy_behaviour(legacy):
     """No consumer is forced onto the new shape in the cycle it lands."""
     assert date_profile("Basic", "Basic") is None
     assert _q(2000, 2000, "Basic") == pytest.approx(1.0)
+
+
+# --- the JSON shape (added 2026-08-31) --------------------------------------
+# A profile authored in Python may key by int and use tuples. The SAME profile
+# read back from compare-spec.json is keyed by STRING with list bands, because
+# JSON has nothing else. Both must score identically, or the tuning surface
+# means one thing here and another to every consumer that loads the versioned
+# artifact -- including the De-Dupe UI's JavaScript engine, which can ONLY see
+# the JSON form.
+#
+# Everything above this line uses the Python shape, which is why the defect
+# these pin was invisible: `gap in credits` fails silently against string keys,
+# the caller falls back to the legacy exponential, and a profile that looks
+# configured has no effect at all.
+
+_JSON_PROFILES = {
+    "Basic": {
+        "year_gap_credit": {"0": 0.60, "1": 0.43, "2": 0.13},
+        "year_gap_floor": 0.10,
+        "full_date_bands": [[0, 1.00], [7, 0.95], [31, 0.70]],
+    },
+}
+
+
+@pytest.fixture
+def json_profiled():
+    set_params(_Cfg(profiles=_JSON_PROFILES))
+
+
+@pytest.mark.parametrize("gap", [0, 1, 2, 3, 7])
+def test_json_shape_scores_identically_to_python_shape(gap):
+    set_params(_Cfg())                      # int keys, tuple bands
+    native = _q(2000, 2000 + gap)
+    set_params(_Cfg(profiles=_JSON_PROFILES))   # string keys, list bands
+    from_json = _q(2000, 2000 + gap)
+    assert native == from_json, (
+        f"gap {gap}: Python-authored profile scores {native} but the same "
+        f"profile read from JSON scores {from_json}")
+
+
+def test_a_json_shaped_profile_is_actually_used(json_profiled):
+    """The silent-no-op guard.
+
+    If the string keys are not matched the caller falls through to the legacy
+    exponential, which at gap 1 gives ~0.891 for an Episode -- so a wrong
+    implementation does not error, it just quietly ignores the table.
+    """
+    assert _q(2000, 2001) == 0.43
+    assert _q(2000, 2000) == 0.60
+
+
+def test_json_shaped_floor_applies_beyond_the_table(json_profiled):
+    assert _q(2000, 2009) == 0.10
+
+
+def test_max_key_is_numeric_not_lexicographic():
+    """`max()` over string keys compares lexicographically: "2" > "10".
+
+    A table reaching gap 10 would treat 2 as its largest key and apply the
+    floor to every gap above 2 -- silently wrong in the middle of the range,
+    where most real pairs sit.
+    """
+    set_params(_Cfg(profiles={"Basic": {
+        "year_gap_credit": {"0": 1.0, "2": 0.5, "10": 0.2},
+        "year_gap_floor": 0.01,
+        "full_date_bands": [[0, 1.0]],
+    }}))
+    assert _q(2000, 2010) == 0.2      # the largest key, not the floor
+    assert _q(2000, 2011) == 0.01     # beyond it, the floor
+    assert _q(2000, 2005) is None or _q(2000, 2005) != 0.01

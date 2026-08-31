@@ -1,7 +1,7 @@
 {
  "$spec": {
   "name": "compare-spec",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "updated": "2026-08-31",
   "doc": "Versioned runtime configuration of the unified match-candidate evaluation engine (eidr-core/specs/unified-scoring.md). THE portfolio's cross-tool tuning artifact, GENERATED from BMR-Review eidr_dedup_score/config.py by that repo's regen_compare_spec.py — config.py is the authoring surface (tune THERE, bump COMPARE_SPEC_VERSION, regenerate; direction inverted 2026-08-05). A version change is the cross-tool signal to regenerate golden-pair expectations. Curated rationale in compare-spec.md; full inline annotations live in config.py itself.",
   "loader": "eidr_core.compare.spec.load_spec",
@@ -188,6 +188,52 @@
   "DATE_EPOCH_YEAR": 1970,
   "DATE_ESTIMATED_LENIENCY": 2.0,
   "DATE_FULL_HALFLIFE_DAYS": 540.0,
+  "DATE_PROFILES": {
+   "Basic": {
+    "year_gap_credit": {
+     "0": 1.0,
+     "1": 0.71,
+     "2": 0.22
+    },
+    "year_gap_floor": 0.17,
+    "full_date_bands": [
+     [
+      0,
+      1.0
+     ],
+     [
+      7,
+      0.95
+     ],
+     [
+      31,
+      0.7
+     ]
+    ]
+   },
+   "Episode": {
+    "year_gap_credit": {
+     "0": 0.6,
+     "1": 0.43,
+     "2": 0.13
+    },
+    "year_gap_floor": 0.1,
+    "full_date_bands": [
+     [
+      0,
+      1.0
+     ],
+     [
+      7,
+      0.95
+     ],
+     [
+      31,
+      0.7
+     ]
+    ]
+   }
+  },
   "DATE_YEAR_HALFLIFE_YEARS": 4.0,
   "DATE_YEAR_HALFLIFE_YEARS_EPISODE": 6.0,
   "DUR_ABS_HALFLIFE_MIN": 12.0,

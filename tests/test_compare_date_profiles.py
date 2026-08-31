@@ -204,3 +204,58 @@ def test_max_key_is_numeric_not_lexicographic():
     assert _q(2000, 2010) == 0.2      # the largest key, not the floor
     assert _q(2000, 2011) == 0.01     # beyond it, the floor
     assert _q(2000, 2005) is None or _q(2000, 2005) != 0.01
+
+
+# --- the full-date fall-through ---------------------------------------------
+
+def test_beyond_the_last_band_the_YEAR_TABLE_applies(profiled):
+    """Not the legacy exponential. 0.24.0 documented this and did the other.
+
+    The bands stop at about a month because a full date stops being worth more
+    than a year there: P(match) is 0.331 at 32-365 days against 0.332 at a
+    one-year gap. Falling through to the exponential meant that finding was
+    never in effect -- two full dates seven weeks apart scored 0.938 where the
+    same records with year-only precision scored 1.00.
+
+    Reported by BMR-Review while adopting 0.24.0; a passing suite did not
+    catch it, because nothing asserted what happened past the last band.
+    """
+    import datetime as dt
+    a = dt.date(2020, 1, 1)
+
+    # 50 days apart, SAME year -> the profile's gap-0 value, not a decayed one.
+    fifty = (a + dt.timedelta(days=50)).isoformat()
+    assert cmp_release_date(R(a.isoformat()), R(fifty)).quality == pytest.approx(0.60)
+
+    # 517 days apart spans a one-year gap -> the gap-1 value.
+    span = (a + dt.timedelta(days=517)).isoformat()
+    assert cmp_release_date(R(a.isoformat()), R(span)).quality == pytest.approx(0.43)
+
+    # Three years -> the floor, not an exponential tail.
+    far = (a + dt.timedelta(days=1096)).isoformat()
+    assert cmp_release_date(R(a.isoformat()), R(far)).quality == pytest.approx(0.10)
+
+
+def test_a_full_date_never_scores_above_the_year_only_equivalent(profiled):
+    """The invariant behind the fall-through, stated directly.
+
+    Extra precision may CONFIRM (inside the bands) but must never invent
+    similarity that year-level data would not support.
+    """
+    import datetime as dt
+    a = dt.date(2020, 1, 1)
+    for days in (40, 100, 200, 300, 364):
+        b = a + dt.timedelta(days=days)
+        full = cmp_release_date(R(a.isoformat()), R(b.isoformat())).quality
+        year_only = cmp_release_date(R(str(a.year)), R(str(b.year))).quality
+        assert full <= year_only + 1e-9, (
+            f"{days}d apart scored {full} but year-only scores {year_only}")
+
+
+def test_a_config_without_profiles_keeps_the_legacy_full_date_curve(legacy):
+    """The fall-through must not disturb a consumer still on flat constants."""
+    import datetime as dt
+    a = dt.date(2020, 1, 1)
+    b = (a + dt.timedelta(days=540)).isoformat()   # exactly one half-life
+    got = cmp_release_date(R(a.isoformat()), R(b)).quality
+    assert got == pytest.approx(0.5, abs=0.01)

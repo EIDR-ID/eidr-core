@@ -252,9 +252,11 @@ def date_profile(a_ct, b_ct):
     ``year_gap_credit``  ``{gap_in_years: quality}`` for year-level comparison
     ``year_gap_floor``   quality for any gap beyond the largest key above
     ``full_date_bands``  ``[(max_days, quality), ...]``, ascending; both sides
-                         full dates. Beyond the last band, fall through to the
-                         year-level table -- a distant full-date pair carries
-                         no more information than a distant year pair.
+                         full dates. Beyond the last band the YEAR-LEVEL table
+                         applies, keyed on the year gap -- a distant full-date
+                         pair carries no more information than a distant year
+                         pair (measured: 0.331 at 32-365 days against 0.332 at
+                         a one-year gap).
     ===================  ====================================================
 
     A table rather than a curve because the measured data is not exponential:
@@ -339,11 +341,27 @@ def cmp_release_date(a, b):
         if banded is not None:
             q = banded
         else:
-            # No band covers this distance (or legacy config): beyond the last
-            # band a full date is worth no more than a year-level one, so fall
-            # through to the same decay the year branch uses.
-            hl = config.DATE_FULL_HALFLIFE_DAYS * leniency
-            q = 0.5 ** (dd / hl)
+            # BEYOND THE LAST BAND, FALL THROUGH TO THE YEAR-LEVEL TABLE. A
+            # distant full-date pair carries no more information than a
+            # distant year pair: the measured likelihood is 0.331 at 32-365
+            # days against 0.332 at a one-year gap, which is why the bands
+            # stop at about a month in the first place.
+            #
+            # 0.24.0 documented this and then fell through to the legacy
+            # exponential instead, so the finding was never in effect: two
+            # full dates seven weeks apart scored 0.938, where the same two
+            # records with year-only precision scored their profile's gap-0
+            # value. It over-credited distant full dates -- wrong in the safe
+            # direction (costing precision, not recall), which is why
+            # BMR-Review shipped 2.8.0 without holding for it, but wrong.
+            gap_q = _profile_year_quality(profile, abs(ay - by)) if profile else None
+            if gap_q is not None:
+                q = gap_q
+            else:
+                # No profile at all, or a profile whose year table cannot
+                # answer: the legacy curve, unchanged.
+                hl = config.DATE_FULL_HALFLIFE_DAYS * leniency
+                q = 0.5 ** (dd / hl)
         if epoch:
             q = max(q, config.DATE_EPOCH_MISMATCH_FLOOR)
             return FieldResult("release_date", q, f"{dd}d apart (1970 epoch suspect)")

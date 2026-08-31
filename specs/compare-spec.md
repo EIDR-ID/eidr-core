@@ -46,6 +46,46 @@ the reasoning, not just the number.
   the denominator (`ALWAYS_APPLICABLE` keeps release_date in regardless);
   calibrated per creation type onto the shared bands (<30 Reject, 30–<80
   Review, ≥80 Accept).
+## Date profiles: the ANCHOR is per creation type, the SHAPE is measured
+
+`DATE_PROFILES` (compare-spec 2.8.0) gives each creation type a table:
+
+```
+Basic    1.00 / 0.71 / 0.22 at year gaps 0/1/2, floor 0.17
+Episode  0.60 / 0.43 / 0.13 at year gaps 0/1/2, floor 0.10
+```
+
+**Two different kinds of number live in one table, and they must not be read
+off each other.**
+
+* The **ratios** are measured. BMR-Review fitted them across 3,306 human
+  decisions: P(match) 0.468 / 0.332 / 0.102 at gaps 0/1/2, i.e. 1 : 0.71 :
+  0.22. They describe how confidence decays with distance, and they are the
+  same for every type until a type has its own labelled data.
+* The **anchor** — the gap-0 value — is a judgement about that type's
+  discriminating power, and it differs for a reason. A season's worth of
+  episodes shares one year, so a shared year is weak evidence for an Episode
+  (0.60) and strong for a film (1.00). No corpus measurement can supply this:
+  the ratios say nothing about what a same-year match is worth to begin with.
+
+BMR-Review made exactly this mistake authoring the first draft — one profile
+for all types, carrying the Episode anchor — and a pinned known pair caught it
+at 99.1 → 93.5. The legacy code had reached 0.60 only through
+`creation_type == "Episode"`, with Basic scoring 1.0.
+
+**Adding a profile:** copy the ratios, choose the anchor deliberately, and
+check the result is monotonically non-increasing. That property is what the
+pre-2.8.0 constants violated — a year-only Episode MISMATCH outscored a MATCH
+for every gap below 4.42 years, because the anchor and the decay curve were on
+different scales.
+
+**Beyond the last `full_date_bands` entry, the year-level table applies**,
+keyed on the year gap — not an exponential tail. A distant full-date pair
+carries no more information than a distant year pair (0.331 at 32–365 days
+against 0.332 at a one-year gap), which is why the bands stop at about a
+month. Extra precision may confirm within the bands; it must never invent
+similarity that year-level data would not support.
+
 ## Naming the upstream matching system
 
 **Ruling, 2026-08-31 (operator).** eidr-core is a public repository and the

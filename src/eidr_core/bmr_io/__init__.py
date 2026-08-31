@@ -586,10 +586,47 @@ class ParentRef:
     ``raw``       the cell as written, for diagnostics.
     ``unresolved`` the cell named a row that is not in the sheet.
 
-    A parent row with no ``Assigned EIDR ID`` yet is normal, not an error: a
-    new Series registered alongside its Seasons has no ID until the registry
-    assigns one. Such a ref has ``row`` set and ``eidr_id`` None, and the
-    caller should build the parent's record FROM THAT ROW.
+    THE RULING (operator, 2026-09-03) that this class encodes:
+
+        A non-EIDR Parent ID must be resolved to that row's Assigned EIDR ID.
+        If there is none -- the field holds anything other than a valid EIDR
+        ID, including nothing at all -- then the row CANNOT be converted into
+        a full metadata record. The original Parent ID is left intact, so a
+        future pass can resolve it once the parent is assigned an ID. A Parent
+        ID is either converted to a valid EIDR ID or left as is; it is never
+        dropped. The Unique Row ID is always preserved exactly.
+
+    So there are three outcomes, and only the first licenses building a full
+    record:
+
+    ===============  ==========================================  ============
+    outcome          state                                       ``bool()``
+    ===============  ==========================================  ============
+    resolved         ``eidr_id`` set                             True
+    deferred         ``row`` set, no ``eidr_id`` (see below)     False
+    unresolved       nothing found; ``unresolved`` True          False
+    ===============  ==========================================  ============
+
+    **Deferred is not an error, and it is not buildable either.** A Series
+    registered alongside its Seasons has no ID until the registry assigns one.
+    Inheriting from that in-sheet row would produce a record whose provenance
+    is a spreadsheet cell while LOOKING exactly like one whose provenance is
+    the registry -- a consumer cannot tell them apart. The ruling refuses to
+    construct that and defers instead, which is safe precisely because the
+    Parent reference is preserved for a later pass.
+
+    ``row`` is still exposed for a deferred ref: it is what a caller uses to
+    report the deferral, or to re-check on a second pass. It is not an
+    invitation to build from it.
+
+    .. warning::
+       eidr-core 0.23.0 shipped the opposite guidance -- that a deferred ref
+       was "usable, build the parent's record FROM THAT ROW" -- and made it
+       truthy, encoding the superseded policy in the API's shape. XML_to_JSON
+       implemented it, measured it (402 of 523 parent references on the
+       1000-row sample are unregistered in-sheet rows), and then caught the
+       contradiction against the ruling. Truthiness now means "resolved", so
+       a consumer reading `if ref:` gets the ruling rather than the mistake.
     """
 
     raw: str = ""
@@ -598,8 +635,23 @@ class ParentRef:
     unresolved: bool = False
 
     def __bool__(self) -> bool:
-        """True when the reference led somewhere usable."""
-        return bool(self.eidr_id) or self.row is not None
+        """True ONLY when the parent resolved to an EIDR ID.
+
+        That is the single condition under which a full record may be built,
+        so `if ref:` reads as "may I build?" rather than "did I find
+        anything?". Use :attr:`deferred` to tell a later-pass deferral from a
+        broken reference.
+        """
+        return bool(self.eidr_id)
+
+    @property
+    def deferred(self) -> bool:
+        """Names an in-sheet row that has no ``Assigned EIDR ID`` *yet*.
+
+        The row cannot be converted now; preserve its Parent ID verbatim and
+        retry once the parent is registered.
+        """
+        return self.row is not None and not self.eidr_id
 
 
 def index_rows(rows: Iterable[Mapping[str, Any]],

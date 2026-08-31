@@ -239,6 +239,61 @@ def _epoch_suspect(y, ymd):
     return ymd is None or ymd == (config.DATE_EPOCH_YEAR, 1, 1)
 
 
+DATE_PROFILE_DEFAULT = "Basic"
+
+
+def date_profile(a_ct, b_ct):
+    """The date-comparison profile for a pair, or ``None`` for legacy config.
+
+    THE SHAPE eidr-core reads, authored in the consumer's config as
+    ``DATE_PROFILES`` -- a mapping of creation type to:
+
+    ===================  ====================================================
+    ``year_gap_credit``  ``{gap_in_years: quality}`` for year-level comparison
+    ``year_gap_floor``   quality for any gap beyond the largest key above
+    ``full_date_bands``  ``[(max_days, quality), ...]``, ascending; both sides
+                         full dates. Beyond the last band, fall through to the
+                         year-level table -- a distant full-date pair carries
+                         no more information than a distant year pair.
+    ===================  ====================================================
+
+    A table rather than a curve because the measured data is not exponential:
+    across 3,306 human decisions the 1->2 year drop is far steeper than 0->1
+    (P(match) 0.468 / 0.332 / 0.102). It also ports to JavaScript without a
+    transcendental, which matters for the De-Dupe UI implementation.
+
+    ``"Basic"`` is the default profile and the fallback for any creation type
+    without its own. A CROSS-type pair also uses it: capping cross-type pairs
+    below Accept is the creation-type gate's job upstream, so the comparator
+    needs no special case for them.
+
+    Returns ``None`` when the registered config predates ``DATE_PROFILES``, so
+    the caller keeps the legacy flat constants and no consumer is forced to
+    adopt the new shape in the same cycle it lands.
+    """
+    profiles = getattr(config, "DATE_PROFILES", None)
+    if not profiles:
+        return None
+    key = a_ct if (a_ct and a_ct == b_ct) else DATE_PROFILE_DEFAULT
+    return profiles.get(key) or profiles.get(DATE_PROFILE_DEFAULT)
+
+
+def _profile_year_quality(profile, gap):
+    credits = profile.get("year_gap_credit") or {}
+    if gap in credits:
+        return float(credits[gap])
+    if credits and gap > max(credits):
+        return float(profile.get("year_gap_floor", 0.0))
+    return None
+
+
+def _profile_full_date_quality(profile, days):
+    for max_days, quality in profile.get("full_date_bands") or []:
+        if days <= max_days:
+            return float(quality)
+    return None
+
+
 def cmp_release_date(a, b):
     ay, aymd = parse_date(a.release_date)
     by, bymd = parse_date(b.release_date)
@@ -256,14 +311,25 @@ def cmp_release_date(a, b):
                                    "1970-01-01 epoch match (default-date suspect)")
             return FieldResult("release_date", 1.0, "exact")
         dd = days_between(aymd, bymd)
-        hl = config.DATE_FULL_HALFLIFE_DAYS * leniency
-        q = 0.5 ** (dd / hl)
+        profile = date_profile(a.creation_type, b.creation_type)
+        banded = _profile_full_date_quality(profile, dd) if profile else None
+        if banded is not None:
+            q = banded
+        else:
+            # No band covers this distance (or legacy config): beyond the last
+            # band a full date is worth no more than a year-level one, so fall
+            # through to the same decay the year branch uses.
+            hl = config.DATE_FULL_HALFLIFE_DAYS * leniency
+            q = 0.5 ** (dd / hl)
         if epoch:
             q = max(q, config.DATE_EPOCH_MISMATCH_FLOOR)
             return FieldResult("release_date", q, f"{dd}d apart (1970 epoch suspect)")
         return FieldResult("release_date", q, f"{dd}d apart"
                            + (" est" if estimated else ""))
     gap = abs(ay - by)
+    profile = date_profile(a.creation_type, b.creation_type)
+    # Legacy path only: a flat per-type flag, kept so a config without
+    # DATE_PROFILES behaves exactly as before.
     episode = (a.creation_type == "Episode" or b.creation_type == "Episode")
     if gap == 0:
         if epoch_a and epoch_b:    # 1970 == 1970: two defaults agreeing proves little
@@ -272,15 +338,28 @@ def cmp_release_date(a, b):
         if epoch:                  # a suspect side agreeing with a GENUINE 1970 date
             return FieldResult("release_date", config.DATE_EPOCH_MIXED_MATCH_CREDIT,
                                "1970 year match (one side epoch suspect)")
+        if profile:
+            pq = _profile_year_quality(profile, 0)
+            if pq is not None:
+                return FieldResult("release_date", pq, "year match (year-only)")
         if episode:                # year-only match between episodes: weak evidence
             return FieldResult("release_date", config.DATE_EPISODE_YEAR_MATCH_CREDIT,
                                "year match (year-only; weak for episodes)")
         return FieldResult("release_date", 1.0, "year match")
-    hl_years = (config.DATE_YEAR_HALFLIFE_YEARS_EPISODE
-                if episode
-                else config.DATE_YEAR_HALFLIFE_YEARS)
-    hl = hl_years * leniency
-    q = 0.5 ** (gap / hl)
+    pq = _profile_year_quality(profile, gap) if profile else None
+    if pq is not None:
+        # A measured table, not a curve. Under the legacy constants a
+        # year-only Episode MISMATCH outscored a MATCH for every gap below
+        # ~4.4 years (0.6 against 0.891 at gap 1) because the match credit and
+        # the decay were on different scales. A monotonic table cannot invert.
+        q = pq * leniency if leniency != 1.0 else pq
+        q = min(q, 1.0)
+    else:
+        hl_years = (config.DATE_YEAR_HALFLIFE_YEARS_EPISODE
+                    if episode
+                    else config.DATE_YEAR_HALFLIFE_YEARS)
+        hl = hl_years * leniency
+        q = 0.5 ** (gap / hl)
     if epoch:
         q = max(q, config.DATE_EPOCH_MISMATCH_FLOOR)
         return FieldResult("release_date", q, f"{gap}yr apart (1970 epoch suspect)")

@@ -1,0 +1,97 @@
+{
+  "id": "altid-non-identity-relation-is-not-a-match",
+  "added": "2026-09-04",
+  "why": "A shared Alt-ID Kind+Value counts as a MATCH only when the relation is absent, empty or IsSameAs. IsDerivedFrom, IsPartOf and Deprecated all assert that the identifier names a DIFFERENT work, so counting them as identity evidence inverts their meaning. Before eidr-core 0.22.0 the relation clause was consulted only in the conflict branch, so these scored a full alt-id match; across four labelled corpora that affected 58 of 62,646 shared pairs and could lift a pair into Accept via ALT_CORROBORATION_STRONG_MIN. The entry is filtered before the match/conflict branch, so it is evidence of NOTHING in either direction -- a Deprecated id that differs is not evidence the works differ either. Same creation type here, so no gate is involved: this pins the comparator, not a guard.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "The Quarry Road",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1974",
+    "length_minutes": "96",
+    "directors": [
+      "Ana Belmonte"
+    ],
+    "countries": [
+      "ES"
+    ],
+    "original_languages": [
+      "es"
+    ],
+    "alt_ids": [
+      {
+        "value": "tt0071234",
+        "id_type": "IMDB",
+        "relation": "IsDerivedFrom"
+      }
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/GOLD-0000-0000-0010-0000-C",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Camino de la Cantera",
+        "lang": "es",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1981",
+    "length_minutes": "118",
+    "directors": [
+      "Tomás Reyes"
+    ],
+    "countries": [
+      "MX"
+    ],
+    "original_languages": [
+      "es"
+    ],
+    "alt_ids": [
+      {
+        "value": "tt0071234",
+        "id_type": "IMDB",
+        "relation": "IsDerivedFrom"
+      }
+    ]
+  },
+  "invariants": {
+    "verdict_not_in": [
+      "Accept"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.6.0",
+    "confidence": 17.9,
+    "verdict": "Reject",
+    "field_qualities": {
+      "title": 0.36,
+      "release_date": 0.297,
+      "director": 0.0,
+      "actor": null,
+      "country": 0.0,
+      "assoc_org": null,
+      "length": 0.814,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "neutral",
+      "release_date": "mismatch",
+      "director": "neutral",
+      "actor": "neutral",
+      "country_of_origin": "neutral",
+      "associated_org": "neutral",
+      "duration": "similar",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

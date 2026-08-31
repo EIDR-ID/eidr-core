@@ -56,19 +56,54 @@ def test_an_eidr_id_is_used_directly():
 
 # --- the new-registration case ---------------------------------------------
 
-def test_a_parent_row_with_no_id_yet_still_resolves_to_the_ROW():
+def test_a_parent_row_with_no_id_yet_is_DEFERRED_not_buildable():
     """A Series registered alongside its Seasons has no EIDR ID yet.
 
-    That is normal, not an error. The caller must build the parent's record
-    from the row, so `row` is set and `eidr_id` is None -- and the ref is
-    still truthy, because it DID lead somewhere usable.
+    Operator ruling 2026-09-03: that row CANNOT be converted into a full
+    metadata record. Not an error -- a deferral. Building from the in-sheet
+    row would produce a record whose provenance is a spreadsheet cell while
+    looking exactly like one whose provenance is the registry, and a consumer
+    cannot tell them apart.
+
+    eidr-core 0.23.0 said the opposite and made this ref TRUTHY, which
+    encoded the superseded policy in the API's shape. XML_to_JSON implemented
+    that guidance, measured it, and caught the contradiction. This test is the
+    corrected contract.
     """
     series = _row("S0001", Title="New Series")
     season = _row("N0001", parent="S0001")
     ref = resolve_parent(season, index_rows([series, season]))
+
+    assert not ref, "a deferred ref must be falsy: it does not license a build"
+    assert ref.deferred is True
     assert ref.eidr_id is None
+    assert ref.unresolved is False, "deferred is not the same as broken"
+
+    # The row stays reachable -- for REPORTING the deferral and for the second
+    # pass, not for building from.
     assert ref.row is series
-    assert ref
+    # And the raw reference is preserved verbatim so it can be written back.
+    assert ref.raw == "S0001"
+
+
+def test_the_three_outcomes_are_distinguishable():
+    """resolved / deferred / unresolved must not collapse into each other."""
+    series = _row("S0007", assigned=SERIES_ID)
+    pending = _row("S0001")
+    resolved = resolve_parent(_row("N1", parent="S0007"),
+                              index_rows([series, pending]))
+    deferred = resolve_parent(_row("N2", parent="S0001"),
+                              index_rows([series, pending]))
+    broken = resolve_parent(_row("N3", parent="S9999"),
+                            index_rows([series, pending]))
+
+    assert (bool(resolved), resolved.deferred, resolved.unresolved) == (True, False, False)
+    assert (bool(deferred), deferred.deferred, deferred.unresolved) == (False, True, False)
+    assert (bool(broken), broken.deferred, broken.unresolved) == (False, False, True)
+
+    # Every one of them keeps the original cell, because a Parent ID is
+    # converted or left as is -- never dropped.
+    assert (resolved.raw, deferred.raw, broken.raw) == ("S0007", "S0001", "S9999")
 
 
 def test_a_chain_walks_up_through_rows_that_have_no_ids():

@@ -1,0 +1,67 @@
+{
+  "id": "altid-non-identity-relation-is-not-a-match",
+  "added": "2026-09-04",
+  "why": "A shared Alt-ID Kind+Value counts as a MATCH only when the relation is absent, empty or IsSameAs. IsDerivedFrom, IsPartOf and Deprecated all assert that the identifier names a DIFFERENT work, so counting them as identity evidence inverts their meaning. Before eidr-core 0.22.0 the relation clause was consulted only in the conflict branch, so these scored a full alt-id match; across four labelled corpora that affected 58 of 62,646 shared pairs and could lift a pair into Accept via ALT_CORROBORATION_STRONG_MIN. The entry is filtered before the match/conflict branch, so it is evidence of NOTHING in either direction -- a Deprecated id that differs is not evidence the works differ either. Same creation type here, so no gate is involved: this pins the comparator, not a guard.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "The Quarry Road",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1974",
+    "length_minutes": "96",
+    "directors": [
+      "Ana Belmonte"
+    ],
+    "countries": [
+      "ES"
+    ],
+    "original_languages": [
+      "es"
+    ],
+    "alt_ids": [
+      {
+        "value": "tt0071234",
+        "id_type": "IMDB",
+        "relation": "IsDerivedFrom"
+      }
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/FEED-0000-0000-0010-0000-S",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Camino de la Cantera",
+        "lang": "es",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1981",
+    "length_minutes": "118",
+    "directors": [
+      "Tomás Reyes"
+    ],
+    "countries": [
+      "MX"
+    ],
+    "original_languages": [
+      "es"
+    ],
+    "alt_ids": [
+      {
+        "value": "tt0071234",
+        "id_type": "IMDB",
+        "relation": "IsDerivedFrom"
+      }
+    ]
+  },
+  "invariants": {
+    "verdict_not_in": [
+      "Accept"
+    ]
+  }
+}

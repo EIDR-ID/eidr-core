@@ -1,0 +1,70 @@
+{
+  "id": "crosstype-related-altid-review-ceiling",
+  "added": "2026-09-04",
+  "why": "Identity and RELATEDNESS are different questions. A shared Alt ID whose relation is IsDerivedFrom says the identifier names a DIFFERENT work, so it is not evidence the two records are the same and must never carry a cross-type pair to Accept. But it IS evidence they are ABOUT each other, so when other metadata already agrees the pair is lifted into Review for a human rather than discarded. This is the theatrical-short-vs-registry-Episode shape: seven NE4 rows regressed to a terminal no-match when eidr-core 0.22.0 made matches identity-only, and human review had confirmed every one as a match. The floor can only raise a score INTO the Review band, never to Accept -- that asymmetry is why a relatedness signal is safe here and would not be safe in the corroboration path. Guard ordering is what this pins: the cross-type gate must cap first and the floor must lift second.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Little Red Rodent Hood",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1952",
+    "length_minutes": "7",
+    "directors": [
+      "Friz Freleng"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": [
+      {
+        "value": "tt0044842",
+        "id_type": "IMDB",
+        "relation": "IsDerivedFrom"
+      }
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/FEED-0000-0000-0009-0000-Q",
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-0009-0001-O",
+    "titles": [
+      {
+        "text": "Little Red Rodent Hood",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1952",
+    "length_minutes": "7",
+    "distribution_number": "12",
+    "directors": [
+      "Friz Freleng"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": [
+      {
+        "value": "tt0044842",
+        "id_type": "IMDB",
+        "relation": "IsSameAs"
+      }
+    ]
+  },
+  "invariants": {
+    "verdict_not_in": [
+      "Accept"
+    ],
+    "score_min": 30.0
+  }
+}

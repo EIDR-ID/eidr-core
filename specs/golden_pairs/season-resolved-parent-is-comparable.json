@@ -1,0 +1,60 @@
+{
+  "id": "season-resolved-parent-is-comparable",
+  "added": "2026-09-04",
+  "why": "A BMR sheet names a child's parent by Unique Row ID, not by EIDR ID -- 523 of 645 rows in the operator's sample, and NONE by EIDR ID. Before compare-spec 2.5.0 that cell was stored verbatim, so parent_id never resolved and the family gate reported a false 'seasons: different Family ID (not the same series)' against the CORRECT candidate, while inheritance produced no title at all. This pair is the same Season on both sides, so with the parent resolved it scores 100 and Accepts; if parent resolution regresses, the gate fires and it collapses to the ineligible ceiling of 10.7 -- the score_min invariant catches that, which a different-seasons pair would not. It also carries the SYSTEM-GENERATED title built from the parent's title (title_class 'series numeric'), the form a Season receives when it supplies none: 47 records in that sheet gained one, on the field this engine weights most heavily. The engine's sheet-resolution step is not reachable from a scored pair, so this pins the CONSEQUENCE of resolution rather than the mechanism. The synthetic ids are CHECKSUM-VALID (hex quads, correct ISO 7064 check character). They were not originally: a 'GOLD-' prefix is not hex, so `gate._valid()` rejected it, `family_id` returned None and `_same_series` fell back to comparing parent_id -- the pair scored 100 through the FALLBACK rather than the family-ID path it names. Found by De-Dupe UI's audit, 2026-08-31. A conformance pair that passes through an unintended path gives false assurance about the path it claims to pin.",
+  "submitted": {
+    "creation_type": "Season",
+    "parent_id": "10.5240/FEED-0000-0000-0011-0000-X",
+    "sequence_number": "1",
+    "titles": [
+      {
+        "text": "Total DramaRama: Season 1",
+        "lang": "en",
+        "is_resource": true,
+        "system_generated": true,
+        "title_class": "series numeric"
+      }
+    ],
+    "release_date": "2018",
+    "countries": [
+      "CA"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "directors": [
+      "Ann Lee"
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/FEED-0000-0000-0011-0002-T",
+    "creation_type": "Season",
+    "parent_id": "10.5240/FEED-0000-0000-0011-0000-X",
+    "sequence_number": "1",
+    "titles": [
+      {
+        "text": "Total DramaRama: Season 1",
+        "lang": "en",
+        "is_resource": true,
+        "system_generated": true,
+        "title_class": "series numeric"
+      }
+    ],
+    "release_date": "2018",
+    "countries": [
+      "CA"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "directors": [
+      "Ann Lee"
+    ]
+  },
+  "invariants": {
+    "verdict_in": [
+      "Accept"
+    ],
+    "score_min": 80.0
+  }
+}

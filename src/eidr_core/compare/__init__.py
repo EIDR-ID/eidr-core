@@ -319,6 +319,93 @@ def _profile_full_date_quality(profile, days):
     return None
 
 
+def _equivalent_year_gap(days):
+    """The year gap a day distance is EVIDENCE for, not the calendar gap.
+
+    Keying the fall-through on the calendar year made the same distance score
+    differently either side of New Year: 32 days apart scored the gap-0 anchor
+    within one year and the gap-1 value across it. Same distance, same
+    evidence, different answer -- an artefact of the calendar, not of the data.
+    """
+    return max(1, round(days / 365.25))
+
+
+def _fallthrough_quality(profile, days, calendar_gap):
+    """Quality for a full-date pair BEYOND the last band.
+
+    Two rules, and both are load-bearing:
+
+    1. Key on the DISTANCE-equivalent year gap, taking the larger of that and
+       the calendar gap so a genuinely distant pair is never credited upward.
+       The measurement is what forces this: P(match) is 0.331 at 32-365 days
+       against 0.332 at a one-year gap, so a 32-day pair IS one-year evidence.
+    2. Never exceed the last band. Monotonicity is the property this whole
+       structure exists to guarantee -- `DATE_PROFILES` replaced flat constants
+       precisely because a mismatch could outscore a match -- and it must not
+       be reintroduced at the band boundary.
+
+    Rule 2 binds only when a profile is authored with its last band BELOW its
+    gap-1 credit, which is an authoring defect :func:`validate_date_profile`
+    reports. When the numbers are consistent the clamp is a no-op, and the
+    result is exactly the distance-equivalent year value.
+    """
+    gap = max(calendar_gap, _equivalent_year_gap(days))
+    q = _profile_year_quality(profile, gap)
+    if q is None:
+        return None
+    bands = profile.get("full_date_bands") or []
+    if bands:
+        q = min(q, float(bands[-1][1]))
+    return q
+
+
+def validate_date_profile(profile, name="profile"):
+    """Authoring problems in a date profile, as a list of strings.
+
+    Empty means the profile is sound. Not raised at runtime: a consumer
+    mid-scoring should not die over tuning constants, and the clamp in
+    :func:`_fallthrough_quality` already keeps a flawed profile monotonic.
+    Call it from a test, or when loading a spec.
+
+    Checks the two properties the structure depends on:
+
+    * the year table is monotonically non-increasing -- the inversion that
+      motivated profiles in the first place;
+    * the last full-date band is at least the gap-1 credit, so the band-to-year
+      boundary does not step UP. As of compare-spec 2.8.0 ``Basic`` fails this
+      by 0.01 (last band 0.70, gap-1 0.71); raising the band to 0.71, or
+      lowering gap-1 to 0.70, makes the clamp unnecessary.
+    """
+    problems = []
+    credits = profile.get("year_gap_credit") or {}
+    try:
+        gaps = sorted(int(k) for k in credits)
+    except (TypeError, ValueError):
+        return [f"{name}: year_gap_credit keys must be integers"]
+    prev = None
+    for g in gaps:
+        v = float(credits[g] if g in credits else credits[str(g)])
+        if prev is not None and v > prev + 1e-9:
+            problems.append(
+                f"{name}: year_gap_credit is not monotonic -- gap {g} scores "
+                f"{v} against {prev} for the closer gap")
+        prev = v
+    floor = profile.get("year_gap_floor")
+    if floor is not None and prev is not None and float(floor) > prev + 1e-9:
+        problems.append(
+            f"{name}: year_gap_floor {floor} exceeds the last credit {prev}")
+    bands = profile.get("full_date_bands") or []
+    if bands and 1 in {int(k) for k in credits}:
+        last = float(bands[-1][1])
+        g1 = float(credits.get(1, credits.get("1")))
+        if last < g1 - 1e-9:
+            problems.append(
+                f"{name}: last full_date_band {last} is below the gap-1 credit "
+                f"{g1}, so the band-to-year boundary steps UP; the clamp masks "
+                f"it, but raise the band to {g1} (or lower gap-1 to {last})")
+    return problems
+
+
 def cmp_release_date(a, b):
     ay, aymd = parse_date(a.release_date)
     by, bymd = parse_date(b.release_date)
@@ -354,7 +441,7 @@ def cmp_release_date(a, b):
             # value. It over-credited distant full dates -- wrong in the safe
             # direction (costing precision, not recall), which is why
             # BMR-Review shipped 2.8.0 without holding for it, but wrong.
-            gap_q = _profile_year_quality(profile, abs(ay - by)) if profile else None
+            gap_q = _fallthrough_quality(profile, dd, abs(ay - by)) if profile else None
             if gap_q is not None:
                 q = gap_q
             else:

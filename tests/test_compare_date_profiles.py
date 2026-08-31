@@ -208,39 +208,104 @@ def test_max_key_is_numeric_not_lexicographic():
 
 # --- the full-date fall-through ---------------------------------------------
 
-def test_beyond_the_last_band_the_YEAR_TABLE_applies(profiled):
-    """Not the legacy exponential. 0.24.0 documented this and did the other.
+def test_beyond_the_last_band_the_DISTANCE_equivalent_year_applies(profiled):
+    """Not the calendar gap, and never above the last band.
 
-    The bands stop at about a month because a full date stops being worth more
-    than a year there: P(match) is 0.331 at 32-365 days against 0.332 at a
-    one-year gap. Falling through to the exponential meant that finding was
-    never in effect -- two full dates seven weeks apart scored 0.938 where the
-    same records with year-only precision scored 1.00.
+    Two separate defects converge here.
 
-    Reported by BMR-Review while adopting 0.24.0; a passing suite did not
-    catch it, because nothing asserted what happened past the last band.
+    0.24.0 fell through to the legacy exponential (BMR-Review). 0.24.1 fixed
+    that but keyed on the CALENDAR year, which produced a second inversion
+    (De-Dupe UI): 31 days apart scored 0.70 and 32 days apart scored the
+    profile's gap-0 anchor -- a pair further apart scoring higher, the exact
+    failure class DATE_PROFILES exists to eliminate.
+
+    The evidence settles the key: P(match) is 0.331 at 32-365 days against
+    0.332 at a one-year gap, so a 32-day pair IS one-year evidence regardless
+    of which side of New Year it falls.
     """
     import datetime as dt
-    a = dt.date(2020, 1, 1)
+    a = dt.date(2020, 3, 1)
 
-    # 50 days apart, SAME year -> the profile's gap-0 value, not a decayed one.
-    fifty = (a + dt.timedelta(days=50)).isoformat()
-    assert cmp_release_date(R(a.isoformat()), R(fifty)).quality == pytest.approx(0.60)
+    def q(days):
+        b = (a + dt.timedelta(days=days)).isoformat()
+        return cmp_release_date(R(a.isoformat()), R(b)).quality
 
-    # 517 days apart spans a one-year gap -> the gap-1 value.
-    span = (a + dt.timedelta(days=517)).isoformat()
-    assert cmp_release_date(R(a.isoformat()), R(span)).quality == pytest.approx(0.43)
+    # 50 days is one-year evidence -> the gap-1 credit, not the gap-0 anchor.
+    assert q(50) == pytest.approx(0.43)
+    # Still one-year evidence most of the way to a year.
+    assert q(200) == pytest.approx(0.43)
+    # Three years -> the floor.
+    assert q(1096) == pytest.approx(0.10)
 
-    # Three years -> the floor, not an exponential tail.
-    far = (a + dt.timedelta(days=1096)).isoformat()
-    assert cmp_release_date(R(a.isoformat()), R(far)).quality == pytest.approx(0.10)
+
+def test_the_band_boundary_does_not_step_up(profiled):
+    """The inversion De-Dupe UI found, pinned at one-day resolution."""
+    import datetime as dt
+    a = dt.date(2020, 3, 1)
+    qs = []
+    for days in range(25, 45):
+        b = (a + dt.timedelta(days=days)).isoformat()
+        qs.append((days, cmp_release_date(R(a.isoformat()), R(b)).quality))
+    for (d0, q0), (d1, q1) in zip(qs, qs[1:]):
+        assert q1 <= q0 + 1e-9, f"{d1}d scored {q1} against {q0} at {d0}d"
 
 
-def test_a_full_date_never_scores_above_the_year_only_equivalent(profiled):
-    """The invariant behind the fall-through, stated directly.
+def test_the_same_distance_scores_the_same_across_new_year(profiled):
+    """A calendar boundary is not evidence.
 
-    Extra precision may CONFIRM (inside the bands) but must never invent
-    similarity that year-level data would not support.
+    Keying the fall-through on the calendar year made 32 days score the gap-0
+    anchor within a year and the gap-1 value across one -- same distance, same
+    evidence, different answer.
+    """
+    within = cmp_release_date(R("2020-03-01"), R("2020-04-02")).quality   # 32d
+    across = cmp_release_date(R("2020-12-20"), R("2021-01-21")).quality   # 32d
+    assert within == pytest.approx(across)
+
+
+def test_the_shipped_profiles_are_validated(profiled):
+    """A profile must not be authored so the boundary steps up.
+
+    The clamp keeps a flawed profile monotonic, so this is the only thing that
+    surfaces the authoring defect rather than silently masking it.
+    """
+    from eidr_core.compare import validate_date_profile
+    assert validate_date_profile(_PROFILES["Basic"], "Basic") == []
+
+
+def test_the_validator_catches_a_boundary_that_steps_up():
+    """The condition, and the number to change, both named."""
+    from eidr_core.compare import validate_date_profile
+    bad = {"year_gap_credit": {0: 1.00, 1: 0.71, 2: 0.22},
+           "year_gap_floor": 0.17,
+           "full_date_bands": [(0, 1.00), (31, 0.70)]}
+    problems = validate_date_profile(bad, "Basic")
+    assert len(problems) == 1
+    assert "0.71" in problems[0] and "0.7" in problems[0]
+
+
+def test_the_validator_catches_a_non_monotonic_year_table():
+    """The original inversion class, as an authoring check."""
+    from eidr_core.compare import validate_date_profile
+    bad = {"year_gap_credit": {0: 0.60, 1: 0.89}, "year_gap_floor": 0.10,
+           "full_date_bands": [(0, 1.0)]}
+    assert any("not monotonic" in p for p in validate_date_profile(bad))
+
+
+def test_beyond_the_bands_a_full_date_matches_its_year_only_equivalent(profiled):
+    """The invariant, in the form that actually holds.
+
+    eidr-core first stated this as "a full-date pair must never score above
+    its year-only equivalent". De-Dupe UI tested that form across both
+    profiles and 17 distances and it fails 7 of 34 -- all INSIDE the bands,
+    all Episode, and all correctly: an Episode 3 days apart scores 0.95
+    against a year-only 0.60, which is the entire point of day-level
+    precision. A shared air date is highly discriminating for an episode even
+    though a shared year is not, and that asymmetry is what the per-type
+    anchor encodes.
+
+    The form that holds, and the one worth pinning: BEYOND the last band a
+    full-date pair scores exactly what the same records would score on
+    year-level evidence for that distance.
     """
     import datetime as dt
     a = dt.date(2020, 1, 1)

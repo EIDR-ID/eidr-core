@@ -79,12 +79,32 @@ pre-2.8.0 constants violated — a year-only Episode MISMATCH outscored a MATCH
 for every gap below 4.42 years, because the anchor and the decay curve were on
 different scales.
 
-**Beyond the last `full_date_bands` entry, the year-level table applies**,
-keyed on the year gap — not an exponential tail. A distant full-date pair
-carries no more information than a distant year pair (0.331 at 32–365 days
-against 0.332 at a one-year gap), which is why the bands stop at about a
-month. Extra precision may confirm within the bands; it must never invent
-similarity that year-level data would not support.
+**Beyond the last `full_date_bands` entry, the year-level table applies** —
+not an exponential tail — keyed on the **distance-equivalent** year gap rather
+than the calendar gap. A distant full-date pair carries no more information
+than a distant year pair (0.331 at 32–365 days against 0.332 at a one-year
+gap), which is why the bands stop at about a month.
+
+Two corrections worth keeping, because the first wording of this rule caused
+both:
+
+* **Key on distance, not the calendar.** Keying on the calendar year made the
+  same 32-day distance score the gap-0 anchor within one year and the gap-1
+  value across New Year — same evidence, different answer.
+* **The invariant is bounded to beyond the bands.** It was first stated as
+  "a full-date pair must never score above its year-only equivalent". That is
+  too strong and fails *correctly* inside the bands: an Episode 3 days apart
+  scores 0.95 against a year-only 0.60, which is the whole point of day-level
+  precision — a shared air date discriminates where a shared year does not.
+  The form that holds is: **beyond the last band, a full-date pair scores
+  exactly its year-level equivalent for that distance.**
+
+**Authoring rule:** the last band must be at least the gap-1 credit, or the
+band-to-year boundary steps UP and a pair further apart scores higher. A clamp
+in `cmp_release_date` keeps a flawed profile monotonic, and
+`eidr_core.compare.validate_date_profile()` reports the defect rather than
+letting the clamp hide it. As of 2.8.0 `Basic` fails this by 0.01 (last band
+0.70, gap-1 0.71).
 
 ## Naming the upstream matching system
 

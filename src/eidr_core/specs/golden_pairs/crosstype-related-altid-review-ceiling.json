@@ -31,9 +31,9 @@
     ]
   },
   "candidate": {
-    "eidr_id": "10.5240/GOLD-0000-0000-0009-0000-Q",
+    "eidr_id": "10.5240/FEED-0000-0000-0009-0000-Q",
     "creation_type": "Episode",
-    "parent_id": "10.5240/GOLD-0000-0000-0009-0001-3",
+    "parent_id": "10.5240/FEED-0000-0000-0009-0001-O",
     "titles": [
       {
         "text": "Little Red Rodent Hood",

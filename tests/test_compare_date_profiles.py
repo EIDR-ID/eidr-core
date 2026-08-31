@@ -246,7 +246,7 @@ def test_the_band_boundary_does_not_step_up(profiled):
     for days in range(25, 45):
         b = (a + dt.timedelta(days=days)).isoformat()
         qs.append((days, cmp_release_date(R(a.isoformat()), R(b)).quality))
-    for (d0, q0), (d1, q1) in zip(qs, qs[1:]):
+    for (d0, q0), (d1, q1) in zip(qs, qs[1:], strict=False):
         assert q1 <= q0 + 1e-9, f"{d1}d scored {q1} against {q0} at {d0}d"
 
 

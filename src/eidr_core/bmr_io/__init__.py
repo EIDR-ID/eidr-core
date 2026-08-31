@@ -95,7 +95,7 @@ __all__ = ["HEADER_ROW", "DATA_START", "read_headers", "count_family",
            "rightmost_in", "expand_family", "transplant",
            "fix_shared_strings",
            "open_sheet", "read_sheet", "family_layout", "RepeatPlan",
-           "pad_groups"
+           "pad_groups",
            "ROW_ID_COLUMN", "PARENT_COLUMN", "ASSIGNED_ID_COLUMN",
            "ParentRef", "index_rows", "resolve_parent", "parent_chain"]
 

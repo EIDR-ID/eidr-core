@@ -49,7 +49,7 @@ engine's human-decision evaluation set (`unified-scoring.md` §5).
 
 ```json
 {"type": "header", "format": "dedupe-worklist" | "dedupe-results" | "dedupe-supplement",
- "format_version": "1.0", "generated_at": "2026-07-27T12:00:00Z",
+ "format_version": "2.0", "generated_at": "2026-07-27T12:00:00Z",
  "engine": {"name": "eidr_dedup_score", "version": "<pkg or git rev>"},
  "compare_spec_version": "<compare-spec.json version, or 'config.py' until step 2 lands>",
  "source": {"registry": "production|sandbox1|sandbox2", "run": "<generation run id>"}}
@@ -58,6 +58,19 @@ engine's human-decision evaluation set (`unified-scoring.md` §5).
 Consumers MUST reject a file whose `format`/`format_version` they don't
 understand, and SHOULD surface `compare_spec_version` in debug views (it is
 the tuning provenance of every score in the file).
+
+**`format_version` is `"2.0"` as of the v2 field rename (2026-08-30).** It
+was left at `"1.0"` when v2 renamed two wire fields, which defeated the rule
+above in the worst possible way: a v1 consumer met a v2 file, recognised the
+`format_version`, accepted it, and read `undefined` for the renamed field.
+The candidate sort then silently fell back to score order with every
+candidate in the null bucket, and **nothing raised**. A rejection would have
+been strictly better than that silence. Caught by De-Dupe UI (S-12).
+
+The rule this documents: **`format_version` bumps whenever a field name or
+shape changes, in the same edit that changes it.** A renamed field IS a
+breaking shape change; a document-version bump is not a substitute, because
+consumers check the wire value, not the spec's title page.
 
 ## 3. Work-list line (`"type": "transaction"`)
 
@@ -140,7 +153,7 @@ pass for previously-unscored candidates:
 
 ## 8. Versioning & conformance
 
-* `format_version` bumps on any breaking shape change; `compare_spec_version`
+* `format_version` bumps on any breaking shape change -- **including a field RENAME**, which is what v2 did; `compare_spec_version`
   changes do NOT bump the format (payloads are self-describing).
 * Golden-pair conformance (Phase 2.3) will include one fixture work-list line
   + expected render outcomes, pinning producer and consumer to this spec.

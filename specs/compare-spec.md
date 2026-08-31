@@ -46,6 +46,32 @@ the reasoning, not just the number.
   the denominator (`ALWAYS_APPLICABLE` keeps release_date in regardless);
   calibrated per creation type onto the shared bands (<30 Reject, 30–<80
   Review, ≥80 Accept).
+## Naming the upstream matching system
+
+**Ruling, 2026-08-31 (operator).** eidr-core is a public repository and the
+commercial matching vendor's name was redacted from it. That redaction is
+scoped to **prose** — comments, narrative documentation, spec text.
+
+It explicitly does **not** extend to:
+
+* **engine contract strings that reviewers see.** The assessment label
+  `Disagree: Tamr missed`, the recovery notes, and the reviewer-facing
+  `reason` strings stay verbatim. A specification's job is to describe what
+  the engine actually emits; redacting the description alone would
+  desynchronize it from the Python and JS implementations, and the label
+  additionally drives routing, the terminal sets and the vocabulary vectors.
+* **verbatim operator quotations.** Altering a quotation to satisfy a
+  redaction misrepresents it.
+
+Raised by De-Dupe UI (S-14) after finding that its redaction could not be
+completed without changing what the engine reports. The alternative — a
+coordinated rename in BMR-Review — is a compare-spec bump plus regenerated
+vocabulary vectors plus spec and JS updated together, which is real cost for
+a string that is accurate. Accepted as-is instead.
+
+**New code should still prefer neutral phrasing** ("the upstream matching
+system") wherever it is not reproducing an emitted value.
+
 * **What counts as a COMMON Alt ID** (operator ruling, 2026-08-30) -- the
   definition both the match and the conflict paths apply, and the one thing
   in this document a consumer may not relax:

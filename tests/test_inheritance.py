@@ -690,3 +690,113 @@ def test_a_kept_system_generated_title_is_not_stamped_self_defined():
     full = build_full_record(child, None, "Season")
     assert full.titles[0].system_generated is True
     assert full.titles[0].self_defined is False
+
+
+# --- Credits: one schema field, two lists (BMR-Review S-21) ----------------
+# The schema has Director and Actor as children of Credits, so they are ONE
+# inheritable field with one provenance value. They inherit independently,
+# which means the two lists can disagree, and a single name can only be
+# truthful about a disagreement by reporting the weaker of the two.
+
+def _credit_parent():
+    return _Rec(creation_type="Series", release_date="2001",
+                directors=[_Title(text="Parent Director")],
+                actors=[_Title(text="Parent Actor")],
+                titles=[_Title(text="The Series", is_resource=True)])
+
+
+def test_credits_reports_self_only_when_the_child_supplied_both():
+    child = _Rec(creation_type="Edit", directors=[_Title(text="Kid Director")],
+                 actors=[_Title(text="Kid Actor")])
+    full = build_full_record(child, _credit_parent(), "Edit")
+    assert provenance(full)["Credits"] == "self"
+
+
+def test_credits_reports_inherited_when_the_child_supplied_neither():
+    full = build_full_record(_Rec(creation_type="Edit"), _credit_parent(), "Edit")
+    assert provenance(full)["Credits"] == "inherited"
+
+
+@pytest.mark.parametrize("supplied,inherited_attr", [
+    ("directors", "actors"),
+    ("actors", "directors"),
+])
+def test_credits_takes_the_weaker_reading_when_the_lists_disagree(
+        supplied, inherited_attr):
+    """A child that supplied one role and inherited the other is NOT self.
+
+    Reported as "self" before this fix, because the self-loop sets "self" as
+    soon as EITHER list is populated and the inheritance loop then used
+    setdefault. A consumer rendering Credits across both roles would have put
+    a self-defined glyph on values the child never asserted -- worse than the
+    silence it replaces, because absent means unknown while self is a claim.
+    """
+    child = _Rec(creation_type="Edit")
+    setattr(child, supplied, [_Title(text="Supplied By The Child")])
+    full = build_full_record(child, _credit_parent(), "Edit")
+
+    # the one it supplied survives; the other really was taken from the parent
+    assert getattr(full, supplied)[0].text == "Supplied By The Child"
+    assert getattr(full, inherited_attr)[0].text.startswith("Parent ")
+    assert provenance(full)["Credits"] == "inherited"
+
+
+def test_credits_is_self_when_there_is_no_parent_to_inherit_from():
+    child = _Rec(creation_type="Basic", directors=[_Title(text="Kid Director")])
+    full = build_full_record(child, None, "Basic")
+    assert provenance(full)["Credits"] == "self"
+
+
+# --- re-entry: building over an ALREADY-built record ------------------------
+# Callers materialize IN PLACE over a cached record (BMR-Review's
+# report.evaluate_case, over mirror.MirrorSource.load), so any record that
+# appears on two rows reaches this builder twice. Presence alone cannot tell
+# "the submitter supplied it" from "an earlier pass inherited it", so the
+# second pass used to promote inherited values to self-defined -- which
+# silently disabled the consumer's inherited-value discount and rewrote
+# provenance from `inherited` to `self`. A record's score must not depend on
+# how many times it has been built.
+
+def test_building_twice_is_idempotent_for_values_flags_and_provenance():
+    parent = _credit_parent()
+    child = _Rec(creation_type="Edit")
+
+    once = build_full_record(child, parent, "Edit")
+    twice = build_full_record(once, parent, "Edit")
+    thrice = build_full_record(twice, parent, "Edit")
+
+    for got in (twice, thrice):
+        assert [n.text for n in got.directors] == [n.text for n in once.directors]
+        assert [n.self_defined for n in got.directors] == [False]
+        assert provenance(got) == provenance(once)
+
+
+def test_a_second_pass_does_not_promote_inherited_values_to_self():
+    """The defect, stated as its consequence."""
+    built = build_full_record(_Rec(creation_type="Edit"), _credit_parent(), "Edit")
+    assert provenance(built)["Credits"] == "inherited"
+    assert all(n.self_defined is False for n in built.directors)
+
+    again = build_full_record(built, _credit_parent(), "Edit")
+    assert provenance(again)["Credits"] == "inherited"
+    assert all(n.self_defined is False for n in again.directors)
+
+
+def test_a_second_pass_does_not_promote_inherited_SCALARS_either():
+    """Scalars carry no per-element flag, so only the carried-forward map can
+    keep them honest -- release_date is the field a child most often
+    inherits."""
+    built = build_full_record(_Rec(creation_type="Edit"), _credit_parent(), "Edit")
+    assert provenance(built)["ReleaseDate"] == "inherited"
+    again = build_full_record(built, _credit_parent(), "Edit")
+    assert provenance(again)["ReleaseDate"] == "inherited"
+
+
+def test_a_genuinely_self_defined_value_still_reads_self_on_re_entry():
+    """The carry-forward must not flip the other way: only non-self states are
+    carried, so a child that really did supply a value keeps saying so."""
+    child = _Rec(creation_type="Edit", directors=[_Title(text="Kid Director")],
+                 actors=[_Title(text="Kid Actor")])
+    built = build_full_record(child, _credit_parent(), "Edit")
+    assert provenance(built)["Credits"] == "self"
+    assert provenance(build_full_record(built, _credit_parent(), "Edit"))["Credits"] == "self"

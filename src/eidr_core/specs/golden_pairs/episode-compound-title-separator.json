@@ -1,10 +1,11 @@
 {
   "id": "episode-compound-title-separator",
-  "added": "2026-09-01",
-  "why": "One 30-minute slot holds several shorter cartoons, and the two sides punctuate the combination differently: the submitter writes 'Colossal Squid / Jawfish', the registry stores 'Colossal Squid; Jawfish'. Until eidr-core 0.26.0 segments() split only on '/', so one side was two segments and the other was one, and the pair scored EXACTLY 0.500 on the field this engine weights most heavily. Two confirmed matches were closed as terminal no-match on that alone (BMR-Review scoring review, 2026-09-01). The lesson is version-independent and belongs in an invariant rather than a value: a delimiter list must never decide identity. Same set, either punctuation, any order -- one program. MUTATION-TESTED, with a limitation worth stating: this pair fails against the FULL pre-0.26.0 comparator (both the invariant and the snapshot), but it does NOT isolate the ';' delimiter on its own. norm_title already strips ';', so with ';' removed from segments() the one-side-delimited token_sort_ratio fallback still returns 1.0 and the pair passes. It is an end-to-end regression pair for the reported defect, not a unit probe for the delimiter list; a pair that isolates the delimiter would need segment sets that differ after normalisation.",
+  "added": "2026-09-16",
+  "why": "A children's programme slot holds several shorts; the submitter writes the compound title 'Colossal Squid / Jawfish' and the registry stores 'Colossal Squid; Jawfish'. Until eidr-core 0.26.0, segments() split only on '/', so one side was two segments and the other one, and the pair scored exactly 0.500 -- matched / max(len). Two confirmed matches on the Amazon parent-aware audit (E00131, E00132; same parent, same series) closed as 'Disagree: all candidates rejected' at 21.6 on that alone, so the correct candidate was never shown to a reviewer. The rule (operator, 2026-09-01): a compound title is a COMBINATION of segments -- the same set in any order is one programme. This pair is that case with the same parent and an identical full air date, so the title is the only thing under test. SCOPE OF THIS PAIR (eidr-core, 2026-09-01, restored after a rewrite dropped it): it fails against the FULL pre-0.26.0 comparator, but it does NOT isolate the ';' delimiter on its own. norm_title already strips ';', so with ';' removed from segments() the one-side-delimited token_sort_ratio fallback still returns 1.0 and this pair passes. It is an end-to-end regression pair for the reported defect, not a unit probe for the delimiter list -- a JS implementation that also strips ';' in normalisation must add it to the splitter deliberately, because a green pair will not prove it did.",
   "submitted": {
     "creation_type": "Episode",
-    "parent_id": "10.5240/FEED-0000-0000-0013-0000-D",
+    "parent_id": "10.5240/FEED-0000-0000-0011-0000-X",
+    "distribution_number": "3",
     "titles": [
       {
         "text": "Colossal Squid / Jawfish",
@@ -12,22 +13,17 @@
         "is_resource": true
       }
     ],
-    "release_date": "2019-06-04",
+    "release_date": "2012-11-22",
     "length_minutes": "22",
-    "countries": [
-      "US"
-    ],
     "original_languages": [
       "en"
-    ],
-    "directors": [
-      "Dana Okoye"
     ]
   },
   "candidate": {
-    "eidr_id": "10.5240/FEED-0000-0000-0013-0001-9",
+    "eidr_id": "10.5240/FEED-0000-0000-0013-0000-6",
     "creation_type": "Episode",
-    "parent_id": "10.5240/FEED-0000-0000-0013-0000-D",
+    "parent_id": "10.5240/FEED-0000-0000-0011-0000-X",
+    "distribution_number": "3",
     "titles": [
       {
         "text": "Colossal Squid; Jawfish",
@@ -35,16 +31,10 @@
         "is_resource": true
       }
     ],
-    "release_date": "2019-06-04",
+    "release_date": "2012-11-22",
     "length_minutes": "22",
-    "countries": [
-      "US"
-    ],
     "original_languages": [
       "en"
-    ],
-    "directors": [
-      "Dana Okoye"
     ]
   },
   "invariants": {
@@ -62,11 +52,11 @@
     "field_qualities": {
       "title": 1.0,
       "release_date": 1.0,
-      "distribution_number": null,
+      "distribution_number": 1.0,
       "length": 1.0,
       "house_sequence": null,
       "time_slot": null,
-      "director": 1.0,
+      "director": null,
       "actor": null,
       "assoc_org": null,
       "original_language": 1.0,
@@ -76,11 +66,11 @@
     "field_states": {
       "titles": "identical",
       "release_date": "identical",
-      "episode_distribution_number": "neutral",
+      "episode_distribution_number": "identical",
       "duration": "identical",
       "episode_house_sequence": "neutral",
       "episode_time_slot": "neutral",
-      "director": "identical",
+      "director": "neutral",
       "actor": "neutral",
       "associated_org": "neutral",
       "original_language": "identical",

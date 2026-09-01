@@ -548,6 +548,13 @@ def build_full_record(
     full = copy.deepcopy(self_rec)
     ctype = creation_type or getattr(full, "creation_type", None) or ""
 
+    # A record this builder has ALREADY built carries its own provenance, and
+    # presence alone cannot distinguish "the submitter supplied it" from "an
+    # earlier pass inherited it". Callers materialize in place over a CACHED
+    # record, so re-entry is normal, not exceptional -- carry the earlier
+    # reading forward and let presence decide only what it can.
+    prior = dict(getattr(full, _PROVENANCE_ATTR, None) or {})
+
     prov: dict[str, str] = {}
     for field, attr in attrs.items():
         if hasattr(full, attr) and not _is_empty(getattr(full, attr)):
@@ -557,19 +564,35 @@ def build_full_record(
             prov["Credits"] = "self"
     if has_user_supplied_title(getattr(full, "titles", None)):
         prov["ResourceName"] = "self"
+    for field, state in prior.items():
+        if state != "self":
+            prov[field] = state
 
     # Everything the submitter supplied is self-defined -- EXCEPT an element
     # already flagged system_generated, which by definition the submitter did
     # not supply. Stamping those True produced contradictory flags
     # (system_generated=True, self_defined=True) on the no-parent path, and
     # BMR-Review's inherited-discount rule reads both flags.
+    #
+    # An element already flagged self_defined=False was not supplied by the
+    # submitter EITHER: it was inherited, by an earlier run of this builder
+    # over the same object. Callers materialize in place over a CACHED record
+    # (BMR-Review's report.evaluate_case, over mirror.MirrorSource.load), so
+    # any record appearing on two rows reaches this loop twice, and stamping
+    # True on the second pass promoted inherited values to self-defined --
+    # silently disabling the consumer's inherited-value discount and rewriting
+    # provenance from `inherited` to `self`. Respect an explicit False for the
+    # same reason system_generated is respected.
     for attr in ("titles", "directors", "actors", "countries",
                  "original_languages", "version_languages", "assoc_orgs",
                  "alt_ids"):
         for element in getattr(full, attr, None) or []:
-            if hasattr(element, "self_defined"):
-                element.self_defined = not getattr(
-                    element, "system_generated", False)
+            if not hasattr(element, "self_defined"):
+                continue
+            if getattr(element, "self_defined", None) is False:
+                continue
+            element.self_defined = not getattr(
+                element, "system_generated", False)
 
     # RULE 1 -- see build_full_base: for a non-child type a supplied parent
     # is ignored. Self IS Full.
@@ -601,7 +624,14 @@ def build_full_record(
         prov[field] = "inherited"
 
     # Credits: one schema field, two lists; inherit each independently but
-    # report them under the single canonical name.
+    # report them under the single canonical name. When the two lists
+    # DISAGREE -- the child supplied directors and inherited actors, or the
+    # reverse -- the single name must carry the WEAKER reading. Reporting
+    # "self" there would assert the child supplied values it never supplied,
+    # and a consumer that renders Credits across both roles would put a
+    # self-defined glyph on inherited data. `setdefault` was doing exactly
+    # that, because the self-loop above sets "self" when EITHER list is
+    # populated. Assign, do not setdefault.
     for attr in _CREDIT_ATTRS:
         if not hasattr(full, attr) or not hasattr(parent_full, attr):
             continue
@@ -612,7 +642,7 @@ def build_full_record(
             if hasattr(element, "self_defined"):
                 element.self_defined = False
         setattr(full, attr, inherited)
-        prov.setdefault("Credits", "inherited")
+        prov["Credits"] = "inherited"
 
     _attach(full, prov)
     if title_error is not None:

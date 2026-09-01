@@ -1,0 +1,103 @@
+{
+  "id": "episode-part-number-one-sided",
+  "added": "2026-09-01",
+  "why": "'The Trial Part 1' against 'The Trial'. Operator, 2026-09-01: \"If there's an episode with a part number and the same title without a part number, you can't be sure which part the un-numbered episode represents.\" The plain title may be part 1, part 2, or both parts combined -- so this is neither a match nor a conflict, and it must never auto-accept. The pair deliberately carries a SHARED identity Alt ID and agrees on every other field, so the alt-id bonus and the corroboration release are both in play: verdict_not_in Accept pins that they cannot carry a title that cannot identify the record. Before eidr-core 0.26.0 the one-sided part scored a full 1.000 and this pair would have auto-accepted.",
+  "submitted": {
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-0013-0000-D",
+    "titles": [
+      {
+        "text": "The Trial Part 1",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2011-10-12",
+    "length_minutes": "48",
+    "countries": [
+      "GB"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "directors": [
+      "Peter Nunn"
+    ],
+    "alt_ids": [
+      {
+        "value": "tt1899250",
+        "id_type": "Proprietary",
+        "domain": "imdb.com"
+      }
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/FEED-0000-0000-0013-0002-6",
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-0013-0000-D",
+    "titles": [
+      {
+        "text": "The Trial",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2011-10-12",
+    "length_minutes": "48",
+    "countries": [
+      "GB"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "directors": [
+      "Peter Nunn"
+    ],
+    "alt_ids": [
+      {
+        "value": "tt1899250",
+        "id_type": "Proprietary",
+        "domain": "imdb.com"
+      }
+    ]
+  },
+  "invariants": {
+    "verdict_not_in": [
+      "Accept"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.10.0",
+    "confidence": 79.0,
+    "verdict": "Review",
+    "field_qualities": {
+      "title": 0.7,
+      "release_date": 1.0,
+      "distribution_number": null,
+      "length": 1.0,
+      "house_sequence": null,
+      "time_slot": null,
+      "director": 1.0,
+      "actor": null,
+      "assoc_org": null,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": 1.0
+    },
+    "field_states": {
+      "titles": "neutral",
+      "release_date": "identical",
+      "episode_distribution_number": "neutral",
+      "duration": "identical",
+      "episode_house_sequence": "neutral",
+      "episode_time_slot": "neutral",
+      "director": "identical",
+      "actor": "neutral",
+      "associated_org": "neutral",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "identical"
+    },
+    "alt_id_conflicts": 0
+  }
+}

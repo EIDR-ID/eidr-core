@@ -19,6 +19,7 @@ compare-spec.json). BMR-Review keeps thin re-export shims so its internal
 imports and the engine-tuning workflow are unchanged.
 """
 from dataclasses import dataclass
+from functools import partial
 
 from rapidfuzz import fuzz
 
@@ -36,7 +37,12 @@ from eidr_core.normalize import (
 from . import _params as config
 from . import nonlinear
 from ._params import set_source as set_params  # noqa: F401 — public registration API, re-exported
-from .titles import parts_conflict, select_titles, title_similarity
+from .titles import (
+    parts_ambiguous,
+    parts_conflict,
+    select_titles,
+    title_similarity,
+)
 
 
 @dataclass
@@ -117,7 +123,9 @@ def cmp_titles(a, b):
         why = ("no real title to compare" if (not a_raw or not b_raw)
                else "system-generated titles only - ignored")
         return FieldResult("title", None, why, meta={})
-    qs = _greedy_align(a_raw, b_raw, simf=title_similarity)
+    _ep = ((getattr(a, "creation_type", None) or "") in ("Episode", "Season")
+           and (getattr(b, "creation_type", None) or "") in ("Episode", "Season"))
+    qs = _greedy_align(a_raw, b_raw, simf=partial(title_similarity, episodic=_ep))
     best = max(qs) if qs else 0.0
     pconf = parts_conflict(a_raw, b_raw)
     # When a part conflict is present, record whether the two sides share the
@@ -138,10 +146,13 @@ def cmp_titles(a, b):
                 if not y:
                     continue
                 base_match = max(base_match, _title_base_ratio(x[0], y[0]))
+    pamb = _ep and (not pconf) and parts_ambiguous(a_raw, b_raw)
     return FieldResult("title", nonlinear.accumulate(qs),
-                       f"best={best:.2f} matches={sum(1 for q in qs if q>0)}",
+                       f"best={best:.2f} matches={sum(1 for q in qs if q>0)}"
+                       + (" part-ambiguous" if pamb else ""),
                        meta={"best_sim": best, "part_conflict": pconf,
-                             "part_base_match": base_match})
+                             "part_base_match": base_match,
+                             "part_ambiguous": pamb})
 
 
 def _proportional(qs, n_a, n_b):

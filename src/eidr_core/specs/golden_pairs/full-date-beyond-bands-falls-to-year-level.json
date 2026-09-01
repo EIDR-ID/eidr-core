@@ -1,0 +1,83 @@
+{
+  "id": "full-date-beyond-bands-falls-to-year-level",
+  "added": "2026-09-10",
+  "why": "Two full dates 91 days apart in the SAME calendar year. Nothing else in the corpus reaches this path: of eleven pairs only two carry a full date on both sides, and one is 0 days apart (inside the first band) while the other trips the 1970-epoch guard, whose DATE_EPOCH_MISMATCH_FLOOR clamps the result and masks the fall-through entirely. So the corpus passed unchanged through eidr-core 0.24.1's fall-through fix -- the THIRD consecutive cycle it could not exercise the thing being changed (eidr-core, 2026-08-31). The lesson: extra precision may CONFIRM within the bands but must never invent similarity that year-level data would not support, so a full-date pair may never outscore its year-only equivalent. `field_quality_max` on release_date is what pins it -- under the 2.8.0/0.24.1 inversion these two dates scored 1.00, ABOVE the 0.70 that 31 days apart scored, because the last band sits below the year table's gap-0 anchor and falling past the bands jumped back up.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "The Quiet Season",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2014-03-01",
+    "length_minutes": "104",
+    "directors": [
+      "Iris Vance"
+    ],
+    "countries": [
+      "GB"
+    ],
+    "original_languages": [
+      "en"
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/FEED-0000-0000-0012-0000-B",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "The Quiet Season",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2014-05-31",
+    "length_minutes": "104",
+    "directors": [
+      "Iris Vance"
+    ],
+    "countries": [
+      "GB"
+    ],
+    "original_languages": [
+      "en"
+    ]
+  },
+  "invariants": {
+    "field_quality_max": {
+      "release_date": 0.75
+    }
+  },
+  "expected": {
+    "spec_version": "2.10.0",
+    "confidence": 94.6,
+    "verdict": "Accept",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 0.71,
+      "director": 1.0,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": 1.0,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "mismatch",
+      "director": "identical",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "identical",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

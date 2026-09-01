@@ -117,11 +117,16 @@ def parse_part(raw, *, bare=True):
     return None
 
 
+# Compound-title and part-number semantics (operator rulings, 2026-09-01).
+COMBINATION_DIFFERS_QUALITY = 0.20   # a different set of segments is a different program
+PART_AMBIGUOUS_QUALITY = 0.70        # numbered vs un-numbered: cannot reach Accept on title
+
+
 def segments(raw):
     """Split a slash-delimited segment title into a normalised set, or None."""
-    if not raw or "/" not in str(raw):
+    if not raw or not re.search(r"[/;]", str(raw)):
         return None
-    parts = [norm_title(p) for p in str(raw).split("/")]
+    parts = [norm_title(p) for p in re.split(r"[/;]", str(raw))]
     parts = [p for p in parts if p]
     return parts if len(parts) > 1 else None
 
@@ -137,14 +142,36 @@ def _fuzzy(a, b):
     return max(fuzz.token_set_ratio(a, b), fuzz.WRatio(a, b)) / 100.0
 
 
-def title_similarity(a_raw, b_raw):
-    """Pairwise title similarity in [0,1] honouring part/segment rules."""
+def title_similarity(a_raw, b_raw, *, episodic=False):
+    """Pairwise title similarity in [0,1] honouring part/segment rules.
+
+    `episodic=True` switches on two EPISODE-ONLY semantics (operator,
+    2026-09-01) that are wrong for films and are therefore off by default:
+
+    * a compound title is a COMBINATION of segments -- same set in any order
+      is one program, a different set is a different program;
+    * a part number on one side only is AMBIGUOUS (any one part, or all).
+
+    For a film, "/" is usually a subtitle separator ("Jumanji/ nekusuto
+    reberu") and a bare number vs its subtitled alternate ("Troublesome Night
+    5" vs "Troublesome Night - The A Files") is the SAME film. Measured:
+    applying the episode rules to films dropped 324 confirmed-match title
+    pairs by >= 0.2 across three labelled corpora, 247 of them with no
+    delimiter at all."""
     pa, pb = parse_part(a_raw), parse_part(b_raw)
     if pa and pb:
         base = _fuzzy(pa[0], pb[0])
         if base >= 0.85:                       # same show, explicit part numbers
             return 1.0 if pa[1] == pb[1] else 0.05
         # different bases -> fall through to ordinary comparison
+    elif episodic and (pa or pb):
+        # ONE side carries a part number and the other does not. If the bases
+        # agree this is AMBIGUOUS, not a match: the un-numbered title may be
+        # any one part, or all parts combined. It must not reach Accept on the
+        # title alone, and it is not a conflict either (operator, 2026-09-01).
+        numbered, plain = (pa, b_raw) if pa else (pb, a_raw)
+        if _fuzzy(numbered[0], norm_title(plain)) >= 0.85:
+            return PART_AMBIGUOUS_QUALITY
     sa, sb = segments(a_raw), segments(b_raw)
     if sa or sb:                               # at least one side is multi-segment
         sa = sa or [norm_title(a_raw)]
@@ -160,7 +187,49 @@ def title_similarity(a_raw, b_raw):
             if bi is not None and best >= 0.85:
                 matched += 1
                 pool.pop(bi)
-        return matched / max(len(sa), len(sb))
+        # A compound title is a COMBINATION of segments (several shorts in one
+        # slot). The same segments in any order are the same program; a
+        # different set -- a subset, a superset, one segment alone -- is a
+        # program combined differently, i.e. a DIFFERENT work. Proportional
+        # credit is therefore wrong: 2 of 3 matching is not "two-thirds the
+        # same", it is a different combination (operator, 2026-09-01).
+        if matched == len(sa) == len(sb):
+            return 1.0
+        if not episodic:
+            # Film: proportional credit, and never below the flat comparison
+            # (a separator on one side must not halve an identical title).
+            #
+            # The floor uses token_sort_ratio, NOT _fuzzy, for the same reason
+            # the episode branch below does: _fuzzy's token_set_ratio scores
+            # any token SUBSET at 1.0, so flooring with it would raise
+            # "Squid / Jawfish / Puffer" vs "Squid / Jawfish" from 0.667 to a
+            # perfect match, and "Squid / Jawfish" vs "Squid" from 0.500 to
+            # 1.000 -- inventing film title matches out of subsets. token_sort
+            # is order-insensitive but demands the FULL token set, so it lifts
+            # only the case this floor is for: the same title written with and
+            # without a separator.
+            flat = fuzz.token_sort_ratio(norm_title(a_raw),
+                                         norm_title(b_raw)) / 100.0
+            proportional = matched / max(len(sa), len(sb))
+            # The floor lifts ONLY when the flat texts agree at the same 0.85
+            # this module uses throughout -- i.e. when the two sides really are
+            # one title written with and without a separator. Taking an
+            # unconditional max() would let a partial flat resemblance drag a
+            # subset upward (0.667 -> 0.788), which is not what the floor is
+            # for and is not a film match.
+            return max(proportional, flat) if flat >= 0.85 else proportional
+        if segments(a_raw) and segments(b_raw):
+            return COMBINATION_DIFFERS_QUALITY
+        # Only one side is delimited. The other side is the same combination
+        # written without a separator ONLY if it contains every segment --
+        # so compare the flat texts with token_sort_ratio, which is
+        # order-insensitive but requires the full token set. _fuzzy's
+        # token_set_ratio is deliberately NOT used here: it scores any token
+        # SUBSET at 1.0, which is right for "Matrix, The" and wrong for a
+        # single cartoon against the slot that contained it.
+        fa, fb = norm_title(a_raw), norm_title(b_raw)
+        strict = fuzz.token_sort_ratio(fa, fb) / 100.0
+        return 1.0 if strict >= 0.85 else COMBINATION_DIFFERS_QUALITY
     return _fuzzy(norm_title(a_raw), norm_title(b_raw))
 
 
@@ -180,6 +249,20 @@ def select_titles(titles):
         return real, False
     fallback = [t for t in titles if t.text]
     return fallback, True
+
+
+def parts_ambiguous(a_titles, b_titles):
+    """True when the best-matching title pair has a part number on exactly ONE
+    side with agreeing bases -- the un-numbered title may be any one part or
+    all parts combined, so the pair may not reach Accept on the title."""
+    for a in a_titles:
+        for b in b_titles:
+            pa, pb = parse_part(a), parse_part(b)
+            if bool(pa) != bool(pb):
+                numbered, plain = (pa, b) if pa else (pb, a)
+                if _fuzzy(numbered[0], norm_title(plain)) >= 0.85:
+                    return True
+    return False
 
 
 def parts_conflict(a_raws, b_raws):

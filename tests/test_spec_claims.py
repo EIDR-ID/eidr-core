@@ -52,14 +52,18 @@ def _claimed_profiles():
     return out
 
 
+def _credit(credits, gap):
+    """One year-gap credit. Keys may be int (authored) or str (JSON round-trip)."""
+    return float(credits[str(gap)] if str(gap) in credits else credits[gap])
+
+
 def _actual_profiles():
     spec = json.loads(SPEC_JSON.read_text(encoding="utf-8"))
     out = {}
     for name, p in (spec["values"].get("DATE_PROFILES") or {}).items():
-        g = p["year_gap_credit"]
-        def at(i):
-            return float(g[str(i)] if str(i) in g else g[i])
-        out[name] = (at(0), at(1), at(2), float(p["year_gap_floor"]))
+        credits = p["year_gap_credit"]
+        out[name] = (_credit(credits, 0), _credit(credits, 1),
+                     _credit(credits, 2), float(p["year_gap_floor"]))
     return out
 
 

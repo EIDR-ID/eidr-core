@@ -50,9 +50,12 @@ the reasoning, not just the number.
 
 `DATE_PROFILES` (compare-spec 2.8.0) gives each creation type a table:
 
+<!-- VALUES-CHECKED: tests/test_spec_claims.py parses this block and
+     compares it to compare-spec.json. Regenerate the numbers there,
+     never here. -->
 ```
 Basic    1.00 / 0.71 / 0.22 at year gaps 0/1/2, floor 0.17
-Episode  0.60 / 0.43 / 0.13 at year gaps 0/1/2, floor 0.10
+Episode  0.80 / 0.57 / 0.18 at year gaps 0/1/2, floor 0.1
 ```
 
 **Two different kinds of number live in one table, and they must not be read
@@ -65,7 +68,7 @@ off each other.**
 * The **anchor** — the gap-0 value — is a judgement about that type's
   discriminating power, and it differs for a reason. A season's worth of
   episodes shares one year, so a shared year is weak evidence for an Episode
-  (0.60) and strong for a film (1.00). No corpus measurement can supply this:
+  (0.80) and strong for a film (1.00). No corpus measurement can supply this:
   the ratios say nothing about what a same-year match is worth to begin with.
 
 BMR-Review made exactly this mistake authoring the first draft — one profile
@@ -94,7 +97,7 @@ both:
 * **The invariant is bounded to beyond the bands.** It was first stated as
   "a full-date pair must never score above its year-only equivalent". That is
   too strong and fails *correctly* inside the bands: an Episode 3 days apart
-  scores 0.95 against a year-only 0.60, which is the whole point of day-level
+  scores 0.95 against a year-only 0.80, which is the whole point of day-level
   precision — a shared air date discriminates where a shared year does not.
   The form that holds is: **beyond the last band, a full-date pair scores
   exactly its year-level equivalent for that distance.**
@@ -103,8 +106,10 @@ both:
 band-to-year boundary steps UP and a pair further apart scores higher. A clamp
 in `cmp_release_date` keeps a flawed profile monotonic, and
 `eidr_core.compare.validate_date_profile()` reports the defect rather than
-letting the clamp hide it. As of 2.8.0 `Basic` fails this by 0.01 (last band
-0.70, gap-1 0.71).
+letting the clamp hide it. `Basic` failed this by 0.01 at 2.8.0 (last band
+0.70 against a gap-1 credit of 0.71); BMR-Review raised the band to 0.71 at
+2.10.0, so both shipped profiles now validate clean and the clamp no longer
+binds.
 
 ## Naming the upstream matching system
 

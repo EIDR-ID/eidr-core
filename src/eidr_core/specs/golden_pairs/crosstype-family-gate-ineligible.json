@@ -1,0 +1,82 @@
+{
+  "id": "crosstype-family-gate-ineligible",
+  "added": "2026-09-02",
+  "why": "Two Seasons of DIFFERENT series: same sequence number, same year, no shared Alt ID. The family gate must rule them ineligible, and nothing in the corpus pinned that. De-Dupe UI rates `eligibility`/`familyId` HIGH severity in 13-conformance.md section 6 -- it selects the weight profile and can clamp a score to the ineligible ceiling or cap it at 79 -- and records that it had ZERO fixtures anywhere, in this corpus or in BMR-Review. The complement already exists: season-resolved-parent-is-comparable pins that two Seasons of the SAME series ARE comparable. Together they pin both directions of the gate, which is what a gate needs -- the positive case alone passes just as happily with the check removed. The invariants are deliberately not a score: verdict_not_in Accept plus a score_max at the ineligible ceiling survive any retune of the weights, whereas a pinned confidence would have to be re-approved every cycle. Note this pair is DELIBERATELY starved of corroboration -- no Alt ID -- because a common Alt ID would legitimately floor it to Review through Guard 7 (the operator's Review-visible ruling), which is a different lesson and wants its own pair.",
+  "submitted": {
+    "creation_type": "Season",
+    "parent_id": "10.5240/FEED-0000-0000-0021-0000-C",
+    "sequence_number": "2",
+    "release_date": "2016",
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "titles": [
+      {
+        "text": "Harbour Lights: Season 2",
+        "lang": "en",
+        "is_resource": true,
+        "system_generated": true
+      }
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/FEED-0000-0000-0022-0001-K",
+    "creation_type": "Season",
+    "parent_id": "10.5240/FEED-0000-0000-0022-0000-8",
+    "sequence_number": "2",
+    "release_date": "2016",
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "titles": [
+      {
+        "text": "Northern Crossing: Season 2",
+        "lang": "en",
+        "is_resource": true,
+        "system_generated": true
+      }
+    ]
+  },
+  "invariants": {
+    "verdict_not_in": [
+      "Accept"
+    ],
+    "score_max": 20.0
+  },
+  "expected": {
+    "spec_version": "2.10.0",
+    "confidence": 10.7,
+    "verdict": "Reject",
+    "field_qualities": {
+      "title": null,
+      "release_date": 1.0,
+      "director": null,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": null,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "neutral",
+      "release_date": "identical",
+      "director": "neutral",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "neutral",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

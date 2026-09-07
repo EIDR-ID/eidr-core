@@ -1,0 +1,46 @@
+# Line endings: LF in the repository, native in the working tree.
+#
+# Set portfolio-wide 2026-09-07. Without this, correct behaviour depends on
+# each contributor having core.autocrlf=true set on their own machine -- a
+# per-machine setting, not a repo property. A clone from an environment
+# without it (a CI runner, a Docker build, a new contributor) would commit
+# CRLF blobs. Declaring it here makes the repo authoritative instead.
+#
+# This is a no-op for existing content: every tracked text file in every
+# portfolio repo was verified LF-in-blob before this landed, so nothing
+# renormalizes.
+
+# Auto detect text files and normalize to LF in the repository.
+* text=auto
+
+# Force LF for specific text files
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+*.gitignore text eol=lf
+*.gitattributes text eol=lf
+
+# Windows scripts must keep CRLF -- cmd.exe and PowerShell can misparse LF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files. text=auto already detects most of these by NUL byte, but a
+# container format whose first 8k happens to be NUL-free can be misdetected,
+# and a mangled .docx or .xlsx is unrecoverable -- so they are declared.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.xlsx binary
+*.docx binary
+*.pptx binary
+*.woff binary
+*.woff2 binary

@@ -1,0 +1,75 @@
+{
+  "id": "family-mismatch-must-reject",
+  "added": "2026-09-16",
+  "why": "Both records are child records, both Family IDs are known and checksum-valid, they DIFFER, and the creation types are the same: the pair must REJECT. This rule is why the Family ID exists (operator, 2026-09-16). Two series each have an episode called 'Pilot' in the same year -- the single most reused episode title there is -- and before compare-spec 2.11.0 this exact shape was held at Review twice over: the cross-type review floor's title-strong trigger accepted the bare exact title as corroboration, and where an alt-id CONFLICT existed, the alt-penalty floor computed its precondition from the UNGATED confidence and restored a score the gate had already ruled out. Found live in the Tamr audit: a 'Pilot' held at Review against candidates from five different families. Fixed by scoping the title trigger to pairs with a non-child side and gating the penalty floor on eligibility; this pair pins the combined outcome.",
+  "submitted": {
+    "creation_type": "Episode",
+    "release_date": "2026",
+    "length_minutes": "30",
+    "titles": [
+      {
+        "text": "Pilot",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "parent_id": "10.5240/FEED-0000-0000-0015-0001-E",
+    "family_id": "10.5240/FEED-0000-0000-0015-0000-G"
+  },
+  "candidate": {
+    "creation_type": "Episode",
+    "release_date": "2026",
+    "length_minutes": "30",
+    "titles": [
+      {
+        "text": "Pilot",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "eidr_id": "10.5240/FEED-0000-0000-0015-0002-C",
+    "parent_id": "10.5240/FEED-0000-0000-0016-0001-J",
+    "family_id": "10.5240/FEED-0000-0000-0016-0000-L"
+  },
+  "invariants": {
+    "verdict_in": [
+      "Reject"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.11.0",
+    "confidence": 10.7,
+    "verdict": "Reject",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 0.8,
+      "director": null,
+      "actor": null,
+      "country": null,
+      "assoc_org": null,
+      "length": 1.0,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "similar",
+      "director": "neutral",
+      "actor": "neutral",
+      "country_of_origin": "neutral",
+      "associated_org": "neutral",
+      "duration": "identical",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

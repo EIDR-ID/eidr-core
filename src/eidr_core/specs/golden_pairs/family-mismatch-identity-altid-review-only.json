@@ -1,0 +1,89 @@
+{
+  "id": "family-mismatch-identity-altid-review-only",
+  "added": "2026-09-16",
+  "why": "The ONE exception to family-mismatch-must-reject: the records share an identity Alt ID (same Kind+Value, relation absent or IsSameAs). A misassigned season keeps its external ids, so a shared identity id is the one signal that outranks recorded ancestry -- the pair may surface for a human. It may NOT auto-accept: the ancestry disagreement is exactly what the reviewer must resolve. verdict_in [Review] pins both walls at once. The exception requires a CLEAN identity match; a shared id alongside a conflicting id on another source rejects, because a genuinely misassigned record keeps its ids consistently.",
+  "submitted": {
+    "creation_type": "Episode",
+    "release_date": "2026",
+    "length_minutes": "30",
+    "titles": [
+      {
+        "text": "Pilot",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "parent_id": "10.5240/FEED-0000-0000-0015-0001-E",
+    "family_id": "10.5240/FEED-0000-0000-0015-0000-G",
+    "alt_ids": [
+      {
+        "value": "tt5550001",
+        "id_type": "IMDB",
+        "relation": "IsSameAs"
+      }
+    ]
+  },
+  "candidate": {
+    "creation_type": "Episode",
+    "release_date": "2026",
+    "length_minutes": "30",
+    "titles": [
+      {
+        "text": "Pilot",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "eidr_id": "10.5240/FEED-0000-0000-0016-0002-H",
+    "parent_id": "10.5240/FEED-0000-0000-0016-0001-J",
+    "family_id": "10.5240/FEED-0000-0000-0016-0000-L",
+    "alt_ids": [
+      {
+        "value": "tt5550001",
+        "id_type": "IMDB",
+        "relation": "IsSameAs"
+      }
+    ]
+  },
+  "invariants": {
+    "verdict_in": [
+      "Review"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.11.0",
+    "confidence": 30.0,
+    "verdict": "Review",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 0.8,
+      "director": null,
+      "actor": null,
+      "country": null,
+      "assoc_org": null,
+      "length": 1.0,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": 1.0
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "similar",
+      "director": "neutral",
+      "actor": "neutral",
+      "country_of_origin": "neutral",
+      "associated_org": "neutral",
+      "duration": "identical",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "identical"
+    },
+    "alt_id_conflicts": 0
+  }
+}

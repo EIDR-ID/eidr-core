@@ -20,10 +20,15 @@ BMR-Review that had drifted from it. Six primitives, canonical semantics:
 * ``fix_shared_strings(xlsx_path)`` — inlineStr -> shared-string conversion
   for EPPlus-based BMR tooling compatibility.
 
-Orchestration stays per-consumer BY DESIGN: eidr-wikidata's typed
-``BMRWriter``/``FAMILIES`` and BMR-Review's dict-based multi-template
-``write_bmr_files`` serve different jobs; only the workbook surgery was
-duplicated.
+WRITER COMPOSITION (added 2026-09-11, ``bmr_io/writer.py``, register R13):
+"orchestration stays per-consumer" held while there were two writers and
+stopped holding at three. ``write_sheet`` is the one copy of the sequence
+both consumers ran (expand families → append extra columns → clear → write
+by header name → transplant → fix shared strings), over rows already
+mapped to ``{column name: value}``. ``TEMPLATES`` / ``families_for`` /
+``SCHEMA_MAX`` are the Template-22 facts (python-tools P1) and
+``template_for_creation_type`` the routing table (P3). Mapping stays per
+consumer — it is policy, and 24% of the source writer was exactly that.
 
 READER HALF (added 2026-08-06, register R3 tail):
 
@@ -97,7 +102,11 @@ __all__ = ["HEADER_ROW", "DATA_START", "read_headers", "count_family",
            "open_sheet", "read_sheet", "family_layout", "RepeatPlan",
            "pad_groups",
            "ROW_ID_COLUMN", "PARENT_COLUMN", "ASSIGNED_ID_COLUMN",
-           "ParentRef", "index_rows", "resolve_parent", "parent_chain"]
+           "ParentRef", "index_rows", "resolve_parent", "parent_chain",
+           # writer composition (bmr_io/writer.py)
+           "Family", "Template", "TEMPLATES", "SHEET_TO_TEMPLATE", "SCHEMA_MAX",
+           "CREATION_TYPES", "families_for", "template_for_creation_type",
+           "max_counts", "WriteReport", "write_sheet"]
 
 
 def _header_map(values: Iterable) -> dict[int, str]:
@@ -747,3 +756,22 @@ def parent_chain(row: Mapping[str, Any],
         seen.add(key)
         current = ref.row
     return chain
+
+
+# The writer composes the primitives defined above, so it imports from this
+# module; importing it here, after they exist, is what lets a consumer write
+# ``from eidr_core.bmr_io import write_sheet`` without a second import path
+# to remember. Bottom-of-file by necessity, not by accident (E402).
+from eidr_core.bmr_io.writer import (  # noqa: E402
+    CREATION_TYPES,
+    SCHEMA_MAX,
+    SHEET_TO_TEMPLATE,
+    TEMPLATES,
+    Family,
+    Template,
+    WriteReport,
+    families_for,
+    max_counts,
+    template_for_creation_type,
+    write_sheet,
+)

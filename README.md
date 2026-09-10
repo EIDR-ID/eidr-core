@@ -52,7 +52,7 @@ under "(none)" is stdlib-only.
 |---|---|---|
 | *(none)* | — | `codes`, `db_schemas`, `altidtool_io`, `ordering`, `normalize`, `external` (including the retry/failover chassis), `verify`, `inheritance`, and `registry.operation_status` |
 | `compare` | rapidfuzz | `eidr_core.compare` (imported at module load) |
-| `bmr` | openpyxl | `eidr_core.bmr_io.read_sheet` / `open_sheet` (lazy). `read_headers` / `family_layout` need no extra — they take an already-open worksheet or plain header names |
+| `bmr` | openpyxl | `eidr_core.bmr_io.read_sheet` / `open_sheet` / `write_sheet` (lazy). `read_headers` / `family_layout` / `families_for` / `template_for_creation_type` need no extra — they take an already-open worksheet or plain names |
 | `aws` | boto3 | `eidr_core.secrets_loader` AWS path (lazy) |
 | `registry` | `eidr[client]` (the EIDR Python SDK, from PyPI) | `eidr_core.registry.get_registry_client` (lazy) |
 
@@ -85,7 +85,7 @@ after a later `git pull`. `eidr_core.__version__` reads the checkout's own
 
 | Module | Contents |
 |---|---|
-| `eidr_core.bmr_io` | Workbook surgery (writer primitives: HEADER_ROW, read/count/rightmost/expand family, transplant, fix_shared_strings) **+** the reader half — `open_sheet` (streaming context manager, lazy rows with absolute sheet row numbers), `read_sheet` (a `list()` over it), `read_headers`, sparse `family_layout`, shared `RepeatPlan`/`pad_groups`. Orchestration stays per-consumer by design |
+| `eidr_core.bmr_io` | Workbook surgery (writer primitives: HEADER_ROW, read/count/rightmost/expand family, transplant, fix_shared_strings) **+** the reader half — `open_sheet` (streaming context manager, lazy rows with absolute sheet row numbers), `read_sheet` (a `list()` over it), `read_headers`, sparse `family_layout`, shared `RepeatPlan`/`pad_groups` **+** the writer composition (0.29.0) — `write_sheet` over rows already mapped to `{column: value}`, `TEMPLATES`/`families_for`/`SCHEMA_MAX` (Template-22 facts, registry maxima from the schema), `template_for_creation_type` (routing). Mapping (what a row says) stays per consumer; the writer reports every value it could not place |
 | `eidr_core.compare` | The L2 comparator library: field comparators (`COMPARATORS`, `FieldResult`), episode-aware `titles`, `nonlinear` accumulation; parameters via `set_params()`, driven by `compare-spec.json` (see `compare.spec`) |
 | `eidr_core.normalize` | L1 normalization: fold/case/alias/numeral, name/title/code normalizers incl. `norm_country`/`canon_country`, date/duration parsing, `sanitize_field`, `word_alias.csv` |
 | `eidr_core.ordering` | Canonical + display ordering key functions per the normalized-record spec (title three-bucket, alt-ID kind/value + display rule, ShortDOI test) |

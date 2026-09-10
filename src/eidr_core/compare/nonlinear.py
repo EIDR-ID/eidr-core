@@ -11,7 +11,18 @@ The first match is worth the most; each additional match contributes r x the
 previous one. When every opportunity is matched perfectly the score is 1.0.
 With all-exact matches this reduces to (1 - r^k)/(1 - r^n).
 
-r is config.NL_MODIFIER (Rovi: 0.75). n basis is config.LIST_DENOMINATOR.
+r is config.NL_MODIFIER (Rovi: 0.75).
+
+opportunities() was removed 2026-09-10. It read config.LIST_DENOMINATOR,
+which no registered parameter source has ever defined -- so with params
+registered (the real-run condition) it raised AttributeError on its own
+documented default. It had no caller in any repository; the live path is
+accumulate(), which never needed an opportunity count. Found by BMR-Review
+and De-Dupe UI independently while checking the call graph rather than the
+mention. A parameter read only through _params has no textual reference in
+the repo that supplies it, so nothing flags an unmet contract until the line
+executes -- which is why a function that raises on its default is worse than
+dead code: it is a loaded trap for whoever reads the signature years later.
 """
 from . import _params as config
 
@@ -26,13 +37,6 @@ def aggregate(qualities, n_opportunities, r=None, denom_basis=None):
     numer = sum(q * (r ** i) for i, q in enumerate(qs))
     denom = sum(r ** j for j in range(n))
     return numer / denom if denom else 0.0
-
-
-def opportunities(len_a, len_b, basis=None):
-    basis = basis or config.LIST_DENOMINATOR
-    if len_a == 0 or len_b == 0:
-        return 0
-    return min(len_a, len_b) if basis == "min" else max(len_a, len_b)
 
 
 def corroborate(qualities, n_opportunities, r=None):

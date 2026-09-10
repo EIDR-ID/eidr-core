@@ -103,7 +103,7 @@ def test_transposition_is_caught():
     ("   ", "empty"),
     ("10.5240/485E-0E15-5AF1-A4C1-2DA6", "malformed"),      # no check char
     ("10.5240/485E0E155AF1A4C12DA6G", "malformed"),          # no hyphens
-    ("10.5237/9DD9-E249", "malformed"),                      # party ID, not content
+    ("10.5237/9DD9-E249", "party ID"),                       # named as what it IS, since 0.28.0
     ("tt0133093", "malformed"),
 ])
 def test_malformed_inputs_named_not_crashed(value, fragment):
@@ -122,3 +122,94 @@ def test_lowercase_and_surrounding_space_accepted():
 def test_check_character_rejects_non_base36_input():
     with pytest.raises(ValueError, match="not valid in an EIDR suffix"):
         check_character("485E-0E15")     # hyphen must be stripped by caller
+
+
+# --- party / service / user IDs: the 2026-08-26 deferral, closed ------------
+#
+# The deferral asked for "confirmed real party-ID vectors" before validating
+# party IDs at all, because the obvious reading (last character is a Mod 37,36
+# check) failed on both samples in the portfolio. python-tools supplied the
+# vectors on 2026-09-08 and they settle it: there is NO check character. Both
+# samples "failed" because there was nothing to check. Every ID below is real
+# (created on sandbox2, or live), or is the schema-defined literal.
+
+from eidr_core.ids import (  # noqa: E402
+    category,
+    is_valid_party_id,
+    is_valid_service_id,
+    is_valid_user_id,
+)
+
+REAL_PARTY_IDS = [
+    "10.5237/9DD9-E249",    # the BulkMatchRegister fixture that "failed" the checksum
+    "10.5237/F625-DC51",
+    "10.5237/805A-BE88",
+    "10.5237/8340-5F9F",
+    "10.5237/0000-0000",    # the tombstone
+    "10.5237/superparty",   # the one non-hex party, a schema literal
+]
+REAL_SERVICE_IDS = ["10.5239/1575-4C9C", "10.5239/CB5F-4F4E", "10.5239/B375-AF2D"]
+
+
+@pytest.mark.parametrize("pid", REAL_PARTY_IDS)
+def test_real_party_ids_validate(pid):
+    assert is_valid_party_id(pid)
+    assert category(pid) == "party"
+
+
+@pytest.mark.parametrize("sid", REAL_SERVICE_IDS)
+def test_real_service_ids_validate(sid):
+    assert is_valid_service_id(sid)
+    assert category(sid) == "service"
+
+
+def test_party_and_service_hex_is_case_insensitive():
+    """The party pattern says so explicitly; the service pattern is written
+    upper-case only, but the registry treats hex as hex. Rejecting a
+    lower-case service ID would be a false alarm of exactly the kind this
+    module exists to prevent."""
+    assert is_valid_party_id("10.5237/9dd9-e249")
+    assert is_valid_service_id("10.5239/1575-4c9c")
+
+
+@pytest.mark.parametrize("bad", [
+    "10.5237/ZZZZ-0000",     # not hex
+    "10.5237/9DD9E249",      # no hyphen
+    "10.5237/9DD9-E249-1",   # content-ID-shaped suffix on a party prefix
+    "10.5237/SUPERPARTY",    # the literal is lower-case in the schema
+    "10.5239/superparty",    # no such service literal
+    "",
+    None,
+])
+def test_malformed_party_and_service_ids_are_rejected(bad):
+    assert not is_valid_party_id(bad)
+    assert not is_valid_service_id(bad)
+
+
+def test_user_ids_are_a_username_pattern_and_nothing_more():
+    assert is_valid_user_id("10.5238/rkroon")
+    assert is_valid_user_id("10.5238/a.b-c_(d)#1")
+    assert not is_valid_user_id("10.5238/ab")          # under 3
+    assert not is_valid_user_id("10.5238/" + "x" * 33)  # over 32
+    assert not is_valid_user_id("10.5238/has space")
+    assert category("10.5238/rkroon") == "user"
+
+
+def test_category_is_by_prefix_only():
+    """A party-prefixed string with a bad suffix is still a party ID that
+    happens to be malformed. Category and validity are separate questions."""
+    assert category("10.5237/ZZZZ-0000") == "party"
+    assert category("10.5240/1FB4-801D-C016-5F48-86E6-9") == "content"
+    assert category("10.9999/anything") is None
+    assert category(None) is None
+
+
+def test_fault_names_the_family_instead_of_calling_a_party_id_malformed():
+    """Until 2026-09-10 a well-formed party ID came back 'malformed content
+    ID', and the module docstring had to warn callers not to read that as a
+    verdict on the party ID. Now the reason IS the verdict."""
+    assert fault("10.5237/9DD9-E249") == "'10.5237/9DD9-E249' is a party ID, not a content ID"
+    assert "malformed" in fault("10.5237/ZZZZ-0000")
+    assert "service ID" in fault("10.5239/1575-4C9C")
+    assert "user ID" in fault("10.5238/rkroon")
+    assert fault("10.9999/nope").startswith("malformed ID")

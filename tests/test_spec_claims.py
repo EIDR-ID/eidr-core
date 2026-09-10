@@ -143,3 +143,35 @@ def test_every_numeric_value_the_prose_claims_matches_the_spec():
         if abs(float(claimed) - float(actual)) > 1e-9:
             bad.append(f"{name}: prose says {claimed}, spec has {actual}")
     assert not bad, "stale value claims in compare-spec.md: " + "; ".join(bad)
+
+
+# --- collection MEMBERSHIP the prose claims ---------------------------------
+#
+# De-Dupe UI (2026-09-09): "checking that a value is mentioned is not checking
+# that a collection is correct" -- their audit_spec_claims verified each
+# assessment label appeared SOMEWHERE in the spec, and the one set that has a
+# hard consequence was the thing not actually being checked. The numeric check
+# above skips collection-valued constants entirely, so a membership claim in
+# the prose ("ALWAYS_APPLICABLE keeps release_date in") was unexecuted.
+#
+# Kept deliberately explicit rather than parsed from prose: a membership claim
+# has no reliable textual shape, and guessing one is how a checker passes for
+# the wrong reason. Add a row when the prose makes a new such claim.
+
+_MEMBERSHIP_CLAIMS = [
+    # (constant, member, where the prose says it)
+    ("ALWAYS_APPLICABLE", "release_date",
+     "compare-spec.md: 'ALWAYS_APPLICABLE keeps release_date in regardless'"),
+]
+
+
+@pytest.mark.parametrize("const,member,where", _MEMBERSHIP_CLAIMS)
+def test_every_membership_the_prose_claims_holds(const, member, where):
+    values = _spec_values()
+    assert const in values, f"{where}: {const} is not in the spec"
+    coll = values[const]
+    keys = coll.keys() if isinstance(coll, dict) else coll
+    assert member in keys, (
+        f"{where}: prose says {member!r} is in {const}, but the spec's "
+        f"{const} is {coll!r}"
+    )

@@ -21,21 +21,33 @@ alarm against real data. That is the same class as R5's SDK defect (a
 wrong answer that looks like a confident answer), and the portfolio's
 answer to that class is: one implementation, centrally tested.
 
-WHAT IS DELIBERATELY NOT HERE
------------------------------
-**Party IDs (``10.5237/``) are NOT validated. DEFERRED by the operator
-(2026-08-26) to the command-line tools work — do not re-litigate it here
-in the meantime.** The original proposal suggested covering them "same
-checksum over a different shape". That was tested against the only two
-samples in the portfolio (``10.5237/9DD9-E249``, ``10.5237/2FE2-24F2``,
-both in BulkMatchRegister's test fixtures) on the obvious reading — last
-character is the check — and BOTH failed. Either the shape differs, the
-checksum is applied over different input, or those fixtures are
-synthetic. Shipping a guess here would recreate precisely the failure
-this module exists to prevent. What it needs is confirmed real party-ID
-vectors, which the CLI work is expected to supply. Until then a party ID
-fails ``fault()`` as a *malformed content ID* — callers must not read
-that as a verdict about the party ID itself.
+PARTY, SERVICE AND USER IDS (deferral of 2026-08-26 CLOSED 2026-09-10)
+----------------------------------------------------------------------
+The deferral asked the CLI work for "confirmed real party-ID vectors".
+python-tools supplied them, and they settle the question the original
+proposal got wrong: **these IDs carry NO check character.** Both fixture
+samples "failed" the Mod 37,36 test not because the checksum is applied
+differently but because there is nothing to check. The suffix is eight
+hex digits and nothing more.
+
+Evidence (schema 2.7.0, ``common.xsd`` / ``service.xsd``, and live IDs):
+
+* party    ``10.5237/XXXX-XXXX`` hex, case-insensitive, OR the literal
+           ``10.5237/superparty`` (the one non-hex party). Real:
+           ``10.5237/9DD9-E249``, ``10.5237/F625-DC51``, the tombstone
+           ``10.5237/0000-0000``.
+* service  ``10.5239/XXXX-XXXX`` -- the schema pattern is upper-case only,
+           but the party pattern is explicitly case-insensitive and the
+           registry treats hex as hex, so both are accepted here
+           case-insensitively. Real: ``10.5239/1575-4C9C``.
+* user     ``10.5238/<username>`` where the username is 3-32 characters
+           from ``0-9 a-z A-Z _ # . - ( )`` -- free-form, so validation is the
+           pattern and nothing else.
+
+So ``is_valid_party_id`` / ``is_valid_service_id`` / ``is_valid_user_id``
+are PATTERN checks, and ``category()`` classifies a DOI by prefix.
+``fault()`` on a party ID now says so instead of "malformed content ID",
+which was the misleading verdict the deferral warned callers about.
 
 TEST VECTORS
 ------------
@@ -50,7 +62,10 @@ from __future__ import annotations
 import re
 
 __all__ = ["ALPHABET", "EIDR_CONTENT_ID_RE", "check_character",
-           "is_valid_eidr_id", "fault"]
+           "is_valid_eidr_id", "fault",
+           "PARTY_ID_RE", "SERVICE_ID_RE", "USER_ID_RE",
+           "is_valid_party_id", "is_valid_service_id", "is_valid_user_id",
+           "category"]
 
 # ISO 7064 Mod 37,36 works over base-36: digits then letters, in order.
 ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -62,6 +77,51 @@ ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 EIDR_CONTENT_ID_RE = re.compile(
     r"^10\.5240/[0-9A-F]{4}(?:-[0-9A-F]{4}){4}-[0-9A-Z]$", re.I
 )
+
+
+# Party / service / user DOIs. NO check character on any of these -- see the
+# module docstring for the evidence. Patterns transcribed from schema 2.7.0
+# (common.xsd partyDOIType / userDOIType, service.xsd serviceDOIType).
+PARTY_ID_RE = re.compile(r"^10\.5237/(?:[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}|superparty)$")
+SERVICE_ID_RE = re.compile(r"^10\.5239/[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$")
+USER_ID_RE = re.compile(r"^10\.5238/[0-9a-zA-Z_#.\-()]{3,32}$")
+
+_PREFIX_CATEGORY = {
+    "10.5240/": "content",
+    "10.5237/": "party",
+    "10.5238/": "user",
+    "10.5239/": "service",
+}
+
+
+def category(doi: str | None) -> str | None:
+    """Which EIDR ID family a DOI belongs to, by prefix: ``'content'``,
+    ``'party'``, ``'user'``, ``'service'`` -- or ``None`` when it is not an
+    EIDR DOI at all. Mirrors the SDK's ``IDCategory``. Prefix only: a
+    party-prefixed string with a bad suffix is still ``'party'``, and it is
+    ``is_valid_party_id`` that says whether it is well-formed."""
+    if doi is None:
+        return None
+    text = str(doi).strip()
+    for prefix, cat in _PREFIX_CATEGORY.items():
+        if text.startswith(prefix):
+            return cat
+    return None
+
+
+def is_valid_party_id(party_id: str | None) -> bool:
+    """``10.5237/XXXX-XXXX`` (hex, either case) or ``10.5237/superparty``."""
+    return bool(party_id) and PARTY_ID_RE.match(str(party_id).strip()) is not None
+
+
+def is_valid_service_id(service_id: str | None) -> bool:
+    """``10.5239/XXXX-XXXX`` (hex, either case)."""
+    return bool(service_id) and SERVICE_ID_RE.match(str(service_id).strip()) is not None
+
+
+def is_valid_user_id(user_id: str | None) -> bool:
+    """``10.5238/<username>``, 3-32 characters of ``[0-9a-zA-Z_#.-()]``."""
+    return bool(user_id) and USER_ID_RE.match(str(user_id).strip()) is not None
 
 
 def check_character(payload: str) -> str:
@@ -107,6 +167,23 @@ def fault(eidr_id: str | None) -> str | None:
     if not text:
         return "malformed ID: empty"
     if not EIDR_CONTENT_ID_RE.match(text):
+        # Say what kind of ID it IS before saying it is not a content ID.
+        # Until 2026-09-10 a well-formed party ID came back "malformed
+        # content ID", and the deferral note had to warn callers not to
+        # read that as a verdict about the party ID. Now it is the verdict.
+        cat = category(text)
+        if cat == "party":
+            ok = is_valid_party_id(text)
+            return (f"{text!r} is a party ID, not a content ID"
+                    + ("" if ok else " (and malformed: expected 10.5237/XXXX-XXXX or superparty)"))
+        if cat == "service":
+            ok = is_valid_service_id(text)
+            return (f"{text!r} is a service ID, not a content ID"
+                    + ("" if ok else " (and malformed: expected 10.5239/XXXX-XXXX)"))
+        if cat == "user":
+            ok = is_valid_user_id(text)
+            return (f"{text!r} is a user ID, not a content ID"
+                    + ("" if ok else " (and malformed: expected 10.5238/<3-32 char username>)"))
         return f"malformed ID {text!r}: not 10.5240/XXXX-XXXX-XXXX-XXXX-XXXX-C"
     suffix = text.split("/", 1)[1]
     body, _, given = suffix.rpartition("-")

@@ -23,6 +23,12 @@
 *.sh text eol=lf
 *.gitignore text eol=lf
 *.gitattributes text eol=lf
+# Added 2026-09-11: pyproject.toml was LF in both blob and working tree but
+# only by text=auto's grace; git warned it would flip to CRLF on the next
+# touch under core.autocrlf. Declared, so the repo decides, not the machine.
+*.toml text eol=lf
+*.cfg text eol=lf
+*.ini text eol=lf
 
 # Windows scripts must keep CRLF -- cmd.exe and PowerShell can misparse LF.
 *.bat text eol=crlf

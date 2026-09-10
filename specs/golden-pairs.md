@@ -1,7 +1,8 @@
 # Golden-pair corpus — fixture formats
 
-**Status:** `pair` mode LANDED 2026-07-29; `case` mode and `recovery_pool`
-RATIFIED 2026-09-10 (S-26 / S-9), implementation pending in the evaluator.
+**Status:** `pair` mode LANDED 2026-07-29; `case` mode RATIFIED 2026-09-10 (S-26) and
+**evaluator LANDED 2026-09-11** (BMR-Review `golden.py`, dispatching on `mode`); `recovery_pool`
+RATIFIED 2026-09-10 (S-9), evaluator raises `NotImplementedError` pending the first captured instance.
 **Owner of the format:** eidr-core. **Owner of the evaluator:** BMR-Review
 (`eidr_dedup_score/golden.py`). **Conforming implementation:** De-Dupe UI,
 in JavaScript, with no database.
@@ -60,6 +61,19 @@ confirms No Match, and the match stays in the registry.
   `spec_version` is the designed post-tune alert.
 * `invariants` are **version-independent lessons**, hand-written, and are
   what a fixture is *for*. See §6.
+* **Records carry ExtraObjectMetadata where the lesson needs it.** A record
+  in `submitted` / `candidate(s)` may carry `edit_use`, `edit_classes`,
+  `edit_details`, `color_type` and `three_d` (and the other per-type extra
+  fields), and the loader MUST build them onto the record. Found by
+  BMR-Review implementing `case` (2026-09-11): the loader silently produced
+  Edits with NO extra info, so every Edit-gate fixture would have landed on
+  the absent-info branch and `edit-info-absent-holds-for-review` would have
+  **passed for the wrong reason** — the exact failure §6 exists to prevent.
+  A conforming JavaScript loader has the same obligation.
+* **A `mode` the evaluator does not yet implement must fail LOUDLY**, naming
+  what it waits for (`recovery_pool` raises `NotImplementedError` until the
+  first captured instance lands), rather than being absent. A fixture that
+  arrives before its evaluator must fail, not silently skip.
 * Synthetic IDs use the `FEED-` prefix with a correct check character where
   validity matters to the lesson (`is_valid_eidr_id` rejects `GOLD-`, which
   is not hex). Only pairs whose lesson depends on validity need valid IDs;

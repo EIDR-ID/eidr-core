@@ -1,0 +1,82 @@
+{
+  "id": "edit-approximate-length-normalisation",
+  "added": "2026-09-11",
+  "mode": "case",
+  "creation_type": "Edit",
+  "tamr_kind": "AUTO",
+  "why": "Two Edits differing ONLY in how ApproximateLength is EXPRESSED are the same edit and must auto-match. Here the submitted side carries a float in minutes (41.5, as the XML adapter produces from PT41M30S) and the candidate carries ISO-8601 text (PT42M, as MirrorSource produces from the approximate_length column). Both display as 42 minutes.\n\n`length_minutes` is HETEROGENEOUS by design, and comparing it raw is a bug: 41.5 == 'PT42M' is false. Every other consumer normalises through parse_minutes at the point of use, and render_record ceils to whole minutes for display -- so the gate must compare the value the REVIEWER SEES. Comparing raw demoted 115 of 264 Edit rows in the 2026-08-24 audit run whose displayed lengths were identical on both sides.\n\nThe principle, which generalises past this field: a reviewer must never be closed out by a difference the interface cannot show them.\n\nMutation-tested: reverting `_length_key` to a raw attribute read fails this fixture and no other.\n\nSCOPE: pins the NORMALISATION, not the rule. It says nothing about whether a genuinely different length rejects.",
+  "submitted": {
+    "creation_type": "Edit",
+    "parent_id": "10.5240/FEED-0001-0002-0003-0004-M",
+    "titles": [
+      {
+        "text": "The Same Film",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2019-04-11",
+    "length_minutes": 41.5,
+    "version_languages": [
+      "en"
+    ],
+    "edit_use": "Broadcast",
+    "edit_details": [
+      [
+        "Crown Media version",
+        "crownmedia.com"
+      ]
+    ],
+    "edit_classes": [],
+    "color_type": "color",
+    "three_d": false
+  },
+  "candidates": [
+    {
+      "creation_type": "Edit",
+      "parent_id": "10.5240/FEED-0001-0002-0003-0004-M",
+      "titles": [
+        {
+          "text": "The Same Film",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2019-04-11",
+      "length_minutes": "PT42M",
+      "version_languages": [
+        "en"
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0005-K",
+      "edit_use": "Broadcast",
+      "edit_details": [
+        [
+          "Crown Media version",
+          "crownmedia.com"
+        ]
+      ],
+      "edit_classes": [],
+      "color_type": "color",
+      "three_d": false
+    }
+  ],
+  "invariants": {
+    "assessment_in": [
+      "Agree"
+    ],
+    "proposed_id_is": "10.5240/FEED-0001-0002-0003-0005-K",
+    "clears_without_review": true,
+    "notes_not_match": [
+      "demonstrably different",
+      "approximate length"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.11.0",
+    "assessment": "Agree",
+    "proposed_id": "10.5240/FEED-0001-0002-0003-0005-K",
+    "confidence": 99.5,
+    "clears_without_review": true,
+    "notes": []
+  }
+}

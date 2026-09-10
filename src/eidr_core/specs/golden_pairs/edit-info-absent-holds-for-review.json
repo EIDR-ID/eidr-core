@@ -1,0 +1,76 @@
+{
+  "id": "edit-info-absent-holds-for-review",
+  "added": "2026-09-11",
+  "mode": "case",
+  "creation_type": "Edit",
+  "tamr_kind": "AUTO",
+  "why": "An Edit whose CANDIDATE asserts no EditInfo at all must reach Review -- never auto-match. A data gap is not evidence of difference, so it must not resolve the row in either direction.\n\nTHE TRAP this pins: `_EDIT_INFO_FIELDS` (the presence test) and `_edit_key` (the comparison key) are DELIBERATELY asymmetric. parent_id, version languages and ApproximateLength are compared but do not count towards being 'described', because every record carries a length and counting it would make an EditInfo-less record look described. Unifying the two lists reads exactly like tidying up a duplication, and it converts the gate into a rubber stamp: two empty keys compare EQUAL and every pair auto-matches, with no symptom anywhere.\n\nA wrong implementation passes every POSITIVE test, which is why this fixture is negative. Mutation-tested: adding parent_id, version_languages and length_minutes to the presence list fails this fixture and no other.\n\nSCOPE: pins the absent-info branch only. It says nothing about whether a DIFFERING EditInfo rejects -- that is a separate lesson and needs its own fixture.",
+  "submitted": {
+    "creation_type": "Edit",
+    "parent_id": "10.5240/FEED-0001-0002-0003-0004-M",
+    "titles": [
+      {
+        "text": "The Same Film",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2019-04-11",
+    "length_minutes": 90,
+    "version_languages": [
+      "en"
+    ],
+    "edit_use": "Broadcast",
+    "edit_details": [
+      [
+        "Crown Media version",
+        "crownmedia.com"
+      ]
+    ],
+    "edit_classes": [],
+    "color_type": "color",
+    "three_d": false
+  },
+  "candidates": [
+    {
+      "creation_type": "Edit",
+      "parent_id": "10.5240/FEED-0001-0002-0003-0004-M",
+      "titles": [
+        {
+          "text": "The Same Film",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2019-04-11",
+      "length_minutes": 90,
+      "version_languages": [
+        "en"
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0005-K"
+    }
+  ],
+  "invariants": {
+    "assessment_not_in": [
+      "Agree"
+    ],
+    "clears_without_review": false,
+    "notes_match": [
+      "base object data accepts",
+      "asserts no EditInfo"
+    ],
+    "notes_not_match": [
+      "demonstrably different"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.11.0",
+    "assessment": "Review",
+    "proposed_id": "10.5240/FEED-0001-0002-0003-0005-K",
+    "confidence": 100.0,
+    "clears_without_review": false,
+    "notes": [
+      "editinfo: base object data accepts 10.5240/FEED-0001-0002-0003-0005-K but the candidate record asserts no EditInfo -- identity cannot be confirmed, held for review"
+    ]
+  }
+}

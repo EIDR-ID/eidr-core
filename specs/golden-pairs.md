@@ -1,8 +1,8 @@
 # Golden-pair corpus — fixture formats
 
-**Status:** `pair` mode LANDED 2026-07-29; `case` mode RATIFIED 2026-09-10 (S-26) and
-**evaluator LANDED 2026-09-11** (BMR-Review `golden.py`, dispatching on `mode`); `recovery_pool`
-RATIFIED 2026-09-10 (S-9), evaluator raises `NotImplementedError` pending the first captured instance.
+**Status:** all three modes LANDED — `pair` 2026-07-29; `case` ratified 2026-09-10 (S-26),
+evaluator 2026-09-11; `recovery_pool` ratified 2026-09-10 (S-9), first captured instance and
+evaluator 2026-09-11 (BMR-Review T17). Corpus: 17 `pair`, 2 `case`, 1 `recovery_pool`.
 **Owner of the format:** eidr-core. **Owner of the evaluator:** BMR-Review
 (`eidr_dedup_score/golden.py`). **Conforming implementation:** De-Dupe UI,
 in JavaScript, with no database.
@@ -71,9 +71,11 @@ confirms No Match, and the match stays in the registry.
   **passed for the wrong reason** — the exact failure §6 exists to prevent.
   A conforming JavaScript loader has the same obligation.
 * **A `mode` the evaluator does not yet implement must fail LOUDLY**, naming
-  what it waits for (`recovery_pool` raises `NotImplementedError` until the
-  first captured instance lands), rather than being absent. A fixture that
-  arrives before its evaluator must fail, not silently skip.
+  what it waits for, rather than being absent. (`recovery_pool` raised
+  `NotImplementedError` for the one day between ratification and its first
+  captured instance.) A fixture that arrives before its evaluator must fail,
+  not silently skip — and a conforming implementation that has not built a
+  mode yet must throw on it, not pass over it.
 * Synthetic IDs use the `FEED-` prefix with a correct check character where
   validity matters to the lesson (`is_valid_eidr_id` rejects `GOLD-`, which
   is not hex). Only pairs whose lesson depends on validity need valid IDs;
@@ -201,14 +203,40 @@ implementation passes every positive test:
 * **`pool` holds candidates AND parents.** A fixture that cannot resolve the
   parent chain cannot reproduce the family gate, and the family gate decides
   whether a recovered candidate was eligible at all.
-* **The invariant is `recall`: the correct record IS IN the pool.** Not a
-  score. Under-recall produces a wrong *outcome*; a score produces a
-  worse-presented one. A recall assertion survives every retune; a score
-  must be re-pinned at each one, which is how a fixture becomes noise.
+* **The invariant is `recall`, and it is REPLAYED, not checked for
+  containment.** Not a score. Under-recall produces a wrong *outcome*; a
+  score produces a worse-presented one. A recall assertion survives every
+  retune; a score must be re-pinned at each one, which is how a fixture
+  becomes noise.
+* **Replay semantics — the pool IS the registry, and the search is RE-RUN
+  against it.** "The correct record is in the pool" read as a containment
+  check is **true by construction and pins nothing**: the pool was recorded
+  from a run in which the search already found the record. The evaluator
+  therefore stands the pool in for the registry, runs the recovery search
+  over it, and asserts the `recall` target **comes back**. A search too
+  narrow to reach a sibling fails even though the sibling sits in the
+  simulated registry — which is the T11 defect exactly. Mutation-tested:
+  disabling the structural pool returns 0 candidates from a 10-record
+  registry. A conforming implementation that satisfies §5 without running
+  its search does not conform.
+* **The recall target is operator-confirmed, never the engine's own
+  proposal.** Otherwise the fixture asserts that the engine agrees with
+  itself.
+* **What a replaying pool source must do** (BMR-Review `canon.PoolSource`;
+  a JavaScript port has the same two obligations):
+  * answer queries by **table and predicate, never by alias** — the search
+    uses several aliases for the same table across queries, and keying on
+    one of them silently returns nothing for the others;
+  * **RAISE on a query it cannot answer, never return empty.** An empty
+    pool from an unmodelled query is indistinguishable from an engine
+    defect; the evaluator reports unanswered queries as a *distinct*
+    failure ("the replay narrowed the search for reasons unrelated to the
+    engine"). BMR-Review lost a cycle to exactly this.
 
-**Status:** the shape is ratified; the first captured instance is owed by
-BMR-Review (T17 step 2, needs a mirror run). The loader lands against that
-instance rather than against this document alone.
+**Status:** LANDED 2026-09-11. First captured instance
+`episode-sibling-under-same-parent` (10 records: 8 candidates and 2
+ancestors; row 1787669628429059202 of the 2026-08 audit correction sheet)
+and the evaluator landed against it rather than against this document.
 
 ## 6. What every fixture must satisfy before it lands
 

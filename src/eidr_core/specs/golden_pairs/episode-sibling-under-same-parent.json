@@ -1,0 +1,779 @@
+{
+  "id": "episode-sibling-under-same-parent",
+  "added": "2026-09-10",
+  "mode": "recovery_pool",
+  "why": "Recovery must reach a SIBLING under the submitted parent. The correct record here is another episode of the same series, and no similarity probe finds it: the submitted title is a season-and-episode compound that the sibling does not share, and there is no shared Alt ID. Only the STRUCTURAL pool -- children of the submitted parent -- reaches it (T11 rule 1).\n\nCaptured from a real mirror run on 2026-09-11 (`run_assessment.py --record-canon`), row 1787669628429059202 of the 2026-08 audit correction sheet, and cut with `cut_recovery_fixture.py`. The recall target was CONFIRMED by the operator, not taken from the engine's own proposal -- pinning the proposal would make the fixture assert that the engine agrees with itself.\n\nTHE INVARIANT IS RECALL, not a score. Under-recall produces a wrong OUTCOME rather than a worse-presented one: the reviewer sees nothing to compare, confirms No Match, and the record stays in the registry as a duplicate. A recall assertion also survives every retune, where a score would need re-pinning at each one.\n\nREPLAY SEMANTICS: the pool stands in for the REGISTRY and the search is re-run against it. Asserting that the recorded pool contains the answer would be true by construction and would pin nothing -- a search returning the whole registry would pass. Mutation-tested: disabling the structural pool returns 0 candidates from a 10-record registry and fails recall.\n\nThe pool holds 8 candidates AND 2 ancestors. The ancestors are not padding: without the parent chain the family gate cannot run, and the family gate decides whether a recovered candidate was eligible at all.\n\nSCOPE: pins that the sibling is REACHED. It says nothing about how the sibling scores once reached -- E00026 is the case where the pool succeeds and the score still falls short, and that is a separate lesson.",
+  "submitted": {
+    "provenance": {
+      "structural_type": "self",
+      "mode": "self",
+      "type": "self",
+      "original_language": "self",
+      "associated_org": "self",
+      "release_date": "self",
+      "country": "self",
+      "duration": "self",
+      "titles": "system"
+    },
+    "eidr_id": null,
+    "creation_type": "Episode",
+    "parent_id": "10.5240/CDD2-41FB-3516-C852-BE97-6",
+    "is_root": false,
+    "titles": [
+      [
+        "NO: Championship Highlights 26/27: Season 2026: Episode 7",
+        "no",
+        false,
+        true,
+        "season numeric",
+        true
+      ]
+    ],
+    "release_date": "2026",
+    "date_estimated": false,
+    "directors": [],
+    "actors": [],
+    "countries": [
+      [
+        "NO",
+        true
+      ]
+    ],
+    "languages": [
+      [
+        "no",
+        true
+      ]
+    ],
+    "version_languages": [],
+    "assoc_orgs": [
+      [
+        "Viaplay Group",
+        true
+      ]
+    ],
+    "alt_ids": [],
+    "length_minutes": 26,
+    "length_estimated": false,
+    "distribution_number": "7",
+    "sequence_number": null,
+    "house_sequence": null,
+    "time_slot": null,
+    "end_date": null,
+    "episode_class": "Main",
+    "series_class": null,
+    "season_class": null,
+    "compilation_class": null,
+    "structural_type": "Abstraction",
+    "referent_type": "TV",
+    "record_type": "TV Episode",
+    "family_id": "10.5240/0ED9-221D-B0F2-2714-903B-7",
+    "edit_use": null,
+    "edit_classes": [],
+    "made_for_regions": [],
+    "edit_details": [],
+    "color_type": null,
+    "three_d": null,
+    "has_other_inclusions": null,
+    "alt_numbers": []
+  },
+  "pool": [
+    {
+      "eidr_id": "10.5240/0705-F9A2-78AC-7368-AC29-P",
+      "creation_type": "Episode",
+      "parent_id": "10.5240/CDD2-41FB-3516-C852-BE97-6",
+      "is_root": false,
+      "titles": [
+        [
+          "NO: Championship Highlights 26/27: Season 2026: Episode 2",
+          "no",
+          true,
+          true,
+          "series numeric",
+          true
+        ]
+      ],
+      "release_date": "2026",
+      "date_estimated": false,
+      "directors": [],
+      "actors": [],
+      "countries": [
+        [
+          "NO",
+          false
+        ]
+      ],
+      "languages": [
+        [
+          "no",
+          false
+        ]
+      ],
+      "version_languages": [],
+      "assoc_orgs": [
+        [
+          "Viaplay Group",
+          false
+        ]
+      ],
+      "alt_ids": [],
+      "length_minutes": 26,
+      "length_estimated": false,
+      "distribution_number": "2",
+      "sequence_number": null,
+      "house_sequence": null,
+      "time_slot": null,
+      "end_date": null,
+      "episode_class": "Main",
+      "series_class": null,
+      "season_class": null,
+      "compilation_class": null,
+      "structural_type": "Abstraction",
+      "referent_type": "TV",
+      "record_type": "TV Episode",
+      "family_id": null,
+      "edit_use": null,
+      "edit_classes": [],
+      "made_for_regions": [],
+      "edit_details": [],
+      "color_type": null,
+      "three_d": null,
+      "has_other_inclusions": null,
+      "alt_numbers": [
+        [
+          "2",
+          "distribution",
+          null
+        ]
+      ]
+    },
+    {
+      "eidr_id": "10.5240/0ED9-221D-B0F2-2714-903B-7",
+      "creation_type": "Series",
+      "parent_id": null,
+      "is_root": true,
+      "titles": [
+        [
+          "NO: Championship Highlights 26/27",
+          "no",
+          true,
+          false,
+          "",
+          true
+        ]
+      ],
+      "release_date": "2026",
+      "date_estimated": false,
+      "directors": [],
+      "actors": [],
+      "countries": [
+        [
+          "NO",
+          true
+        ]
+      ],
+      "languages": [
+        [
+          "no",
+          true
+        ]
+      ],
+      "version_languages": [],
+      "assoc_orgs": [
+        [
+          "Viaplay Group",
+          true
+        ]
+      ],
+      "alt_ids": [],
+      "length_minutes": 26,
+      "length_estimated": false,
+      "distribution_number": null,
+      "sequence_number": null,
+      "house_sequence": null,
+      "time_slot": null,
+      "end_date": null,
+      "episode_class": null,
+      "series_class": "Episodic",
+      "season_class": null,
+      "compilation_class": null,
+      "structural_type": "Abstraction",
+      "referent_type": "Series",
+      "record_type": "Series",
+      "family_id": null,
+      "edit_use": null,
+      "edit_classes": [],
+      "made_for_regions": [],
+      "edit_details": [],
+      "color_type": null,
+      "three_d": null,
+      "has_other_inclusions": null,
+      "alt_numbers": []
+    },
+    {
+      "eidr_id": "10.5240/2B38-71EF-2FCF-8A4F-AF2F-E",
+      "creation_type": "Episode",
+      "parent_id": "10.5240/CDD2-41FB-3516-C852-BE97-6",
+      "is_root": false,
+      "titles": [
+        [
+          "NO: Championship Highlights 26/27: Season 2026: Episode 4",
+          "no",
+          true,
+          true,
+          "series numeric",
+          true
+        ]
+      ],
+      "release_date": "2026",
+      "date_estimated": false,
+      "directors": [],
+      "actors": [],
+      "countries": [
+        [
+          "NO",
+          false
+        ]
+      ],
+      "languages": [
+        [
+          "no",
+          false
+        ]
+      ],
+      "version_languages": [],
+      "assoc_orgs": [
+        [
+          "Viaplay Group",
+          false
+        ]
+      ],
+      "alt_ids": [],
+      "length_minutes": 26,
+      "length_estimated": false,
+      "distribution_number": "4",
+      "sequence_number": null,
+      "house_sequence": null,
+      "time_slot": null,
+      "end_date": null,
+      "episode_class": "Main",
+      "series_class": null,
+      "season_class": null,
+      "compilation_class": null,
+      "structural_type": "Abstraction",
+      "referent_type": "TV",
+      "record_type": "TV Episode",
+      "family_id": null,
+      "edit_use": null,
+      "edit_classes": [],
+      "made_for_regions": [],
+      "edit_details": [],
+      "color_type": null,
+      "three_d": null,
+      "has_other_inclusions": null,
+      "alt_numbers": [
+        [
+          "4",
+          "distribution",
+          null
+        ]
+      ]
+    },
+    {
+      "eidr_id": "10.5240/6FA0-27BD-1C7D-890F-5777-B",
+      "creation_type": "Episode",
+      "parent_id": "10.5240/CDD2-41FB-3516-C852-BE97-6",
+      "is_root": false,
+      "titles": [
+        [
+          "NO: Championship Highlights 26/27: Season 2026: Episode 7",
+          "no",
+          true,
+          true,
+          "series numeric",
+          true
+        ]
+      ],
+      "release_date": "2026",
+      "date_estimated": false,
+      "directors": [],
+      "actors": [],
+      "countries": [
+        [
+          "NO",
+          false
+        ]
+      ],
+      "languages": [
+        [
+          "no",
+          false
+        ]
+      ],
+      "version_languages": [],
+      "assoc_orgs": [
+        [
+          "Viaplay Group",
+          false
+        ]
+      ],
+      "alt_ids": [],
+      "length_minutes": 26,
+      "length_estimated": false,
+      "distribution_number": "7",
+      "sequence_number": null,
+      "house_sequence": null,
+      "time_slot": null,
+      "end_date": null,
+      "episode_class": "Main",
+      "series_class": null,
+      "season_class": null,
+      "compilation_class": null,
+      "structural_type": "Abstraction",
+      "referent_type": "TV",
+      "record_type": "TV Episode",
+      "family_id": null,
+      "edit_use": null,
+      "edit_classes": [],
+      "made_for_regions": [],
+      "edit_details": [],
+      "color_type": null,
+      "three_d": null,
+      "has_other_inclusions": null,
+      "alt_numbers": [
+        [
+          "7",
+          "distribution",
+          null
+        ]
+      ]
+    },
+    {
+      "eidr_id": "10.5240/90A6-3D5E-6AA4-E933-6E11-T",
+      "creation_type": "Episode",
+      "parent_id": "10.5240/CDD2-41FB-3516-C852-BE97-6",
+      "is_root": false,
+      "titles": [
+        [
+          "NO: Championship Highlights 26/27: Season 2026: Episode 5",
+          "no",
+          true,
+          true,
+          "series numeric",
+          true
+        ]
+      ],
+      "release_date": "2026",
+      "date_estimated": false,
+      "directors": [],
+      "actors": [],
+      "countries": [
+        [
+          "NO",
+          false
+        ]
+      ],
+      "languages": [
+        [
+          "no",
+          false
+        ]
+      ],
+      "version_languages": [],
+      "assoc_orgs": [
+        [
+          "Viaplay Group",
+          false
+        ]
+      ],
+      "alt_ids": [],
+      "length_minutes": 26,
+      "length_estimated": false,
+      "distribution_number": "5",
+      "sequence_number": null,
+      "house_sequence": null,
+      "time_slot": null,
+      "end_date": null,
+      "episode_class": "Main",
+      "series_class": null,
+      "season_class": null,
+      "compilation_class": null,
+      "structural_type": "Abstraction",
+      "referent_type": "TV",
+      "record_type": "TV Episode",
+      "family_id": null,
+      "edit_use": null,
+      "edit_classes": [],
+      "made_for_regions": [],
+      "edit_details": [],
+      "color_type": null,
+      "three_d": null,
+      "has_other_inclusions": null,
+      "alt_numbers": [
+        [
+          "5",
+          "distribution",
+          null
+        ]
+      ]
+    },
+    {
+      "eidr_id": "10.5240/9C27-CC11-E52B-13DD-1DA1-A",
+      "creation_type": "Episode",
+      "parent_id": "10.5240/CDD2-41FB-3516-C852-BE97-6",
+      "is_root": false,
+      "titles": [
+        [
+          "NO: Championship Highlights 26/27: Season 2026: Episode 1",
+          "no",
+          true,
+          true,
+          "series numeric",
+          true
+        ]
+      ],
+      "release_date": "2026",
+      "date_estimated": false,
+      "directors": [],
+      "actors": [],
+      "countries": [
+        [
+          "NO",
+          false
+        ]
+      ],
+      "languages": [
+        [
+          "no",
+          false
+        ]
+      ],
+      "version_languages": [],
+      "assoc_orgs": [
+        [
+          "Viaplay Group",
+          false
+        ]
+      ],
+      "alt_ids": [],
+      "length_minutes": 26,
+      "length_estimated": false,
+      "distribution_number": "1",
+      "sequence_number": null,
+      "house_sequence": null,
+      "time_slot": null,
+      "end_date": null,
+      "episode_class": "Main",
+      "series_class": null,
+      "season_class": null,
+      "compilation_class": null,
+      "structural_type": "Abstraction",
+      "referent_type": "TV",
+      "record_type": "TV Episode",
+      "family_id": null,
+      "edit_use": null,
+      "edit_classes": [],
+      "made_for_regions": [],
+      "edit_details": [],
+      "color_type": null,
+      "three_d": null,
+      "has_other_inclusions": null,
+      "alt_numbers": [
+        [
+          "1",
+          "distribution",
+          null
+        ]
+      ]
+    },
+    {
+      "eidr_id": "10.5240/B050-49DB-E901-99C9-A6E0-6",
+      "creation_type": "Episode",
+      "parent_id": "10.5240/CDD2-41FB-3516-C852-BE97-6",
+      "is_root": false,
+      "titles": [
+        [
+          "NO: Championship Highlights 26/27: Season 2026: Episode 6",
+          "no",
+          true,
+          true,
+          "series numeric",
+          true
+        ]
+      ],
+      "release_date": "2026",
+      "date_estimated": false,
+      "directors": [],
+      "actors": [],
+      "countries": [
+        [
+          "NO",
+          false
+        ]
+      ],
+      "languages": [
+        [
+          "no",
+          false
+        ]
+      ],
+      "version_languages": [],
+      "assoc_orgs": [
+        [
+          "Viaplay Group",
+          false
+        ]
+      ],
+      "alt_ids": [],
+      "length_minutes": 26,
+      "length_estimated": false,
+      "distribution_number": "6",
+      "sequence_number": null,
+      "house_sequence": null,
+      "time_slot": null,
+      "end_date": null,
+      "episode_class": "Main",
+      "series_class": null,
+      "season_class": null,
+      "compilation_class": null,
+      "structural_type": "Abstraction",
+      "referent_type": "TV",
+      "record_type": "TV Episode",
+      "family_id": null,
+      "edit_use": null,
+      "edit_classes": [],
+      "made_for_regions": [],
+      "edit_details": [],
+      "color_type": null,
+      "three_d": null,
+      "has_other_inclusions": null,
+      "alt_numbers": [
+        [
+          "6",
+          "distribution",
+          null
+        ]
+      ]
+    },
+    {
+      "eidr_id": "10.5240/CDD2-41FB-3516-C852-BE97-6",
+      "creation_type": "Season",
+      "parent_id": "10.5240/0ED9-221D-B0F2-2714-903B-7",
+      "is_root": false,
+      "titles": [
+        [
+          "NO: Championship Highlights 26/27: Season 2026",
+          "no",
+          true,
+          true,
+          "series numeric",
+          true
+        ]
+      ],
+      "release_date": "2026",
+      "date_estimated": false,
+      "directors": [],
+      "actors": [],
+      "countries": [
+        [
+          "NO",
+          false
+        ]
+      ],
+      "languages": [
+        [
+          "no",
+          false
+        ]
+      ],
+      "version_languages": [],
+      "assoc_orgs": [
+        [
+          "Viaplay Group",
+          false
+        ]
+      ],
+      "alt_ids": [],
+      "length_minutes": 26,
+      "length_estimated": false,
+      "distribution_number": null,
+      "sequence_number": 2026,
+      "house_sequence": null,
+      "time_slot": null,
+      "end_date": null,
+      "episode_class": null,
+      "series_class": null,
+      "season_class": "Main",
+      "compilation_class": null,
+      "structural_type": "Abstraction",
+      "referent_type": "Season",
+      "record_type": "Season",
+      "family_id": null,
+      "edit_use": null,
+      "edit_classes": [],
+      "made_for_regions": [],
+      "edit_details": [],
+      "color_type": null,
+      "three_d": null,
+      "has_other_inclusions": null,
+      "alt_numbers": []
+    },
+    {
+      "eidr_id": "10.5240/F2CF-5032-925E-C98E-BD81-3",
+      "creation_type": "Episode",
+      "parent_id": "10.5240/CDD2-41FB-3516-C852-BE97-6",
+      "is_root": false,
+      "titles": [
+        [
+          "NO: Championship Highlights 26/27: Season 2026: Episode 3",
+          "no",
+          true,
+          true,
+          "series numeric",
+          true
+        ]
+      ],
+      "release_date": "2026",
+      "date_estimated": false,
+      "directors": [],
+      "actors": [],
+      "countries": [
+        [
+          "NO",
+          false
+        ]
+      ],
+      "languages": [
+        [
+          "no",
+          false
+        ]
+      ],
+      "version_languages": [],
+      "assoc_orgs": [
+        [
+          "Viaplay Group",
+          false
+        ]
+      ],
+      "alt_ids": [],
+      "length_minutes": 26,
+      "length_estimated": false,
+      "distribution_number": "3",
+      "sequence_number": null,
+      "house_sequence": null,
+      "time_slot": null,
+      "end_date": null,
+      "episode_class": "Main",
+      "series_class": null,
+      "season_class": null,
+      "compilation_class": null,
+      "structural_type": "Abstraction",
+      "referent_type": "TV",
+      "record_type": "TV Episode",
+      "family_id": null,
+      "edit_use": null,
+      "edit_classes": [],
+      "made_for_regions": [],
+      "edit_details": [],
+      "color_type": null,
+      "three_d": null,
+      "has_other_inclusions": null,
+      "alt_numbers": [
+        [
+          "3",
+          "distribution",
+          null
+        ]
+      ]
+    },
+    {
+      "eidr_id": "10.5240/FA78-F936-544A-62B3-5E7C-U",
+      "creation_type": "Episode",
+      "parent_id": "10.5240/CDD2-41FB-3516-C852-BE97-6",
+      "is_root": false,
+      "titles": [
+        [
+          "NO: Championship Highlights 26/27: Season 2026: Episode 8",
+          "no",
+          true,
+          true,
+          "series numeric",
+          true
+        ]
+      ],
+      "release_date": "2026",
+      "date_estimated": false,
+      "directors": [],
+      "actors": [],
+      "countries": [
+        [
+          "NO",
+          false
+        ]
+      ],
+      "languages": [
+        [
+          "no",
+          false
+        ]
+      ],
+      "version_languages": [],
+      "assoc_orgs": [
+        [
+          "Viaplay Group",
+          false
+        ]
+      ],
+      "alt_ids": [],
+      "length_minutes": 26,
+      "length_estimated": false,
+      "distribution_number": "8",
+      "sequence_number": null,
+      "house_sequence": null,
+      "time_slot": null,
+      "end_date": null,
+      "episode_class": "Main",
+      "series_class": null,
+      "season_class": null,
+      "compilation_class": null,
+      "structural_type": "Abstraction",
+      "referent_type": "TV",
+      "record_type": "TV Episode",
+      "family_id": null,
+      "edit_use": null,
+      "edit_classes": [],
+      "made_for_regions": [],
+      "edit_details": [],
+      "color_type": null,
+      "three_d": null,
+      "has_other_inclusions": null,
+      "alt_numbers": [
+        [
+          "8",
+          "distribution",
+          null
+        ]
+      ]
+    }
+  ],
+  "expect": {
+    "recall": "10.5240/6FA0-27BD-1C7D-890F-5777-B"
+  },
+  "expected": {
+    "spec_version": "2.11.0",
+    "returned": [
+      "10.5240/0705-F9A2-78AC-7368-AC29-P",
+      "10.5240/2B38-71EF-2FCF-8A4F-AF2F-E",
+      "10.5240/6FA0-27BD-1C7D-890F-5777-B",
+      "10.5240/90A6-3D5E-6AA4-E933-6E11-T",
+      "10.5240/9C27-CC11-E52B-13DD-1DA1-A",
+      "10.5240/B050-49DB-E901-99C9-A6E0-6",
+      "10.5240/F2CF-5032-925E-C98E-BD81-3",
+      "10.5240/FA78-F936-544A-62B3-5E7C-U"
+    ],
+    "pool_size": 10,
+    "recall": true,
+    "unanswered_queries": []
+  }
+}

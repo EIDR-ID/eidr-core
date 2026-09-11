@@ -177,29 +177,43 @@ def test_missing_companion_and_group_two_columns_are_reported_not_refused(source
                                     "Relation 3", "IMDb Relation"]
 
 
-def test_required_headers_keeps_the_structure_and_drops_the_companions():
+def test_required_is_mechanics_plus_registry_required_never_inherited():
+    """Operator ruling 2026-09-11: a column that is optional in the registry,
+    or that a child can inherit, may be empty or missing without error."""
     from eidr_core.bmr_io.subset import required_headers
     req = required_headers("non_episodic")
-    # Family primaries in group 1 are the structure; their qualifiers are not.
-    assert "Alternate Title 1" in req and "Alt ID 1" in req and "Associated Org 1" in req
-    for q in ("Alt Title Language 1", "Alt Title Class 1", "Domain 1", "Relation 1",
-              "Associated Org Role 1", "Associated Org Party ID 1", "Language Mode 1"):
-        assert q not in req, q
-    assert "Alternate Title 2" not in req and "Director 2" not in req
-    # Singleton qualifiers and the identifier pair older sheets lack (survey 2026-09-11).
-    for q in ("Title Class", "IMDb", "IMDb Relation", "ISAN", "Description Language"):
-        assert q not in req, q
-    for s in ("Unique Row ID", "Title", "Title Language", "Referent Type", "Publication Status",
-              "Director 1", "Original Language 1", "Assigned EIDR ID",
-              "Registration Errors & Notes"):
+    for s in ("Unique Row ID", "Assigned EIDR ID", "Registration Errors & Notes",
+              "Structural Type", "Mode", "Referent Type", "Title", "Title Language",
+              "Original Language 1", "Release Date", "Country of Origin 1",
+              "Publication Status", "Approx Length"):
         assert s in req, s
+    for q in ("Title Class", "Alternate Title 1", "Alt Title Class 1", "Associated Org 1",
+              "Alt ID 1", "Domain 1", "Relation 1", "Director 1", "IMDb", "Registrant",
+              "Language Mode 1", "Description"):
+        assert q not in req, q
+    # A sheet that holds children: every base field is inheritable.
+    epi = required_headers("episodic")
+    assert "Parent EIDR/Row ID" in epi and "Title" not in epi and "Release Date" not in epi
+    # An Edit must PROVIDE its EditInfo, description, length and date.
+    ed = required_headers("edit")
+    for s in ("Edit Use", "Color Type", "In 3D", "Description", "Approx Length", "Release Date"):
+        assert s in ed, s
+    assert "Title" not in ed
+    assert "Manif Class 1" in required_headers("manifestation")
+    assert "Component Mode" in required_headers("clip")
     with pytest.raises(KeyError):
         required_headers("Stand-Alone Works")   # a key, not a tab name
 
 
-def test_header_rows_are_not_the_callers_to_keep(source, tmp_path):
-    with pytest.raises(ValueError, match="header rows are always kept"):
-        subset_rows(source, str(tmp_path / "s.xlsx"), SHEET, keep_rows=[3, 4])
+def test_title_class_and_relation_may_be_missing_per_the_ruling(source, tmp_path):
+    wb = openpyxl.load_workbook(source)
+    ws = wb[SHEET]
+    for name in ("Title Class", "Relation 1", "Relation 2", "Relation 3"):
+        ws.cell(HEADER_ROW, _col(name)).value = None
+    wb.save(source)
+    rep = subset_rows(source, str(tmp_path / "s.xlsx"), SHEET, keep_rows=[4])
+    assert rep.rows_kept == 1
+    assert set(rep.missing_optional) == {"Title Class", "Relation 1", "Relation 2", "Relation 3"}
 
 
 def test_every_template_declares_its_shipped_headers():

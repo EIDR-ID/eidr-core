@@ -35,29 +35,37 @@ their P0), both baked in rather than documented:
   report.
 
 Conformance is checked HERE, at emit time, against the shipped header row
-(``Template.headers``), in two tiers — because the strict reading was
-tested against the operator's real sheets on 2026-09-11 and would have
-refused most of them:
+(``Template.headers``), in two tiers. The operator's ruling (2026-09-11):
+**a column that is optional in the registry, or that a child record can
+inherit, may be empty or entirely missing from a BMR sheet without that
+being an error** — Title Class and Alt ID Relation included. So:
 
-* **Required**: the scalar structure columns and each family's group-1
-  PRIMARY (``Alternate Title 1``, ``Alt ID 1``, ``Associated Org 1``, ...).
-  Missing one of these is a ``TemplateMismatch`` and the emit is refused,
-  leaving no output file behind.
-* **Optional**: anything that qualifies another column (``Alt Title Class
-  1``, ``Domain 1``, ``Associated Org Role 1``, ``Relation N``, ``Title
-  Class``, ``IMDb Relation``), every group-2+ member, and the ``IMDb`` /
-  ``ISAN`` identifier pair older template revisions lacked. The survey of
-  every workbook under ``D:\\BMR`` (294 Template-22 data sheets): 190 carry
-  every shipped column; 104 omit something, and what they omit is
-  companions (``Alt Title Class`` on 84, ``Relation 2/3`` on 54), whole
-  groups the member never used (a second Alternate Title on 24, a third
-  Associated Org on 20), a single group-1 qualifier on four sheets, and
-  the ``IMDb`` / ``ISAN`` pair on three. The BMR tool took every one of
-  them and BMR-Review assessed many. A missing optional column is REPORTED
-  (``SubsetReport.missing_optional``), never refused: the subsetter copies
-  what the member supplied, and a column the member never had is not a
-  defect in the copy. Under the two tiers the survey refuses exactly one
-  sheet, which has no Template-22 header row at all.
+* **Required**: the sheet mechanics every template carries (``Unique Row
+  ID``, ``Operator's Notes``, ``Assigned EIDR ID``, ``Registration Errors &
+  Notes``) plus, per template, the columns the registry REQUIRES and a
+  record on that sheet can NEVER inherit. On a roots-only sheet
+  (Stand-Alone Works, Compilations) that is the base structure — Structural
+  Type, Mode, Referent Type, Title + language, Original Language 1, Release
+  Date, Country of Origin 1, Publication Status, Approx Length. On a sheet
+  that carries children it shrinks to the parent reference plus the
+  creation-type block the schema makes mandatory: ``Edit Use`` / ``Color
+  Type`` / ``In 3D`` and the Description, length and date an Edit must
+  provide rather than inherit; ``Component Mode`` / ``Start Time`` /
+  ``Content Duration`` for a Clip; ``Manif Class 1`` for a Manifestation;
+  nothing but the parent for Episodics, since a Season or Episode inherits
+  every base field (``eidr_core.inheritance.INHERITABLE_FIELDS``). Missing
+  one of these is a ``TemplateMismatch``: the emit is refused and no output
+  file is left behind.
+* **Optional**: everything else the template ships — alternate titles,
+  associated orgs, alt IDs and their relations, credits, classes, the
+  IMDb / ISAN pair, every group-2+ member. Reported in
+  ``SubsetReport.missing_optional``, never refused.
+
+Measured before the ruling, with a stricter rule: of 294 Template-22 data
+sheets under ``D:\\BMR``, "every shipped column present" would have refused
+104 that the BMR tool accepted; the two-tier rule refuses exactly one,
+which has no header row at all. The ruling only widens the optional tier,
+so that result stands.
 
 Extra columns and expanded families conform. "Is my input conforming
 enough" is therefore answered per sheet, every time, rather than assumed
@@ -75,7 +83,6 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
-import re
 import shutil
 import tempfile
 from collections.abc import Iterable, Sequence
@@ -88,48 +95,57 @@ log = logging.getLogger(__name__)
 
 __all__ = ["TemplateMismatch", "SubsetReport", "subset_rows", "required_headers"]
 
-# Singleton columns that QUALIFY another column (a class, a language, a
-# relation) or that older template revisions did not carry (the IMDb / ISAN
-# identifier pair). A sheet without them is still a BMR sheet.
-_OPTIONAL_SINGLE = frozenset({
-    "Title Class", "Description Language",
-    "IMDb", "IMDb Relation", "ISAN", "ISAN Relation", "V-ISAN", "V-ISAN Relation",
-})
-_NUMBERED = re.compile(r"^(.*?) (\d+)$")
+# Sheet mechanics: present on every template, written or read by the BMR
+# tool itself, so a sheet without them is not a BMR sheet.
+_MECHANICS = ("Unique Row ID", "Operator's Notes", "Assigned EIDR ID",
+              "Registration Errors & Notes")
 
+# Registry-required base structure of a ROOT record (common.xsd baseObjectData
+# for a creation: StructuralType, Mode, ReferentType, ResourceName + lang,
+# OriginalLanguage, ReleaseDate, CountryOfOrigin, Status, ApproximateLength
+# all carry no minOccurs="0"). Every one of these is INHERITABLE by a child
+# (eidr_core.inheritance.INHERITABLE_FIELDS), so they are required only on
+# the two sheets that hold roots alone.
+_ROOT_BASE = ("Structural Type", "Mode", "Referent Type", "Title", "Title Language",
+              "Original Language 1", "Release Date", "Country of Origin 1",
+              "Publication Status", "Approx Length")
 
-def _optional(header: str, template: str) -> bool:
-    """A shipped column a real sheet may lack and still be a BMR sheet.
-
-    Optional: any family member from group 2 up (a member who never used a
-    second Alternate Title has no columns for it); any family member that
-    is not the family's PRIMARY (``Associated Org Role 1``, ``Domain 1``,
-    ``Alt Title Class 1`` qualify ``Associated Org 1`` / ``Alt ID 1`` /
-    ``Alternate Title 1``); and the singleton qualifiers above. Required is
-    what is left: the scalar structure (``Unique Row ID``, ``Title``,
-    ``Referent Type``, ``Publication Status``, ``Assigned EIDR ID``, ...)
-    and each family's group-1 primary — the columns whose absence means
-    this is not that template's data sheet.
-    """
-    if header in _OPTIONAL_SINGLE:
-        return True
-    m = _NUMBERED.match(header)
-    if not m:
-        return False
-    base, n = m.group(1), int(m.group(2))
-    if n >= 2:
-        return True
-    for fam in TEMPLATES[template].families:
-        if base in fam.anchor_members and base != fam.primary:
-            return True
-    return False
+# Per template: what the registry requires that a record on THAT sheet can
+# never inherit. Registrant is required by the registry but supplied by the
+# BMR tool's Configuration tab, so its column is not required here.
+_REQUIRED: dict[str, tuple[str, ...]] = {
+    "non_episodic": _MECHANICS + _ROOT_BASE,
+    "compilation":  _MECHANICS + _ROOT_BASE,
+    # Series rows are roots, but Season and Episode rows inherit every base
+    # field, and the sheet-level check cannot tell the rows apart.
+    "episodic":      _MECHANICS + ("Parent EIDR/Row ID",),
+    # editInfoType: Parent, EditUse, ColorType, ThreeD have no minOccurs="0";
+    # the schema annotation says an Edit must PROVIDE Description,
+    # ApproximateLength and ReleaseDate rather than inherit them.
+    "edit":          _MECHANICS + ("Parent EIDR/Row ID", "Edit Use", "Color Type", "In 3D",
+                                   "Description", "Approx Length", "Release Date"),
+    # clipInfoType: Parent, ComponentsMode, Start, Duration.
+    "clip":          _MECHANICS + ("Parent EIDR/Row ID", "Component Mode", "Start Time",
+                                   "Content Duration"),
+    # manifestationInfoType: ManifestationClass maxOccurs=8, no minOccurs.
+    "manifestation": _MECHANICS + ("Parent EIDR/Row ID", "Manif Class 1"),
+}
 
 
 def required_headers(template: str) -> tuple[str, ...]:
     """The shipped headers of ``template`` (a ``TEMPLATES`` key) whose
-    absence makes a sheet NOT that template's data sheet (see module
-    docstring)."""
-    return tuple(h for h in TEMPLATES[template].headers if not _optional(h, template))
+    absence makes a sheet NOT that template's data sheet: sheet mechanics
+    plus the registry-required, never-inherited columns (see the module
+    docstring for the ruling and the schema facts)."""
+    shipped = TEMPLATES[template].headers          # KeyError on a non-key, by design
+    req = _REQUIRED[template]
+    missing = [h for h in req if h not in shipped]
+    assert not missing, f"{template}: required columns not on the shipped template: {missing}"
+    return tuple(h for h in shipped if h in req)
+
+
+def _optional(header: str, template: str) -> bool:
+    return header not in _REQUIRED[template]
 
 
 class TemplateMismatch(ValueError):

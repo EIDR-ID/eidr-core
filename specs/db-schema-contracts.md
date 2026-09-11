@@ -11,7 +11,7 @@ packaged so every consumer locates them via importlib.resources:
 
 | Database | Owner/writer | Contract | Change cadence |
 |---|---|---|---|
-| `eidr_mirror_db` (48 tables) | EIDR MCP | `src/eidr_core/specs/db_schemas/eidr_mirror_db/` | rare |
+| `eidr_mirror_db` (49 tables since 2026.08.03-1) | EIDR MCP | `src/eidr_core/specs/db_schemas/eidr_mirror_db/` | rare |
 | `eidr_dq_db` (17 tables) | eidr-dq | `…/eidr_dq_db/` | infrequent (most active of the three) |
 | `language_registry` (7 tables) | LanguageCode | `…/language_registry/` | rare |
 | `imdb_snapshot_db` | eidr-imdb | `…/imdb_snapshot_db/` | rare (snapshot reloads; added 2026-09-11 on eidr-imdb's request — the fourth database is the 2026-08-03 pattern applied, not a new decision) |

@@ -1,0 +1,945 @@
+{
+  "database": "imdb_snapshot_db",
+  "owner": "eidr-imdb",
+  "version": "2026.09.11",
+  "generated_at": "2026-09-11T21:15:20+00:00",
+  "source": "live database (authoritative; operator 2026-08-03)",
+  "tables": {
+    "altid_pull": {
+      "columns": [
+        {
+          "name": "pull_id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "pulled_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "row_count",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "backfill_checked": {
+      "columns": [
+        {
+          "name": "pull_id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "eidr_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "found",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "checked_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        }
+      ]
+    },
+    "correction": {
+      "columns": [
+        {
+          "name": "pull_id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "eidr_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "imdb_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "op",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "relation",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "applied_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "apply_status",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "apply_detail",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "crosswalk_class": {
+      "columns": [
+        {
+          "name": "pull_id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "eidr_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "imdb_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "relation",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "existence",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "remapped_to",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "target_present",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "eidr_count",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "companion_present",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "classified_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        }
+      ]
+    },
+    "eidr_imdb_link": {
+      "columns": [
+        {
+          "name": "pull_id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "eidr_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "imdb_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "id_type",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "domain",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "relation",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "order_index",
+          "type": "integer",
+          "nullable": true
+        }
+      ]
+    },
+    "eidr_record": {
+      "columns": [
+        {
+          "name": "pull_id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "eidr_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "structural_type",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "referent_type",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "mode",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "release_year",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "length_minutes",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "parent_id",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "entity_hash": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "kind",
+          "type": "character",
+          "nullable": false
+        },
+        {
+          "name": "entity_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "row_hash",
+          "type": "bytea",
+          "nullable": false
+        }
+      ]
+    },
+    "episode_info": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "title_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "series_title_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "season_number",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "episode_number",
+          "type": "integer",
+          "nullable": true
+        }
+      ]
+    },
+    "ingest_reject": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "kind",
+          "type": "character",
+          "nullable": false
+        },
+        {
+          "name": "entity_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "rule",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "detail",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "raw",
+          "type": "jsonb",
+          "nullable": true
+        }
+      ]
+    },
+    "live_probe": {
+      "columns": [
+        {
+          "name": "imdb_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "probed_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "verdict",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "title_type",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "year",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "rank",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "detail",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "name": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "name_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "remapped_to",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "death_date",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "death_status",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "row_hash",
+          "type": "bytea",
+          "nullable": false
+        },
+        {
+          "name": "rest",
+          "type": "jsonb",
+          "nullable": true
+        }
+      ]
+    },
+    "series_info": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "title_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "start_year",
+          "type": "smallint",
+          "nullable": true
+        },
+        {
+          "name": "end_year",
+          "type": "smallint",
+          "nullable": true
+        },
+        {
+          "name": "episode_count",
+          "type": "integer",
+          "nullable": true
+        }
+      ]
+    },
+    "shape_shared": {
+      "columns": [
+        {
+          "name": "pull_id",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "imdb_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "imdb_type",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "n_eidr",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "n_child",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "n_short",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "n_series",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "shape",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "snapshot": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "title_file",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "name_file",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "published_date",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "title_count",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "name_count",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "title": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "title_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "title_type",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "original_title",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "year",
+          "type": "smallint",
+          "nullable": true
+        },
+        {
+          "name": "runtime_minutes",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "is_adult",
+          "type": "boolean",
+          "nullable": false
+        },
+        {
+          "name": "remapped_to",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "imdb_url",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "row_hash",
+          "type": "bytea",
+          "nullable": false
+        },
+        {
+          "name": "rest",
+          "type": "jsonb",
+          "nullable": true
+        }
+      ]
+    },
+    "title_aka": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "title_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "language",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "country",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "title_company": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "title_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "bucket",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "company_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "country",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "is_uncredited",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "formats",
+          "type": "jsonb",
+          "nullable": true
+        }
+      ]
+    },
+    "title_country": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "title_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "country",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "title_credit": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "title_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "name_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "name_ref",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "sub_category",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "credited_as",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "billing",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "roles",
+          "type": "jsonb",
+          "nullable": true
+        },
+        {
+          "name": "attributes",
+          "type": "jsonb",
+          "nullable": true
+        }
+      ]
+    },
+    "title_genre": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "title_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "genre",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "title_keyword": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "title_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "keyword",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "title_language": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "title_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "language",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "title_production_status": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "title_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "status_date",
+          "type": "date",
+          "nullable": true
+        }
+      ]
+    },
+    "title_release": {
+      "columns": [
+        {
+          "name": "snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "title_id",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "release_date",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "release_date_full",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "country",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    }
+  }
+}

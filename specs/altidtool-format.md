@@ -1,4 +1,4 @@
-# AltIDTool Input File Format (SPEC v1)
+# AltIDTool Input File Format (SPEC v1.1)
 
 **Status:** landed 2026-08-04 (register R9 / Phase 3 item 3). The reference
 implementation is **`eidr_core.altidtool_io`** (`format_line` / `write_lines`
@@ -33,6 +33,24 @@ Lines are therefore **3, 4, or 5 columns wide**:
 | eidr-wikidata `bmr/altidtool.py` (`altid_additions.tsv`, ~2.2M rows/run) + `outputs` (`missing_from_eidr.altid.tsv`) | canonical variable-width | ✅ composes via `eidr_core.altidtool_io.format_line` (2026-08-04) |
 | BMRtoAltID `bmr_to_altid.py` | canonical variable-width | ✅ composes via `eidr_core.altidtool_io.format_line` (2026-08-04; **operator ruling**: variable columns, max 5, no trailing tabs — the fixed-5 dialect is retired; `parse_line` still tolerates old files) |
 | EIDR MCP `eidrtoaltid.py` | **NOT this format** — a 2–4 column extract *report* WITH a header (id + value, optional Relation/Resource Name). Previously mischaracterized as a parallel emitter (OVERLAPS row 4 / drift group); corrected 2026-08-04 | out of scope |
+
+## Removal lines (v1.1, 2026-09-11)
+
+The AltIDTool itself also accepts **removal** lines, which no portfolio feed
+generator emits but which the python-tools `AltIDTool` reads
+(`docs/research/legacy-java-tools-extraction.md`: `ID` removes all Alt IDs;
+`ID<TAB>TYPE` removes every Alt ID of that type). A three-column line whose
+value is empty is a removal of that type, not an Alt ID with no value. Blank
+lines and lines starting with `//` are comments.
+
+    10.5240/AAAA-…-X                          remove every alternate ID
+    10.5240/AAAA-…-X	IMDB                     remove every IMDB alternate ID
+    10.5240/AAAA-…-X	IMDB	                 same (empty value)
+
+`parse_edit_line` in `eidr_core.altidtool_io` reads the superset (addition,
+removal, comment); `parse_line` stays strict so a feed generator can never
+produce a removal by accident. Added so that the tools can vendor this
+module (`specs/vendoring.md`) without losing their removal path.
 
 ## For consumers/readers
 

@@ -115,7 +115,10 @@ __all__ = ["HEADER_ROW", "DATA_START", "read_headers", "count_family",
            "CREATION_TYPES", "families_for", "template_for_creation_type",
            "max_counts", "WriteReport", "write_sheet",
            # row-subset copy (bmr_io/subset.py)
-           "TemplateMismatch", "SubsetReport", "subset_rows"]
+           "TemplateMismatch", "SubsetReport", "subset_rows",
+           # the header-row policy over a plain row of values (BMR-Review
+           # discovers the header row itself and then needs THE same policy)
+           "header_map"]
 
 
 def _header_map(values: Iterable) -> dict[int, str]:
@@ -151,6 +154,14 @@ def _header_map(values: Iterable) -> dict[int, str]:
         if s:
             out[col_idx] = s
     return out
+
+
+def header_map(values: Iterable) -> dict[int, str]:
+    """Public name for the header-row policy (2026-09-11): BMR-Review finds
+    the header row by content, because review round-trips move it off row 3,
+    and then built its own ``{name: index}`` inline -- keeping whitespace-only
+    headers the shared policy drops. One policy, one function."""
+    return _header_map(values)
 
 
 def read_headers(ws, header_row: int = HEADER_ROW) -> dict[int, str]:

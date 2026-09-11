@@ -1,8 +1,8 @@
-# Database Schema Contracts — mirror, DQ, language (register 2.4)
+# Database Schema Contracts — mirror, DQ, language, imdb (register 2.4)
 
 **Status: ✅ APPROVED (operator, 2026-08-03) and LANDED.** Supersedes the
-`mirror-schema.md` draft; scope expanded per the approval: **all three
-portfolio databases, one pattern.**
+`mirror-schema.md` draft; scope expanded per the approval: **all
+portfolio databases, one pattern** (three at approval; four since 2026-09-11).
 
 ## The contracts
 
@@ -14,6 +14,7 @@ packaged so every consumer locates them via importlib.resources:
 | `eidr_mirror_db` (48 tables) | EIDR MCP | `src/eidr_core/specs/db_schemas/eidr_mirror_db/` | rare |
 | `eidr_dq_db` (17 tables) | eidr-dq | `…/eidr_dq_db/` | infrequent (most active of the three) |
 | `language_registry` (7 tables) | LanguageCode | `…/language_registry/` | rare |
+| `imdb_snapshot_db` | eidr-imdb | `…/imdb_snapshot_db/` | rare (snapshot reloads; added 2026-09-11 on eidr-imdb's request — the fourth database is the 2026-08-03 pattern applied, not a new decision) |
 
 Each directory: `manifest.json` (the machine contract: tables → columns with
 type + nullability, date version, provenance), `schema.sql` (normalized
@@ -23,7 +24,9 @@ type + nullability, date version, provenance), `schema.sql` (normalized
 ## Tooling
 
 * **Regenerate** (deliberate act, part of any schema change):
-  `python eidr-core/tools/dump_db_schema.py --db {mirror|dq|language}` —
+  `python D:\Software\eidr-core-ops\tools\dump_db_schema.py --db {mirror|dq|language|imdb}`
+  (the tool moved to the PRIVATE ops repo in the 2026-08-30 split; it writes into this
+  checkout via `EIDR_CORE_ROOT` / `--spec-root`) —
   dumps live DB → manifest + DDL, bumps the date version, prepends the
   CHANGES entry with the computed table/column diff. Commit + push eidr-core.
 * **Drift check**: same tool with `--check` — compares the live DB to the

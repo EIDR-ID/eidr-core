@@ -213,3 +213,31 @@ def test_fault_names_the_family_instead_of_calling_a_party_id_malformed():
     assert "service ID" in fault("10.5239/1575-4C9C")
     assert "user ID" in fault("10.5238/rkroon")
     assert fault("10.9999/nope").startswith("malformed ID")
+
+
+# ── free-text extraction (2026-09-11) ─────────────────────────────────────
+
+VALID = "10.5240/7791-8534-2C23-9030-8610-5"
+BAD_CHECK = "10.5240/7791-8534-2C23-9030-8610-6"
+
+
+def test_find_content_ids_pulls_ids_out_of_a_notes_column_in_order():
+    from eidr_core.ids import find_content_ids
+    text = f"candidates: {VALID.lower()}; also {VALID} (dup) then 10.5237/9DD9-E249 (a party)"
+    assert find_content_ids(text) == [VALID]          # de-duplicated, upper-cased, party ignored
+
+
+def test_find_content_ids_drops_a_bad_check_character_unless_asked_not_to():
+    from eidr_core.ids import find_content_ids
+    text = f"{BAD_CHECK} and {VALID}"
+    assert find_content_ids(text) == [VALID]
+    assert find_content_ids(text, valid_only=False) == [BAD_CHECK, VALID]
+
+
+def test_find_content_ids_respects_boundaries_and_empty_input():
+    from eidr_core.ids import find_content_ids
+    # An extra trailing character makes it not an ID, not a longer one.
+    assert find_content_ids(f"x{VALID}Q y") == []
+    assert find_content_ids(f"({VALID})") == [VALID]
+    assert find_content_ids(None) == [] and find_content_ids("") == []
+

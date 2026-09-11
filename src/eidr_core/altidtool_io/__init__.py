@@ -28,7 +28,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import NamedTuple
 
-__all__ = ["AltIdRow", "format_line", "write_lines", "parse_line"]
+__all__ = ["AltIdRow", "AltIdRemoval", "format_line", "write_lines", "parse_line",
+           "parse_edit_line"]
 
 
 class AltIdRow(NamedTuple):
@@ -37,6 +38,18 @@ class AltIdRow(NamedTuple):
     value: str
     domain: str = ""
     relation: str = ""
+
+
+class AltIdRemoval(NamedTuple):
+    """A REMOVAL line, which the AltIDTool also accepts (spec v1.1, 2026-09-11):
+    one column removes every alternate ID from the record; two columns remove
+    every ID of that type; three columns with an EMPTY value likewise remove
+    the type. ``alt_type`` is "" for remove-all. Producers in this portfolio
+    never emit these (they add); the python-tools ``AltIDTool`` reads them, and
+    it needed a shared parser that knows the shape so that vendoring this
+    module does not break its removal path."""
+    eidr_id: str
+    alt_type: str = ""
 
 
 def format_line(eidr_id: str, alt_type: str, value: str,
@@ -73,3 +86,33 @@ def parse_line(line: str) -> AltIdRow:
         raise ValueError(f"not an AltIDTool line ({len(parts)} columns): {line!r}")
     parts += [""] * (5 - len(parts))
     return AltIdRow(*parts)
+
+
+def parse_edit_line(line: str) -> AltIdRow | AltIdRemoval | None:
+    """Parse one line of an AltIDTool EDIT file: an addition (``AltIdRow``),
+    a removal (``AltIdRemoval``), or ``None`` for a blank or ``//`` comment
+    line. This is the superset ``parse_line`` refuses: ``parse_line`` stays
+    strict (3-5 columns, no comments) because the feed generators that call
+    it must never emit a removal by accident.
+
+    Whitespace: only the line terminator is stripped before splitting -- a
+    tab is significant and an empty domain column between type and relation
+    carries meaning; each column's own surrounding whitespace is trimmed.
+    """
+    body = line.rstrip("\r\n")
+    if not body.strip() or body.lstrip().startswith("//"):
+        return None
+    cols = [c.strip() for c in body.split("\t")]
+    eidr_id = cols[0]
+    if not eidr_id:
+        raise ValueError(f"not an AltIDTool edit line (no EIDR ID in column 1): {line!r}")
+    if len(cols) == 1:
+        return AltIdRemoval(eidr_id)
+    if len(cols) == 2:
+        return AltIdRemoval(eidr_id, cols[1])
+    if len(cols) > 5:
+        raise ValueError(f"not an AltIDTool line ({len(cols)} columns): {line!r}")
+    if not cols[2]:
+        return AltIdRemoval(eidr_id, cols[1])
+    cols += [""] * (5 - len(cols))
+    return AltIdRow(*cols)

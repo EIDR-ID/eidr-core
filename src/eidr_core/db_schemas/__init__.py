@@ -24,7 +24,10 @@ import json
 from functools import cache
 from importlib.resources import files
 
-DATABASES = ("eidr_mirror_db", "eidr_dq_db", "language_registry")
+# Fourth entry added 2026-09-11 (eidr-imdb request): "all portfolio databases,
+# one pattern" was the 2026-08-03 approval; a fourth database is the pattern
+# applied, not a new decision.
+DATABASES = ("eidr_mirror_db", "eidr_dq_db", "language_registry", "imdb_snapshot_db")
 
 
 @cache

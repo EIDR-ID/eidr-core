@@ -49,6 +49,7 @@ HEADERS = [
     "Alternate Title 2", "Alt Title Language 2", "Alt Title Class 2",
     "Country of Origin 1",
     "Associated Org 1", "Associated Org Role 1", "Associated Org Party ID 1",
+    "Metadata Authority 1", "Metadata Authority Party ID 1",
     "Release Date", "Publication Status", "Approx Length",
     "Director 1", "Director 2", "Actor 1", "Actor 2", "Actor 3", "Actor 4",
     "Alt ID 1", "Domain 1", "Relation 1",
@@ -290,3 +291,31 @@ def test_routing_refuses_what_is_not_a_creation_type():
     for bad in ("Movie", "TV", "", "Alias", "movie"):
         with pytest.raises(ValueError, match="not an EIDR creation type"):
             template_for_creation_type(bad)
+
+
+# ── the two families added 2026-09-11 ────────────────────────────────────
+
+def test_metadata_authority_is_an_expandable_family(template, tmp_path):
+    """XML_to_JSON's mapper emits `Metadata Authority Party ID {i}`; before
+    2026-09-11 the shared writer had no such family and dropped group 2+."""
+    out = str(tmp_path / "out.xlsx")
+    rows = [_row(**{f"Metadata Authority {i}": f"MA{i}" for i in (1, 2, 3)},
+                 **{"Metadata Authority Party ID 3": "10.5237/0000-0003"})]
+    rep = write_sheet(template, SHEET, rows, out)
+    hdr = _headers(out)
+    assert "Metadata Authority 3" in hdr.values()
+    assert "Metadata Authority Party ID 3" in hdr.values()
+    assert rep.expanded == {"Metadata Authority": 3} and rep.dropped == {}
+    with pytest.raises(ValueError, match="exceeds the registry maximum"):
+        write_sheet(template, SHEET, rows, out, caps={"Metadata Authority": 5})
+
+
+def test_alternate_no_is_an_episodic_family_and_unbounded():
+    fams = families_for("episodic")
+    alt = next(f for f in fams if f.primary == "Alternate No.")
+    assert alt.anchor_members == ("Alternate No.", "Alt. No. Domain")
+    assert SCHEMA_MAX["Alternate No."] is None
+    assert max_counts([{"Alt. No. Domain 3": "x"}], fams) == {"Alternate No.": 3}
+    # Not on the Stand-Alone sheet, so not a family there: nothing to expand.
+    assert "Alternate No." not in {f.primary for f in families_for("non_episodic")}
+

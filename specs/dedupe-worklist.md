@@ -20,10 +20,23 @@ alt-ID display order pending normalized-record §4 ratification). Originally
 drafted as register Phase 2.6, 2026-07-27. Language-neutral
 contract between **BMR-Review** (producer: work list + scoring payloads) and
 the **De-Dupe UI** eidr-ui-nextjs module (consumer: renders, appends
-decisions). This is the pilot's data plane per the approved
-`unified-scoring.md` §3: the UI never scores; every score/state it shows
-arrives in these files. In API-Shim mode the SAME per-candidate payload
-schema (§4) is served by the scoring service — one schema, two transports.
+decisions).
+
+> **Architecture note (2026-09-11).** The sentence this paragraph used to
+> carry — "the UI never scores; every score/state it shows arrives in these
+> files" — was SUPERSEDED by the operator's 2026-08-28 decision recorded in
+> De-Dupe UI `spec/engine/00-architecture.md` §1: the UI carries its own
+> engine (a JavaScript implementation of `compare-spec.json`, pinned by the
+> shared golden-pair corpus) and evaluates each API-Shim transaction itself.
+> BMR-Review is a batch tool over static files and is not a component of that
+> system. This worklist format is retained as a **dev/test fixture**:
+> `run_worklist.py` output is the highest-volume corpus for the cross-engine
+> differential test (De-Dupe UI `spec/engine/13` §3). It is no longer a
+> production data plane, and `unified-scoring.md` §8(d) is superseded to the
+> same extent. The payload schema (§4) is unchanged and still shared.
+
+In API-Shim mode the SAME per-candidate payload schema (§4) is served by the
+scoring service — one schema, two transports.
 
 Both files are **JSON Lines** (UTF-8, one JSON object per line, `\n`
 terminated) — BMR-Review's existing house format (`*.assessment.jsonl`) and

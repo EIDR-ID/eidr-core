@@ -61,8 +61,8 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["ALPHABET", "EIDR_CONTENT_ID_RE", "check_character",
-           "is_valid_eidr_id", "fault",
+__all__ = ["ALPHABET", "EIDR_CONTENT_ID_RE", "CONTENT_ID_SEARCH_RE", "check_character",
+           "is_valid_eidr_id", "fault", "find_content_ids",
            "PARTY_ID_RE", "SERVICE_ID_RE", "USER_ID_RE",
            "is_valid_party_id", "is_valid_service_id", "is_valid_user_id",
            "category"]
@@ -76,6 +76,16 @@ ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 # IDs while looking symmetric and correct.
 EIDR_CONTENT_ID_RE = re.compile(
     r"^10\.5240/[0-9A-F]{4}(?:-[0-9A-F]{4}){4}-[0-9A-Z]$", re.I
+)
+
+# The same shape, UNANCHORED, for pulling IDs out of free text (a notes
+# column, a log line, an error message). Added 2026-09-11: BMR-Review carried
+# FOUR different search regexes for this one question (`[0-9A-Za-z-]{20,}`,
+# hex-quad-anchored, `[0-9A-Fa-f-]{20,}`, prefix-only), and De-Dupe UI's
+# engine mirrors the notes-parsing rule in JavaScript, so the pattern is a
+# cross-language fact. Word-boundaried so `10.5240/...-Kx` is not a match.
+CONTENT_ID_SEARCH_RE = re.compile(
+    r"(?<![0-9A-Z/])10\.5240/[0-9A-F]{4}(?:-[0-9A-F]{4}){4}-[0-9A-Z](?![0-9A-Z-])", re.I
 )
 
 
@@ -198,3 +208,28 @@ def is_valid_eidr_id(eidr_id: str | None) -> bool:
     """True when ``eidr_id`` is a syntactically sound, checksum-valid
     EIDR Content ID. Use ``fault()`` when you need to say WHY not."""
     return fault(eidr_id) is None
+
+
+def find_content_ids(text: str | None, *, valid_only: bool = True) -> list[str]:
+    """Every content ID mentioned in ``text``, in order of appearance, upper-cased,
+    de-duplicated.
+
+    ``valid_only`` (default) keeps only IDs whose check character is right:
+    a notes column that says "candidates: 10.5240/AAAA-...-Z" with a typo
+    should not hand a scorer a candidate that does not exist. Pass
+    ``valid_only=False`` to see everything ID-shaped, e.g. to REPORT the
+    malformed ones with ``fault()``.
+    """
+    if not text:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for m in CONTENT_ID_SEARCH_RE.finditer(str(text)):
+        cand = m.group(0).upper()
+        if cand in seen:
+            continue
+        if valid_only and not is_valid_eidr_id(cand):
+            continue
+        seen.add(cand)
+        out.append(cand)
+    return out

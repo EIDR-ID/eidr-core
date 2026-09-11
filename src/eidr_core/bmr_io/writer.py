@@ -134,6 +134,12 @@ SCHEMA_MAX: dict[str, int | None] = {
     "Version Language":  64,
     "Manif Class":       8,
     "Manif Details":     8,
+    # Added 2026-09-11: XML_to_JSON's mapper emits both (its own heuristic
+    # expander grew any "... 1" run), and eidr-wikidata had been losing
+    # `Alternate No. 2+` silently. MetadataAuthority maxOccurs=4 (common.xsd
+    # :280); AlternateNumber is unbounded (md-v2.8 SequenceInfo :122).
+    "Metadata Authority": 4,
+    "Alternate No.":      None,
 }
 
 # The five families every content template shares (Clips have only the
@@ -152,6 +158,12 @@ _ALT_ID = _fam("Alt ID", "Alt ID", "Domain", "Relation")
 # why a family list never holds both.
 _VERSION_LANGUAGE = _fam("Version Language", "Version Language", "Language Mode")
 _MADE_FOR_REGION = _fam("Made for Region", "Made for Region")
+# Every content template but Compilations ships "Metadata Authority 1" +
+# "Metadata Authority Party ID 1" (Compilations carry the pair unnumbered).
+_METADATA_AUTHORITY = _fam("Metadata Authority", "Metadata Authority",
+                           "Metadata Authority Party ID")
+# Episodics only: the SequenceInfo alternate numbers.
+_ALTERNATE_NO = _fam("Alternate No.", "Alternate No.", "Alt. No. Domain")
 
 
 class Template(NamedTuple):
@@ -281,29 +293,32 @@ _HEADERS: dict[str, tuple[str, ...]] = {
 TEMPLATES: dict[str, Template] = {
     "episodic": Template(
         "episodic", "EIDR_Episodic_Template-22.xlsx", "Episodics",
-        (_ORIGINAL_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG,
+        (_ORIGINAL_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG, _METADATA_AUTHORITY,
          _fam("Season Class", "Season Class"), _fam("Episode Class", "Episode Class"),
-         _ALT_ID),
+         _ALTERNATE_NO, _ALT_ID),
         headers=_HEADERS["episodic"]),
     "non_episodic": Template(
         "non_episodic", "EIDR_Non-Episodic_Template-22.xlsx", "Stand-Alone Works",
-        (_ORIGINAL_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG, _ALT_ID),
+        (_ORIGINAL_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG,
+        _METADATA_AUTHORITY, _ALT_ID),
         headers=_HEADERS["non_episodic"]),
     "edit": Template(
         "edit", "EIDR_Edit_Template-22.xlsx", "Edits",
         (_fam("Edit Class", "Edit Class"), _MADE_FOR_REGION,
          _fam("Edit Details", "Edit Details", "Edit Details Domain"),
-         _VERSION_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG, _ALT_ID),
+         _VERSION_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG,
+         _METADATA_AUTHORITY, _ALT_ID),
         headers=_HEADERS["edit"]),
     "clip": Template(
         "clip", "EIDR_Clip_Template-22.xlsx", "Clips",
-        (_ASSOCIATED_ORG, _ALT_ID),
+        (_ASSOCIATED_ORG, _METADATA_AUTHORITY, _ALT_ID),
         headers=_HEADERS["clip"]),
     "manifestation": Template(
         "manifestation", "EIDR_Manifestation_Template-22.xlsx", "Manifestations",
         (_fam("Manif Class", "Manif Class"), _MADE_FOR_REGION,
          _fam("Manif Details", "Manif Details", "Manif Details Domain"),
-         _VERSION_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG, _ALT_ID),
+         _VERSION_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG,
+         _METADATA_AUTHORITY, _ALT_ID),
         headers=_HEADERS["manifestation"]),
     # Compilation rows come in Header + Entry groups (python-tools P4, not
     # this module's business); the column families are the Stand-Alone set.

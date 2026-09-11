@@ -406,3 +406,11 @@ def test_open_sheet_names_a_missing_sheet(tmp_path):
             open_sheet(_write_sheet(tmp_path, STOP_HEADERS, STOP_ROWS),
                        "No Such Tab"):
         pass
+
+
+def test_header_map_is_the_public_name_for_the_one_policy():
+    """BMR-Review discovers the header row by content and then needs the
+    SAME policy over that row: integer keys, true indices, blanks skipped."""
+    from eidr_core.bmr_io import header_map
+    got = header_map(["Unique Row ID", None, "  ", " Title ", ""])
+    assert got == {1: "Unique Row ID", 4: "Title"}

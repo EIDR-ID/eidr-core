@@ -30,6 +30,13 @@ mapped to ``{column name: value}``. ``TEMPLATES`` / ``families_for`` /
 ``template_for_creation_type`` the routing table (P3). Mapping stays per
 consumer — it is policy, and 24% of the source writer was exactly that.
 
+ROW-SUBSET COPY (added 2026-09-11, ``bmr_io/subset.py``, register 2026-09-10
+BMRtoAltID ruling): ``subset_rows`` copies header rows plus chosen data rows
+of a BMR sheet, positionally, onto a copy of the source workbook -- "copy,
+do not construct", because a copy cannot lose a column BMR-Review scores.
+Conformance to ``Template.headers`` is checked at emit time; the template
+is the tab's; ``blank_columns=`` is the one sanctioned modification.
+
 READER HALF (added 2026-08-06, register R3 tail):
 
 * ``open_sheet(path, sheet_name, ...)`` — STREAMING context manager
@@ -106,7 +113,9 @@ __all__ = ["HEADER_ROW", "DATA_START", "read_headers", "count_family",
            # writer composition (bmr_io/writer.py)
            "Family", "Template", "TEMPLATES", "SHEET_TO_TEMPLATE", "SCHEMA_MAX",
            "CREATION_TYPES", "families_for", "template_for_creation_type",
-           "max_counts", "WriteReport", "write_sheet"]
+           "max_counts", "WriteReport", "write_sheet",
+           # row-subset copy (bmr_io/subset.py)
+           "TemplateMismatch", "SubsetReport", "subset_rows"]
 
 
 def _header_map(values: Iterable) -> dict[int, str]:
@@ -762,6 +771,11 @@ def parent_chain(row: Mapping[str, Any],
 # module; importing it here, after they exist, is what lets a consumer write
 # ``from eidr_core.bmr_io import write_sheet`` without a second import path
 # to remember. Bottom-of-file by necessity, not by accident (E402).
+from eidr_core.bmr_io.subset import (  # noqa: E402
+    SubsetReport,
+    TemplateMismatch,
+    subset_rows,
+)
 from eidr_core.bmr_io.writer import (  # noqa: E402
     CREATION_TYPES,
     SCHEMA_MAX,

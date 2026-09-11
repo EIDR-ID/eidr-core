@@ -159,7 +159,120 @@ class Template(NamedTuple):
     filename: str
     sheet: str
     families: tuple[Family, ...]
+    # The data sheet's header row as SHIPPED (row 3), read from the
+    # templates on 2026-09-11. This is what "Template-22 conformance"
+    # means for a sheet: every one of these names present, by exact text.
+    # Extra columns and expanded families are conforming; a missing name
+    # is not. Empty only for a caller-built Template.
+    headers: tuple[str, ...] = ()
 
+
+# Shipped header rows, one per data sheet (see Template.headers). Lengths
+# cross-checked against the template files: 72 / 56 / 63 / 49 / 61 / 63.
+_HEADERS: dict[str, tuple[str, ...]] = {
+    "episodic": (
+        'Unique Row ID', 'Parent EIDR/Row ID', 'Mode', 'Structural Type', 'Referent Type',
+        'Title', 'Title Language', 'Title Class', 'Original Language 1', 'Language Mode 1',
+        'Alternate Title 1', 'Alt Title Language 1', 'Alt Title Class 1',
+        'Alternate Title 2', 'Alt Title Language 2', 'Alt Title Class 2',
+        'Country of Origin 1', 'Associated Org 1', 'Associated Org Role 1',
+        'Associated Org Party ID 1', 'Associated Org 2', 'Associated Org Role 2',
+        'Associated Org Party ID 2', 'Associated Org 3', 'Associated Org Role 3',
+        'Associated Org Party ID 3', 'Metadata Authority 1',
+        'Metadata Authority Party ID 1', 'Release Date', 'End Date', 'Time Slot',
+        'Series Class', 'Season Class 1', 'Episode Class 1', 'Number Required',
+        'Date Required', 'Original Title Required', 'Season No.', 'Distribution No.',
+        'Dist. No. Domain', 'House No.', 'House No. Domain', 'Alternate No. 1',
+        'Alt. No. Domain 1', 'Publication Status', 'Approx Length', 'Registrant',
+        'Director 1', 'Director 2', 'Actor 1', 'Actor 2', 'Actor 3', 'Actor 4', 'Alt ID 1',
+        'Domain 1', 'Relation 1', 'Alt ID 2', 'Domain 2', 'Relation 2', 'Alt ID 3',
+        'Domain 3', 'Relation 3', 'IMDb', 'IMDb Relation', 'ISAN', 'ISAN Relation',
+        'Description', 'Description Language', 'Registrant Extra', "Operator's Notes",
+        'Assigned EIDR ID', 'Registration Errors & Notes',
+    ),
+    "non_episodic": (
+        'Unique Row ID', 'Mode', 'Structural Type', 'Referent Type', 'Title',
+        'Title Language', 'Title Class', 'Original Language 1', 'Language Mode 1',
+        'Alternate Title 1', 'Alt Title Language 1', 'Alt Title Class 1',
+        'Alternate Title 2', 'Alt Title Language 2', 'Alt Title Class 2',
+        'Country of Origin 1', 'Associated Org 1', 'Associated Org Role 1',
+        'Associated Org Party ID 1', 'Associated Org 2', 'Associated Org Role 2',
+        'Associated Org Party ID 2', 'Associated Org 3', 'Associated Org Role 3',
+        'Associated Org Party ID 3', 'Metadata Authority 1',
+        'Metadata Authority Party ID 1', 'Release Date', 'Publication Status',
+        'Approx Length', 'Registrant', 'Director 1', 'Director 2', 'Actor 1', 'Actor 2',
+        'Actor 3', 'Actor 4', 'Alt ID 1', 'Domain 1', 'Relation 1', 'Alt ID 2', 'Domain 2',
+        'Relation 2', 'Alt ID 3', 'Domain 3', 'Relation 3', 'IMDb', 'IMDb Relation',
+        'ISAN', 'ISAN Relation', 'Description', 'Description Language', 'Registrant Extra',
+        "Operator's Notes", 'Assigned EIDR ID', 'Registration Errors & Notes',
+    ),
+    "edit": (
+        'Unique Row ID', 'Parent EIDR/Row ID', 'Mode', 'Edit Use', 'Color Type', 'In 3D',
+        'Edit Class 1', 'Edit Class 2', 'Edit Class 3', 'Made for Region 1',
+        'Made for Region 2', 'Made for Region 3', 'Edit Details 1',
+        'Edit Details Domain 1', 'Structural Type', 'Referent Type', 'Title',
+        'Title Language', 'Title Class', 'Version Language 1', 'Language Mode 1',
+        'Alternate Title 1', 'Alt Title Language 1', 'Alt Title Class 1',
+        'Country of Origin 1', 'Associated Org 1', 'Associated Org Role 1',
+        'Associated Org Party ID 1', 'Associated Org 2', 'Associated Org Role 2',
+        'Associated Org Party ID 2', 'Associated Org 3', 'Associated Org Role 3',
+        'Associated Org Party ID 3', 'Metadata Authority 1',
+        'Metadata Authority Party ID 1', 'Release Date', 'Publication Status',
+        'Approx Length', 'Registrant', 'Director 1', 'Director 2', 'Actor 1', 'Actor 2',
+        'Actor 3', 'Actor 4', 'Alt ID 1', 'Domain 1', 'Relation 1', 'Alt ID 2', 'Domain 2',
+        'Relation 2', 'Alt ID 3', 'Domain 3', 'Relation 3', 'ISAN', 'ISAN Relation',
+        'Description', 'Description Language', 'Registrant Extra', "Operator's Notes",
+        'Assigned EIDR ID', 'Registration Errors & Notes',
+    ),
+    "clip": (
+        'Unique Row ID', 'Parent EIDR/Row ID', 'Mode', 'Start Time', 'Content Duration',
+        'Component Mode', 'Structural Type', 'Referent Type', 'Title', 'Title Language',
+        'Title Class', 'Associated Org 1', 'Associated Org Role 1',
+        'Associated Org Party ID 1', 'Associated Org 2', 'Associated Org Role 2',
+        'Associated Org Party ID 2', 'Associated Org 3', 'Associated Org Role 3',
+        'Associated Org Party ID 3', 'Metadata Authority 1',
+        'Metadata Authority Party ID 1', 'Release Date', 'Publication Status',
+        'Approx Length', 'Registrant', 'Director 1', 'Director 2', 'Actor 1', 'Actor 2',
+        'Actor 3', 'Actor 4', 'Alt ID 1', 'Domain 1', 'Relation 1', 'Alt ID 2', 'Domain 2',
+        'Relation 2', 'Alt ID 3', 'Domain 3', 'Relation 3', 'V-ISAN', 'V-ISAN Relation',
+        'Description', 'Description Language', 'Registrant Extra', "Operator's Notes",
+        'Assigned EIDR ID', 'Registration Errors & Notes',
+    ),
+    "manifestation": (
+        'Unique Row ID', 'Parent EIDR/Row ID', 'Structural Type', 'Manif Class 1',
+        'Manif Class 2', 'Made for Region 1', 'Made for Region 2', 'Manif Details 1',
+        'Manif Details Domain 1', 'Release Date', 'Publication Status', 'Approx Length',
+        'Version Language 1', 'Language Mode 1', 'Mode', 'Referent Type', 'Title',
+        'Title Language', 'Title Class', 'Alternate Title 1', 'Alt Title Language 1',
+        'Alt Title Class 1', 'Alternate Title 2', 'Alt Title Language 2',
+        'Alt Title Class 2', 'Country of Origin 1', 'Associated Org 1',
+        'Associated Org Role 1', 'Associated Org Party ID 1', 'Associated Org 2',
+        'Associated Org Role 2', 'Associated Org Party ID 2', 'Associated Org 3',
+        'Associated Org Role 3', 'Associated Org Party ID 3', 'Metadata Authority 1',
+        'Metadata Authority Party ID 1', 'Registrant', 'Director 1', 'Director 2',
+        'Actor 1', 'Actor 2', 'Actor 3', 'Actor 4', 'Alt ID 1', 'Domain 1', 'Relation 1',
+        'Alt ID 2', 'Domain 2', 'Relation 2', 'Alt ID 3', 'Domain 3', 'Relation 3', 'ISAN',
+        'ISAN Relation', 'Description', 'Description Language', 'Registrant Extra',
+        "Operator's Notes", 'Assigned EIDR ID', 'Registration Errors & Notes',
+    ),
+    "compilation": (
+        'Unique Row ID', 'Header Row ID', 'Entry Number', 'Content ID', 'Display Name',
+        'Entry Class', 'Compilation Class', 'Has Other Inclusions', 'Description',
+        'Description Language', 'Mode', 'Structural Type', 'Referent Type', 'Title',
+        'Title Language', 'Title Class', 'Original Language 1', 'Language Mode 1',
+        'Alternate Title 1', 'Alt Title Language 1', 'Alt Title Class 1',
+        'Alternate Title 2', 'Alt Title Language 2', 'Alt Title Class 2',
+        'Country of Origin 1', 'Associated Org 1', 'Associated Org Role 1',
+        'Associated Org Party ID 1', 'Associated Org 2', 'Associated Org Role 2',
+        'Associated Org Party ID 2', 'Associated Org 3', 'Associated Org Role 3',
+        'Associated Org Party ID 3', 'Metadata Authority', 'Metadata Authority Party ID',
+        'Release Date', 'Publication Status', 'Approx Length', 'Registrant', 'Director 1',
+        'Director 2', 'Actor 1', 'Actor 2', 'Actor 3', 'Actor 4', 'Alt ID 1', 'Domain 1',
+        'Relation 1', 'Alt ID 2', 'Domain 2', 'Relation 2', 'Alt ID 3', 'Domain 3',
+        'Relation 3', 'IMDb', 'IMDb Relation', 'ISAN', 'ISAN Relation', 'Registrant Extra',
+        "Operator's Notes", 'Assigned EIDR ID', 'Registration Errors & Notes',
+    ),
+}
 
 # Every Template-22 content sheet, as shipped (header rows read from the
 # templates on 2026-09-11). The Video Service template is deliberately
@@ -170,28 +283,34 @@ TEMPLATES: dict[str, Template] = {
         "episodic", "EIDR_Episodic_Template-22.xlsx", "Episodics",
         (_ORIGINAL_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG,
          _fam("Season Class", "Season Class"), _fam("Episode Class", "Episode Class"),
-         _ALT_ID)),
+         _ALT_ID),
+        headers=_HEADERS["episodic"]),
     "non_episodic": Template(
         "non_episodic", "EIDR_Non-Episodic_Template-22.xlsx", "Stand-Alone Works",
-        (_ORIGINAL_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG, _ALT_ID)),
+        (_ORIGINAL_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG, _ALT_ID),
+        headers=_HEADERS["non_episodic"]),
     "edit": Template(
         "edit", "EIDR_Edit_Template-22.xlsx", "Edits",
         (_fam("Edit Class", "Edit Class"), _MADE_FOR_REGION,
          _fam("Edit Details", "Edit Details", "Edit Details Domain"),
-         _VERSION_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG, _ALT_ID)),
+         _VERSION_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG, _ALT_ID),
+        headers=_HEADERS["edit"]),
     "clip": Template(
         "clip", "EIDR_Clip_Template-22.xlsx", "Clips",
-        (_ASSOCIATED_ORG, _ALT_ID)),
+        (_ASSOCIATED_ORG, _ALT_ID),
+        headers=_HEADERS["clip"]),
     "manifestation": Template(
         "manifestation", "EIDR_Manifestation_Template-22.xlsx", "Manifestations",
         (_fam("Manif Class", "Manif Class"), _MADE_FOR_REGION,
          _fam("Manif Details", "Manif Details", "Manif Details Domain"),
-         _VERSION_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG, _ALT_ID)),
+         _VERSION_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG, _ALT_ID),
+        headers=_HEADERS["manifestation"]),
     # Compilation rows come in Header + Entry groups (python-tools P4, not
     # this module's business); the column families are the Stand-Alone set.
     "compilation": Template(
         "compilation", "EIDR_Compilation_Template-22.xlsx", "Compilations",
-        (_ORIGINAL_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG, _ALT_ID)),
+        (_ORIGINAL_LANGUAGE, _ALTERNATE_TITLE, _COUNTRY, _ASSOCIATED_ORG, _ALT_ID),
+        headers=_HEADERS["compilation"]),
 }
 
 SHEET_TO_TEMPLATE: dict[str, str] = {t.sheet: k for k, t in TEMPLATES.items()}

@@ -287,8 +287,9 @@ _HEADERS: dict[str, tuple[str, ...]] = {
 }
 
 # Every Template-22 content sheet, as shipped (header rows read from the
-# templates on 2026-09-11). The Video Service template is deliberately
-# absent: it registers parties, not content records, its families are
+# templates on 2026-09-11). The Service template (`EIDR_Service_Template-22`,
+# renamed from Video Service on 2026-09-12) is deliberately absent: it
+# registers Service records, not content records, its families are
 # different and unverified, and no portfolio consumer writes it.
 TEMPLATES: dict[str, Template] = {
     "episodic": Template(

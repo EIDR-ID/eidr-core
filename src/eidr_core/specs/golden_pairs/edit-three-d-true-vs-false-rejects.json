@@ -1,0 +1,86 @@
+{
+  "id": "edit-three-d-true-vs-false-rejects",
+  "added": "2026-09-12",
+  "mode": "case",
+  "creation_type": "Edit",
+  "tamr_kind": "AUTO",
+  "why": "Two Edits with identical EditInfo except ThreeD TRUE against ThreeD FALSE are different edits and must be rejected without review: a 3D cut and a 2D cut of one work are exactly the kind of pair the extra-object-info gate exists to keep apart.\n\nWHY IT EXISTS: the sibling fixture `edit-three-d-absent-equals-false` pins that absence is not a difference. On its own, that fixture passes just as happily against an engine that never compares ThreeD at all -- the positive case pins the absence of the gate equally well (specs/golden-pairs.md section 6, rule 2). This fixture is the other direction: ThreeD IS compared, and a stated difference is decisive.\n\nMutation-tested: making the ThreeD component of `_edit_key` a constant (compare as always-equal) fails this fixture and no other.\n\nSCOPE: pins that a TRUE/FALSE difference on ThreeD alone rejects. It says nothing about the wording beyond the field name in the difference detail. No Alt ID on either side, so the pair cannot floor to Review through Guard 7 for a different reason.",
+  "submitted": {
+    "creation_type": "Edit",
+    "parent_id": "10.5240/FEED-0001-0002-0003-0004-M",
+    "titles": [
+      {
+        "text": "The Same Film",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2019-04-11",
+    "length_minutes": 90,
+    "version_languages": [
+      "en"
+    ],
+    "edit_use": "Broadcast",
+    "edit_details": [
+      [
+        "Crown Media version",
+        "crownmedia.com"
+      ]
+    ],
+    "edit_classes": [],
+    "color_type": "color",
+    "three_d": true
+  },
+  "candidates": [
+    {
+      "creation_type": "Edit",
+      "parent_id": "10.5240/FEED-0001-0002-0003-0004-M",
+      "titles": [
+        {
+          "text": "The Same Film",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2019-04-11",
+      "length_minutes": 90,
+      "version_languages": [
+        "en"
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0005-K",
+      "edit_use": "Broadcast",
+      "edit_details": [
+        [
+          "Crown Media version",
+          "crownmedia.com"
+        ]
+      ],
+      "edit_classes": [],
+      "color_type": "color",
+      "three_d": false
+    }
+  ],
+  "invariants": {
+    "assessment_not_in": [
+      "Agree",
+      "Accept: sole match",
+      "Review"
+    ],
+    "clears_without_review": true,
+    "notes_match": [
+      "EditInfo differs",
+      "3D",
+      "demonstrably different"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.11.0",
+    "assessment": "Disagree: all candidates rejected",
+    "proposed_id": "NO MATCH",
+    "confidence": 100.0,
+    "clears_without_review": true,
+    "notes": [
+      "editinfo: base object data accepts 10.5240/FEED-0001-0002-0003-0005-K but EditInfo differs (3D) -- demonstrably different"
+    ]
+  }
+}

@@ -93,7 +93,8 @@ from eidr_core.bmr_io.writer import SHEET_TO_TEMPLATE, TEMPLATES
 
 log = logging.getLogger(__name__)
 
-__all__ = ["TemplateMismatch", "SubsetReport", "subset_rows", "required_headers"]
+__all__ = ["TemplateMismatch", "SubsetReport", "SheetCheck", "subset_rows",
+           "check_sheet", "required_headers"]
 
 # Sheet mechanics: present on every template, written or read by the BMR
 # tool itself, so a sheet without them is not a BMR sheet.
@@ -172,6 +173,72 @@ class SubsetReport:
     missing_optional: list[str] = field(default_factory=list)
 
 
+@dataclass
+class SheetCheck:
+    """What ``check_sheet`` learned about a source sheet, without writing."""
+    template: str                 # TEMPLATES key resolved from the sheet name
+    sheet: str
+    headers: dict[int, str]       # 1-based column -> header (header_map policy)
+    extra_columns: list[str] = field(default_factory=list)
+    missing_optional: list[str] = field(default_factory=list)
+
+
+def _template_key(sheet_name: str) -> str:
+    key = SHEET_TO_TEMPLATE.get(sheet_name)
+    if key is None:
+        raise TemplateMismatch(
+            f"{sheet_name!r} is not a Template-22 data sheet; one of "
+            f"{sorted(SHEET_TO_TEMPLATE)}")
+    return key
+
+
+def _inspect(wb, key: str, src_xlsx: str, sheet_name: str) -> SheetCheck:
+    """The conformance rules, in ONE place: ``check_sheet`` runs them before
+    a consumer starts an expensive run, and ``subset_rows`` runs the same
+    function before it writes, so a sheet that passes the pre-flight cannot
+    be refused at emit time for a reason the pre-flight did not know."""
+    if sheet_name not in wb.sheetnames:
+        raise TemplateMismatch(f"{src_xlsx} has no sheet {sheet_name!r} "
+                               f"(sheets: {wb.sheetnames})")
+    ws = wb[sheet_name]
+    headers = read_headers(ws)
+    present = set(headers.values())
+    shipped = TEMPLATES[key].headers
+    missing = [h for h in required_headers(key) if h not in present]
+    if missing:
+        raise TemplateMismatch(
+            f"sheet {sheet_name!r} of {src_xlsx} is missing "
+            f"{len(missing)} required Template-22 column(s): {missing}")
+    return SheetCheck(
+        template=key, sheet=sheet_name, headers=headers,
+        extra_columns=[h for c, h in sorted(headers.items()) if h not in shipped],
+        missing_optional=[h for h in shipped if h not in present and _optional(h, key)])
+
+
+def check_sheet(src_xlsx: str, sheet_name: str) -> SheetCheck:
+    """Pre-flight: would ``subset_rows`` accept ``sheet_name`` of ``src_xlsx``?
+
+    Raises the same ``TemplateMismatch`` for the same reasons, and returns
+    what the subsetter would have reported about the columns, without
+    copying or writing anything. Added 0.33.0 for BMRtoAltID: its audit is a
+    long mirror-bound run and the subset copy comes AFTER it, so a
+    non-conforming source was refused an hour late. Asking first turns that
+    into a two-second refusal. (A ``dry_run=`` flag on ``subset_rows`` was
+    the other shape proposed; rejected because a dry run still needs a
+    destination path and row list that mean nothing before the run.)
+    """
+    import openpyxl  # the `bmr` extra
+
+    key = _template_key(sheet_name)
+    if not os.path.exists(src_xlsx):
+        raise FileNotFoundError(f"BMR sheet not found: {src_xlsx}")
+    wb = openpyxl.load_workbook(src_xlsx, read_only=True, data_only=True)
+    try:
+        return _inspect(wb, key, src_xlsx, sheet_name)
+    finally:
+        wb.close()
+
+
 def subset_rows(src_xlsx: str, dst_xlsx: str, sheet_name: str,
                 keep_rows: Iterable[int], *,
                 blank_columns: Sequence[str] = ()) -> SubsetReport:
@@ -185,11 +252,7 @@ def subset_rows(src_xlsx: str, dst_xlsx: str, sheet_name: str,
     """
     import openpyxl  # the `bmr` extra
 
-    key = SHEET_TO_TEMPLATE.get(sheet_name)
-    if key is None:
-        raise TemplateMismatch(
-            f"{sheet_name!r} is not a Template-22 data sheet; one of "
-            f"{sorted(SHEET_TO_TEMPLATE)}")
+    key = _template_key(sheet_name)
     keep = sorted({int(r) for r in keep_rows})
     low = [r for r in keep if r < DATA_START]
     if low:
@@ -201,19 +264,9 @@ def subset_rows(src_xlsx: str, dst_xlsx: str, sheet_name: str,
     shutil.copyfile(src_xlsx, dst_xlsx)
     try:
         wb = openpyxl.load_workbook(dst_xlsx, data_only=False)
-        if sheet_name not in wb.sheetnames:
-            raise TemplateMismatch(f"{src_xlsx} has no sheet {sheet_name!r} "
-                                   f"(sheets: {wb.sheetnames})")
+        checked = _inspect(wb, key, src_xlsx, sheet_name)
         ws = wb[sheet_name]
-        headers = read_headers(ws)
-        present = set(headers.values())
-        shipped = TEMPLATES[key].headers
-        missing = [h for h in required_headers(key) if h not in present]
-        if missing:
-            raise TemplateMismatch(
-                f"sheet {sheet_name!r} of {src_xlsx} is missing "
-                f"{len(missing)} required Template-22 column(s): {missing}")
-        missing_optional = [h for h in shipped if h not in present and _optional(h, key)]
+        headers = checked.headers
         name_to_col = {h: c for c, h in headers.items()}
         unknown = [b for b in blank_columns if b not in name_to_col]
         if unknown:
@@ -223,8 +276,8 @@ def subset_rows(src_xlsx: str, dst_xlsx: str, sheet_name: str,
         report = SubsetReport(
             path=dst_xlsx, template=key, sheet=sheet_name, rows_kept=0,
             blanked=dict.fromkeys(blank_columns, 0),
-            extra_columns=[h for c, h in sorted(headers.items()) if h not in shipped],
-            missing_optional=missing_optional)
+            extra_columns=checked.extra_columns,
+            missing_optional=checked.missing_optional)
 
         max_row, max_col = ws.max_row, ws.max_column
         kept: list[list[object]] = []

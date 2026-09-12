@@ -64,6 +64,7 @@ import re
 __all__ = ["ALPHABET", "EIDR_CONTENT_ID_RE", "CONTENT_ID_SEARCH_RE", "check_character",
            "is_valid_eidr_id", "fault", "find_content_ids",
            "PARTY_ID_RE", "SERVICE_ID_RE", "USER_ID_RE",
+           "PARTY_ID_SUFFIX", "SERVICE_ID_SUFFIX", "USER_ID_SUFFIX",
            "is_valid_party_id", "is_valid_service_id", "is_valid_user_id",
            "category"]
 
@@ -92,9 +93,19 @@ CONTENT_ID_SEARCH_RE = re.compile(
 # Party / service / user DOIs. NO check character on any of these -- see the
 # module docstring for the evidence. Patterns transcribed from schema 2.7.0
 # (common.xsd partyDOIType / userDOIType, service.xsd serviceDOIType).
-PARTY_ID_RE = re.compile(r"^10\.5237/(?:[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}|superparty)$")
-SERVICE_ID_RE = re.compile(r"^10\.5239/[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$")
-USER_ID_RE = re.compile(r"^10\.5238/[0-9a-zA-Z_#.\-()]{3,32}$")
+#
+# The SUFFIX rules are exported on their own (0.33.0, python-sdk's proposal
+# of 2026-09-12): a consumer that validates only the part after the prefix
+# -- the SDK's EIDRID model does -- composes from these instead of parsing
+# the anchored pattern's spelling, which a future named group or flag would
+# have broken silently. The anchored regexes are built from the same strings
+# so the two cannot drift.
+PARTY_ID_SUFFIX = r"(?:[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}|superparty)"
+SERVICE_ID_SUFFIX = r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}"
+USER_ID_SUFFIX = r"[0-9a-zA-Z_#.\-()]{3,32}"
+PARTY_ID_RE = re.compile(r"^10\.5237/" + PARTY_ID_SUFFIX + r"$")
+SERVICE_ID_RE = re.compile(r"^10\.5239/" + SERVICE_ID_SUFFIX + r"$")
+USER_ID_RE = re.compile(r"^10\.5238/" + USER_ID_SUFFIX + r"$")
 
 _PREFIX_CATEGORY = {
     "10.5240/": "content",

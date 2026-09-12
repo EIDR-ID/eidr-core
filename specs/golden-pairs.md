@@ -2,7 +2,7 @@
 
 **Status:** all three modes LANDED — `pair` 2026-07-29; `case` ratified 2026-09-10 (S-26),
 evaluator 2026-09-11; `recovery_pool` ratified 2026-09-10 (S-9), first captured instance and
-evaluator 2026-09-11 (BMR-Review T17). Corpus: 17 `pair`, 2 `case`, 1 `recovery_pool`.
+evaluator 2026-09-11 (BMR-Review T17). Corpus: 17 `pair`, 4 `case`, 1 `recovery_pool` (22).
 **Owner of the format:** eidr-core. **Owner of the evaluator:** BMR-Review
 (`eidr_dedup_score/golden.py`). **Conforming implementation:** De-Dupe UI,
 in JavaScript, with no database.
@@ -176,6 +176,19 @@ implementation passes every positive test:
    ISO-8601 text (mirror) on the other, same displayed minutes. Must be
    EQUAL. Comparing raw demoted 115 of 264 Edit rows whose displayed lengths
    were identical.
+3. `edit-three-d-absent-equals-false` (2026-09-12) — identical EditInfo
+   except one side OMITS ThreeD and the other states `false`. Must
+   auto-match: booleans default to false when unstated, so absence is not
+   a difference. The trap fails CLOSED — a raw comparison reports
+   `EditInfo differs (3D)` and `decisive_nomatch` closes the identical pair
+   as `Disagree: all candidates rejected` with no reviewer.
+4. `edit-three-d-true-vs-false-rejects` (2026-09-12) — the other direction
+   for the same field, per §6 rule 2: `true` against `false` must reject
+   without review. Read with 3: together they pin that ThreeD IS compared
+   and that absence is NOT a difference. Raised by De-Dupe UI, whose spec
+   said "booleans pass through untouched" and would have built the closed
+   failure in JavaScript; the rule had been pinned in one engine's unit test
+   only.
 
 ## 5. `mode: "recovery_pool"` — recovery search
 

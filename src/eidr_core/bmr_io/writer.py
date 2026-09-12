@@ -487,8 +487,12 @@ def write_sheet(template_path: str, sheet_name: str,
     → expand families left-to-right to the largest group any row needs →
     append ``extra_columns`` → clear everything from ``DATA_START`` → write
     each value by header NAME → save to a temp file → ``transplant`` the
-    edited worksheet back into the template container so its macros,
-    validations and formulas survive openpyxl → ``fix_shared_strings`` for
+    edited worksheet back into the template container so whatever macros,
+    validations and formulas the template carries survive openpyxl (the
+    shipped Template-22 workbooks carry NONE -- validation was VBA, removed at
+    users' request, and is registry-side by design (BMR project, 2026-09-12);
+    a consumer test that counts validations on these files compares 0 to 0
+    and pins nothing -- eidr-imdb E4, 2026-09-12) → ``fix_shared_strings`` for
     the EPPlus-based BMR tool.
 
     ``families`` defaults to the sheet's own (``TEMPLATES`` by sheet name);

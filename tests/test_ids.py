@@ -241,3 +241,30 @@ def test_find_content_ids_respects_boundaries_and_empty_input():
     assert find_content_ids(f"({VALID})") == [VALID]
     assert find_content_ids(None) == [] and find_content_ids("") == []
 
+
+
+# ── 0.33.0: the suffix rules are exported on their own ─────────────────────
+
+def test_the_anchored_patterns_are_composed_from_the_exported_suffixes():
+    """python-sdk validates the part after the prefix and used to derive it
+    by string surgery on USER_ID_RE.pattern; a named group or a flag added
+    here would have produced a wrong suffix pattern with no test noticing.
+    Composing the anchored regexes from the exported suffixes makes the two
+    one fact. The literal spellings are pinned so a refactor cannot move
+    them silently."""
+    import re
+
+    from eidr_core import ids
+    assert ids.PARTY_ID_RE.pattern == r"^10\.5237/" + ids.PARTY_ID_SUFFIX + "$"
+    assert ids.SERVICE_ID_RE.pattern == r"^10\.5239/" + ids.SERVICE_ID_SUFFIX + "$"
+    assert ids.USER_ID_RE.pattern == r"^10\.5238/" + ids.USER_ID_SUFFIX + "$"
+    # schema 2.7.0 transcriptions, verbatim
+    assert ids.USER_ID_SUFFIX == r"[0-9a-zA-Z_#.\-()]{3,32}"
+    assert ids.SERVICE_ID_SUFFIX == r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}"
+    assert ids.PARTY_ID_SUFFIX == r"(?:[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}|superparty)"
+    # a suffix anchored on its own agrees with the full-ID validator
+    user = re.compile("^" + ids.USER_ID_SUFFIX + "$")
+    for suffix, ok in (("ab", False), ("abc", True), ("a" * 32, True), ("a" * 33, False),
+                       ("x#(y).z", True), ("no space", False)):
+        assert bool(user.match(suffix)) is ok, suffix
+        assert ids.is_valid_user_id("10.5238/" + suffix) is ok, suffix

@@ -223,3 +223,43 @@ def test_every_template_declares_its_shipped_headers():
         assert t.headers[-3:] == ("Operator's Notes", "Assigned EIDR ID",
                                   "Registration Errors & Notes")
         assert len(set(t.headers)) == len(t.headers), f"{t.key}: duplicate header"
+
+
+# ── 0.33.0: check_sheet is the subsetter's own rules, run before the copy ──
+
+def test_check_sheet_reports_without_writing_and_agrees_with_subset_rows(source, tmp_path):
+    from eidr_core.bmr_io import check_sheet
+    before = sorted(os.listdir(tmp_path))
+    chk = check_sheet(str(source), SHEET)
+    assert sorted(os.listdir(tmp_path)) == before, "a pre-flight must not write"
+    rep = subset_rows(str(source), str(tmp_path / "out.xlsx"), SHEET, [DATA_START])
+    assert (chk.template, chk.sheet) == (rep.template, rep.sheet)
+    assert chk.extra_columns == rep.extra_columns
+    assert chk.missing_optional == rep.missing_optional
+    assert chk.headers[_col("Unique Row ID")] == "Unique Row ID"
+
+
+@pytest.mark.parametrize("breakage",
+                         ["unknown-sheet-name", "no-such-sheet", "required-header-gone"])
+def test_check_sheet_refuses_exactly_what_subset_rows_refuses(source, tmp_path, breakage):
+    """The two must agree, or a source that passes the pre-flight is refused
+    an hour later at emit time -- the failure check_sheet exists to prevent."""
+    import openpyxl
+
+    from eidr_core.bmr_io import check_sheet
+    sheet = SHEET
+    if breakage == "unknown-sheet-name":
+        sheet = "Not A Template Sheet"
+    elif breakage == "no-such-sheet":
+        wb = openpyxl.load_workbook(source)
+        wb[SHEET].title = "Renamed"
+        wb.save(source)
+    else:
+        wb = openpyxl.load_workbook(source)
+        wb[SHEET].cell(HEADER_ROW, _col("Unique Row ID")).value = None
+        wb.save(source)
+    with pytest.raises(TemplateMismatch) as pre:
+        check_sheet(str(source), sheet)
+    with pytest.raises(TemplateMismatch) as emit:
+        subset_rows(str(source), str(tmp_path / "out.xlsx"), sheet, [DATA_START])
+    assert str(pre.value) == str(emit.value)

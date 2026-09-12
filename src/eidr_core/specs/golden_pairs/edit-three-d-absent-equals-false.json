@@ -1,0 +1,86 @@
+{
+  "id": "edit-three-d-absent-equals-false",
+  "added": "2026-09-12",
+  "mode": "case",
+  "creation_type": "Edit",
+  "tamr_kind": "AUTO",
+  "why": "Two Edits with identical EditInfo except that one side OMITS ThreeD and the other states FALSE are the same edit and must auto-match. Booleans default to false when unstated (common.xsd), so a mirror record that omits ThreeD is not 'different' from a sheet record that says no.\n\nTHE TRAP this pins: the naive comparison key -- read the attribute as-is, null on one side, false on the other -- reports `EditInfo differs (3D)`, sets the candidate to Reject, and through decisive_nomatch closes the row as `Disagree: all candidates rejected` WITHOUT review. That is the fail-CLOSED direction on a pair that is identical: the reviewer never sees the row, and the correct record is refused. The rule landed in BMR-Review's Python on 2026-09-11 but was pinned in one engine's unit test only; a JavaScript port built from a spec that said 'booleans pass through untouched' reproduces the closed failure exactly (De-Dupe UI, 2026-09-12).\n\nMutation-tested: reverting `_edit_key`'s ThreeD line to the raw `getattr(rec, 'three_d', None)` fails this fixture and no other.\n\nSCOPE: pins that ABSENT compares equal to FALSE. It says nothing about whether ThreeD is compared at all -- `edit-three-d-true-vs-false-rejects` pins that, and the two are read together (specs/golden-pairs.md section 6, rule 2). No Alt ID on either side, so the pair cannot floor to Review through Guard 7 for a different reason.",
+  "submitted": {
+    "creation_type": "Edit",
+    "parent_id": "10.5240/FEED-0001-0002-0003-0004-M",
+    "titles": [
+      {
+        "text": "The Same Film",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2019-04-11",
+    "length_minutes": 90,
+    "version_languages": [
+      "en"
+    ],
+    "edit_use": "Broadcast",
+    "edit_details": [
+      [
+        "Crown Media version",
+        "crownmedia.com"
+      ]
+    ],
+    "edit_classes": [],
+    "color_type": "color",
+    "three_d": false
+  },
+  "candidates": [
+    {
+      "creation_type": "Edit",
+      "parent_id": "10.5240/FEED-0001-0002-0003-0004-M",
+      "titles": [
+        {
+          "text": "The Same Film",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2019-04-11",
+      "length_minutes": 90,
+      "version_languages": [
+        "en"
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0005-K",
+      "edit_use": "Broadcast",
+      "edit_details": [
+        [
+          "Crown Media version",
+          "crownmedia.com"
+        ]
+      ],
+      "edit_classes": [],
+      "color_type": "color"
+    }
+  ],
+  "invariants": {
+    "assessment_in": [
+      "Agree"
+    ],
+    "proposed_id_is": "10.5240/FEED-0001-0002-0003-0005-K",
+    "clears_without_review": true,
+    "assessment_not_in": [
+      "Disagree: all candidates rejected",
+      "Review"
+    ],
+    "notes_not_match": [
+      "demonstrably different",
+      "asserts no EditInfo",
+      "3D"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.11.0",
+    "assessment": "Agree",
+    "proposed_id": "10.5240/FEED-0001-0002-0003-0005-K",
+    "confidence": 100.0,
+    "clears_without_review": true,
+    "notes": []
+  }
+}

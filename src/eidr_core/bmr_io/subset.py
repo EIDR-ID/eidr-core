@@ -77,6 +77,21 @@ every kept row are written cell-for-cell into the same columns, in source
 row order, onto a copy of the SOURCE workbook (so its other sheets,
 validations and macros come along via the same transplant the writers
 use). Nothing is renamed, reordered or re-mapped.
+
+**Formula cells, stated plainly (2026-09-13, BMRtoAltID's measurement):**
+the data sheet is what openpyxl writes, not the source XML with a few
+cells patched. A formula's TEXT survives; its CACHED VALUE does not, and a
+shared formula is expanded per cell. So a reader that opens the output
+with ``data_only=True`` (BMR-Review's ``read_bmr_sheet`` does) sees
+``None`` where the source showed a computed number, until the file is
+opened and saved in Excel. Measured across 66 real Template-22 sheets:
+every formula cell sat in an operator's scratch column past the template
+(``OK``, ``Filter``, ``Matched ID``), never in a template column, so no
+round trip is affected today. If a member sheet ever carries a formula in
+a scored column, the fix is to patch the source sheet XML in place for
+the changed cells only; that is a different transplant and is not built.
+``tests/test_bmr_subset.py`` pins the behaviour as it is so the day it
+changes is a deliberate one.
 """
 from __future__ import annotations
 
@@ -382,6 +397,14 @@ def subset_rows(src_xlsx: str, dst_xlsx: str, sheet_name: str,
                 if v is not None:
                     ws.cell(i, c).value = v
         report.rows_kept = len(kept)
+        # Clearing cells leaves the source's <row> elements behind, empty,
+        # and the <dimension> still names the source's last row: a 5,000-row
+        # source subset to 856 rows still declared A1:QY5003 and a read-only
+        # reader saw max_row 5,003 (BMRtoAltID, 2026-09-13, measured). Drop
+        # the rows past the kept range so the sheet's shape is the subset's.
+        last_kept = DATA_START + len(kept) - 1
+        if max_row > last_kept:
+            ws.delete_rows(last_kept + 1, max_row - last_kept)
 
         out_dir = os.path.dirname(os.path.abspath(dst_xlsx)) or "."
         fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=out_dir)

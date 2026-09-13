@@ -263,3 +263,48 @@ def test_check_sheet_refuses_exactly_what_subset_rows_refuses(source, tmp_path, 
     with pytest.raises(TemplateMismatch) as emit:
         subset_rows(str(source), str(tmp_path / "out.xlsx"), sheet, [DATA_START])
     assert str(pre.value) == str(emit.value)
+
+
+# ── 0.35.1: the sheet's SHAPE is the subset's (BMRtoAltID, 2026-09-13) ────
+
+def _sheet_xml(path, sheet=SHEET):
+    import re
+    import zipfile
+    with zipfile.ZipFile(path) as z:
+        wb_xml = z.read("xl/workbook.xml").decode("utf-8")
+        rels = z.read("xl/_rels/workbook.xml.rels").decode("utf-8")
+        rid = re.search(r'<sheet[^>]*name="%s"[^>]*r:id="([^"]+)"' % re.escape(sheet), wb_xml).group(1)
+        target = re.search(r'<Relationship[^>]*Id="%s"[^>]*Target="([^"]+)"' % rid, rels).group(1)
+        return z.read("xl/" + target.lstrip("/xl/").lstrip("/")).decode("utf-8")
+
+
+def test_the_output_sheet_has_exactly_the_kept_rows_and_a_matching_dimension(source, tmp_path):
+    """A 5,000-row source subset to 856 rows still carried 5,003 <row>
+    elements (4,144 empty) and declared A1:QY5003; a read-only reader saw
+    max_row 5,003. Pinned: <row> count is header rows + rows_kept, and the
+    <dimension> ends on that row."""
+    import re
+    out = tmp_path / "out.xlsx"
+    rep = subset_rows(str(source), str(out), SHEET, [DATA_START])
+    xml = _sheet_xml(out)
+    rows = re.findall(r"<row ", xml)
+    assert len(rows) == (DATA_START - 1) + rep.rows_kept, len(rows)
+    dim = re.search(r'<dimension ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"', xml)
+    assert dim and int(dim.group(4)) == (DATA_START - 1) + rep.rows_kept, dim.group(0) if dim else None
+
+
+def test_formula_text_survives_but_its_cached_value_does_not(source, tmp_path):
+    """The documented behaviour of the openpyxl round-trip, pinned so a change
+    is deliberate. A data_only reader sees None for a formula cell."""
+    import openpyxl
+    wb = openpyxl.load_workbook(source)
+    ws = wb[SHEET]
+    col = ws.max_column + 1
+    ws.cell(HEADER_ROW, col).value = "Scratch"
+    ws.cell(DATA_START, col).value = "=1+1"
+    wb.save(source)
+    out = tmp_path / "out.xlsx"
+    subset_rows(str(source), str(out), SHEET, [DATA_START])
+    assert openpyxl.load_workbook(out)[SHEET].cell(DATA_START, col).value == "=1+1"
+    assert openpyxl.load_workbook(out, data_only=True)[SHEET].cell(DATA_START, col).value is None
+

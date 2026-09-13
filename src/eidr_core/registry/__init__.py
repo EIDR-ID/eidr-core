@@ -210,6 +210,27 @@ def build_registry_credentials(secrets: dict | None = None) -> _SDKCredentials:
     return Credentials.load()
 
 
+def _transport_config_with_trust(trust: str) -> Any | None:
+    """``TransportConfig(trust=trust)`` if the installed SDK has that
+    parameter; None otherwise (the 1.2.0 surface has no trust policy, and
+    guessing a keyword it does not know would fail every call)."""
+    import inspect
+
+    try:
+        from eidr.client import TransportConfig  # lazy; the [client] extra
+    except ImportError:
+        return None
+    try:
+        params = inspect.signature(TransportConfig).parameters
+    except (TypeError, ValueError):
+        return None
+    if "trust" not in params:
+        log.debug("registry_client: installed SDK TransportConfig has no trust=; "
+                  "leaving the SDK default (move to eidr>=1.3.0 for system trust)")
+        return None
+    return TransportConfig(trust=trust)
+
+
 def get_registry_client(
     *,
     registry: str | Any = DEFAULT_REGISTRY,
@@ -219,6 +240,7 @@ def get_registry_client(
     tracing: Any | None = None,
     enforce_superparty_gate: bool = True,
     writable: bool | None = None,
+    trust: str | None = "system",
     # type-ignore: the SDK exports Client conditionally (the [client] extra),
     # so mypy sees a variable, not a class, whenever `eidr` is installed.
 ) -> _SDKClient:  # type: ignore[valid-type]
@@ -259,8 +281,25 @@ def get_registry_client(
             ``load_secrets``). Only consulted when ``credentials`` is
             None.
         transport_config: Optional SDK ``TransportConfig`` for
-            timeouts / retries / TLS verification. Sensible SDK
-            defaults are usually fine.
+            timeouts / retries / TLS verification. When given it is
+            passed through UNTOUCHED (``trust`` is then the caller's
+            to set on it); when None, one is built from ``trust``.
+        trust: TLS trust policy, default ``"system"``: verify against
+            the operating system's trust store, which is what every
+            EIDR host needs -- the registry does not serve its full
+            intermediate chain and certifi cannot obtain the missing
+            issuer (python-sdk Finding 4, 2026-09-12; BMR-Review hit
+            ``CERTIFICATE_VERIFY_FAILED`` on every sandbox2 call,
+            2026-09-13). Ruled into THIS factory rather than each
+            consumer's first sandbox call, because target, credentials
+            and the write gate already live here. Passed through
+            ``TransportConfig(trust=...)`` only when the installed SDK
+            declares that parameter (1.3.0+; feature-detected, so 1.2.0
+            is unchanged). ``None`` leaves the SDK default. Keep
+            ``truststore`` installed (the ``registry`` extra declares
+            it): with it the platform verifier fetches a missing
+            intermediate the way a browser does; without it the SDK
+            falls back to the stdlib context, which fetches nothing.
         tracing: Optional SDK ``TraceSink`` (or ``True`` for the
             default file sink) to capture request / response
             diagnostics. Off by default.
@@ -327,6 +366,9 @@ def get_registry_client(
             writable=writable,
             description="Configured via eidr_core.registry.get_registry_client",
         )
+
+    if transport_config is None and trust is not None:
+        transport_config = _transport_config_with_trust(trust)
 
     return Client(  # type: ignore[operator]  # same conditional-export story as above
         registry=registry_target,

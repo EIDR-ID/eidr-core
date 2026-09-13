@@ -268,14 +268,12 @@ def test_check_sheet_refuses_exactly_what_subset_rows_refuses(source, tmp_path, 
 # ── 0.35.1: the sheet's SHAPE is the subset's (BMRtoAltID, 2026-09-13) ────
 
 def _sheet_xml(path, sheet=SHEET):
-    import re
+    """The worksheet part for ``sheet``: openpyxl writes parts in sheet order
+    as xl/worksheets/sheetN.xml, and the transplant keeps that container."""
     import zipfile
+    n = openpyxl.load_workbook(path, read_only=True).sheetnames.index(sheet) + 1
     with zipfile.ZipFile(path) as z:
-        wb_xml = z.read("xl/workbook.xml").decode("utf-8")
-        rels = z.read("xl/_rels/workbook.xml.rels").decode("utf-8")
-        rid = re.search(r'<sheet[^>]*name="%s"[^>]*r:id="([^"]+)"' % re.escape(sheet), wb_xml).group(1)
-        target = re.search(r'<Relationship[^>]*Id="%s"[^>]*Target="([^"]+)"' % rid, rels).group(1)
-        return z.read("xl/" + target.lstrip("/xl/").lstrip("/")).decode("utf-8")
+        return z.read(f"xl/worksheets/sheet{n}.xml").decode("utf-8")
 
 
 def test_the_output_sheet_has_exactly_the_kept_rows_and_a_matching_dimension(source, tmp_path):

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1Ytllf3i7ZV2bmJqwuPPRsbYkfNNuLuWo7HuthR5BCLJdleF89gVrGygKAKaC4A
+\restrict CHh2Vu07rvgIMR3pVYMPAUjuhYqlwWd9dIzMjMBiZapbW6qcpSeH8p2Mh3Lwang
 
 
 SET statement_timeout = 0;
@@ -185,6 +185,178 @@ CREATE TABLE public.name (
     death_status text,
     row_hash bytea NOT NULL,
     rest jsonb
+);
+
+
+--
+-- Name: public_aka; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.public_aka (
+    public_snapshot_id smallint NOT NULL,
+    tconst text NOT NULL,
+    ordering integer NOT NULL,
+    title text,
+    region text,
+    language text,
+    types text,
+    attributes text,
+    is_original_title boolean
+);
+
+
+--
+-- Name: public_crew; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.public_crew (
+    public_snapshot_id smallint NOT NULL,
+    tconst text NOT NULL,
+    role text NOT NULL,
+    seq smallint NOT NULL,
+    nconst text NOT NULL
+);
+
+
+--
+-- Name: public_episode; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.public_episode (
+    public_snapshot_id smallint NOT NULL,
+    tconst text NOT NULL,
+    parent_tconst text,
+    season_number integer,
+    episode_number integer
+);
+
+
+--
+-- Name: public_genre; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.public_genre (
+    public_snapshot_id smallint NOT NULL,
+    tconst text NOT NULL,
+    seq smallint NOT NULL,
+    genre text NOT NULL
+);
+
+
+--
+-- Name: public_known_for; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.public_known_for (
+    public_snapshot_id smallint NOT NULL,
+    nconst text NOT NULL,
+    seq smallint NOT NULL,
+    tconst text NOT NULL
+);
+
+
+--
+-- Name: public_name; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.public_name (
+    public_snapshot_id smallint NOT NULL,
+    nconst text NOT NULL,
+    primary_name text,
+    birth_year smallint,
+    death_year smallint,
+    primary_profession text,
+    known_for_titles text
+);
+
+
+--
+-- Name: public_principal; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.public_principal (
+    public_snapshot_id smallint NOT NULL,
+    tconst text NOT NULL,
+    ordering integer NOT NULL,
+    nconst text NOT NULL,
+    category text,
+    job text,
+    characters text
+);
+
+
+--
+-- Name: public_profession; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.public_profession (
+    public_snapshot_id smallint NOT NULL,
+    nconst text NOT NULL,
+    seq smallint NOT NULL,
+    profession text NOT NULL
+);
+
+
+--
+-- Name: public_rating; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.public_rating (
+    public_snapshot_id smallint NOT NULL,
+    tconst text NOT NULL,
+    average_rating numeric(3,1),
+    num_votes integer
+);
+
+
+--
+-- Name: public_reject; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.public_reject (
+    public_snapshot_id smallint NOT NULL,
+    dataset text NOT NULL,
+    line_no bigint,
+    entity_id text,
+    rule text NOT NULL,
+    detail text,
+    raw text
+);
+
+
+--
+-- Name: public_snapshot; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.public_snapshot (
+    public_snapshot_id smallint NOT NULL,
+    label text NOT NULL,
+    fetched_at timestamp with time zone DEFAULT now() NOT NULL,
+    source_date date,
+    source_dir text,
+    per_file jsonb,
+    status text DEFAULT 'loading'::text NOT NULL,
+    started_at timestamp with time zone DEFAULT now() NOT NULL,
+    finished_at timestamp with time zone,
+    notes text
+);
+
+
+--
+-- Name: public_title; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.public_title (
+    public_snapshot_id smallint NOT NULL,
+    tconst text NOT NULL,
+    title_type text,
+    primary_title text,
+    original_title text,
+    is_adult boolean,
+    start_year smallint,
+    end_year smallint,
+    runtime_minutes integer,
+    genres text
 );
 
 
@@ -510,6 +682,22 @@ ALTER TABLE ONLY public.title_release
 
 
 --
+-- Name: public_snapshot public_snapshot_label_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.public_snapshot
+    ADD CONSTRAINT public_snapshot_label_key UNIQUE (label);
+
+
+--
+-- Name: public_snapshot public_snapshot_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.public_snapshot
+    ADD CONSTRAINT public_snapshot_pkey PRIMARY KEY (public_snapshot_id);
+
+
+--
 -- Name: snapshot snapshot_label_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -655,4 +843,4 @@ CREATE INDEX ix_title_year ON public.title USING btree (snapshot_id, year);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1Ytllf3i7ZV2bmJqwuPPRsbYkfNNuLuWo7HuthR5BCLJdleF89gVrGygKAKaC4A
+\unrestrict CHh2Vu07rvgIMR3pVYMPAUjuhYqlwWd9dIzMjMBiZapbW6qcpSeH8p2Mh3Lwang

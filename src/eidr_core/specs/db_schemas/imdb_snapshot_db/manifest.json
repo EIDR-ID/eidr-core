@@ -1,8 +1,8 @@
 {
   "database": "imdb_snapshot_db",
   "owner": "eidr-imdb",
-  "version": "2026.09.11",
-  "generated_at": "2026-09-11T21:15:20+00:00",
+  "version": "2026.09.13",
+  "generated_at": "2026-09-13T18:52:18+00:00",
   "source": "live database (authoritative; operator 2026-08-03)",
   "tables": {
     "altid_pull": {
@@ -440,6 +440,434 @@
         {
           "name": "rest",
           "type": "jsonb",
+          "nullable": true
+        }
+      ]
+    },
+    "public_aka": {
+      "columns": [
+        {
+          "name": "public_snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "tconst",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "ordering",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "region",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "language",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "types",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "attributes",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "is_original_title",
+          "type": "boolean",
+          "nullable": true
+        }
+      ]
+    },
+    "public_crew": {
+      "columns": [
+        {
+          "name": "public_snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "tconst",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "nconst",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "public_episode": {
+      "columns": [
+        {
+          "name": "public_snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "tconst",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "parent_tconst",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "season_number",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "episode_number",
+          "type": "integer",
+          "nullable": true
+        }
+      ]
+    },
+    "public_genre": {
+      "columns": [
+        {
+          "name": "public_snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "tconst",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "genre",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "public_known_for": {
+      "columns": [
+        {
+          "name": "public_snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "nconst",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "tconst",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "public_name": {
+      "columns": [
+        {
+          "name": "public_snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "nconst",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "primary_name",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "birth_year",
+          "type": "smallint",
+          "nullable": true
+        },
+        {
+          "name": "death_year",
+          "type": "smallint",
+          "nullable": true
+        },
+        {
+          "name": "primary_profession",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "known_for_titles",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "public_principal": {
+      "columns": [
+        {
+          "name": "public_snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "tconst",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "ordering",
+          "type": "integer",
+          "nullable": false
+        },
+        {
+          "name": "nconst",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "job",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "characters",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "public_profession": {
+      "columns": [
+        {
+          "name": "public_snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "nconst",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "seq",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "profession",
+          "type": "text",
+          "nullable": false
+        }
+      ]
+    },
+    "public_rating": {
+      "columns": [
+        {
+          "name": "public_snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "tconst",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "average_rating",
+          "type": "numeric",
+          "nullable": true
+        },
+        {
+          "name": "num_votes",
+          "type": "integer",
+          "nullable": true
+        }
+      ]
+    },
+    "public_reject": {
+      "columns": [
+        {
+          "name": "public_snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "dataset",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "line_no",
+          "type": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "entity_id",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "rule",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "detail",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "raw",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "public_snapshot": {
+      "columns": [
+        {
+          "name": "public_snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "fetched_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "source_date",
+          "type": "date",
+          "nullable": true
+        },
+        {
+          "name": "source_dir",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "per_file",
+          "type": "jsonb",
+          "nullable": true
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "nullable": false
+        },
+        {
+          "name": "finished_at",
+          "type": "timestamp with time zone",
+          "nullable": true
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": true
+        }
+      ]
+    },
+    "public_title": {
+      "columns": [
+        {
+          "name": "public_snapshot_id",
+          "type": "smallint",
+          "nullable": false
+        },
+        {
+          "name": "tconst",
+          "type": "text",
+          "nullable": false
+        },
+        {
+          "name": "title_type",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "primary_title",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "original_title",
+          "type": "text",
+          "nullable": true
+        },
+        {
+          "name": "is_adult",
+          "type": "boolean",
+          "nullable": true
+        },
+        {
+          "name": "start_year",
+          "type": "smallint",
+          "nullable": true
+        },
+        {
+          "name": "end_year",
+          "type": "smallint",
+          "nullable": true
+        },
+        {
+          "name": "runtime_minutes",
+          "type": "integer",
+          "nullable": true
+        },
+        {
+          "name": "genres",
+          "type": "text",
           "nullable": true
         }
       ]

@@ -25,6 +25,7 @@ and its own columns) and is deliberately NOT unified here.
 """
 from __future__ import annotations
 
+import os
 from collections.abc import Iterable
 from typing import NamedTuple
 
@@ -68,7 +69,8 @@ def format_line(eidr_id: str, alt_type: str, value: str,
     return line
 
 
-def write_lines(path, rows: Iterable[AltIdRow | tuple]) -> int:
+def write_lines(path: str | os.PathLike[str],
+                rows: Iterable[AltIdRow | tuple[str, ...]]) -> int:
     """Write rows (AltIdRow or plain tuples) to ``path`` as an AltIDTool
     input file (UTF-8, LF). Returns the row count."""
     n = 0

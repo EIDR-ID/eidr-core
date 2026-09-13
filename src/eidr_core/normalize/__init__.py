@@ -83,15 +83,53 @@ def _num_token(tok: str) -> str:
     return tok
 
 
+def _tokens_around_ampersands(s: str, alias) -> tuple[list[str], bool]:
+    """Tokenise ``s`` with ``&``/``+`` read as "and", folding numerals and
+    aliasing words -- EXCEPT the single letters that sit beside an
+    ampersand, and a name that is one letter long.
+
+    Why (python-tools, 2026-09-12): the old order was "replace & with and,
+    then alias every token", and the alias tables map the Romance
+    conjunctions ``e``/``y``/``a`` to "and" and the Roman numerals
+    ``i``/``v``/``x`` to digits. So ``A&E Networks`` became
+    ``a and and networks``, ``V&A`` became ``5 and a`` and ``X&Y`` became
+    ``10 and and`` -- and ``A&E Television Networks`` is a real production
+    party (10.5237/DF2A-52D3). A letter beside an ampersand is an initial,
+    never a conjunction or a numeral. Everything else is aliased exactly as
+    before, so ``Juan y Maria`` still reads "john and mary" and
+    ``Simon & Schuster`` still reads "simon and schuster".
+
+    Returns the tokens and whether the FIRST token is such an initial, so
+    ``norm_title`` does not strip the ``A`` of ``A&E`` as an article.
+    """
+    bare = s.strip()
+    if len(bare) == 1 and bare.isalpha():
+        return [bare], True                             # a one-letter name
+    parts = re.split(r"[&+]", s)
+    out: list[str] = []
+    first_initial = False
+    for i, part in enumerate(parts):
+        words = re.sub(r"[^\w\s]", " ", part, flags=re.UNICODE).split()
+        for j, w in enumerate(words):
+            beside_amp = (j == 0 and i > 0) or (j == len(words) - 1 and i < len(parts) - 1)
+            if beside_amp and len(w) == 1 and w.isalpha():
+                if not out:
+                    first_initial = True
+                out.append(w)                          # an initial: verbatim
+            else:
+                out.append(alias(_num_token(w)))
+        if i < len(parts) - 1:
+            out.append("and")
+    return out, first_initial
+
+
 def norm_title(s: str, strip_articles: bool = True) -> str:
     if not s:
         return ""
     s = ascii_fold(nfkc(s)).casefold()
     s = re.sub(r"[\u2018\u2019\u201c\u201d]", "'", s)
-    s = re.sub(r"[&+]", " and ", s)                      # &/+ -> and
-    s = re.sub(r"[^\w\s]", " ", s, flags=re.UNICODE)   # drop punctuation
-    toks = [alias_title(_num_token(t)) for t in s.split()]
-    if strip_articles and len(toks) > 1 and toks[0] in _ARTICLES:
+    toks, first_initial = _tokens_around_ampersands(s, alias_title)
+    if strip_articles and len(toks) > 1 and toks[0] in _ARTICLES and not first_initial:
         toks = toks[1:]
     return " ".join(toks).strip()
 
@@ -105,9 +143,7 @@ def norm_name(s: str) -> str:
         last, first = [p.strip() for p in s.split(",", 1)]
         if first:
             s = f"{first} {last}"
-    s = re.sub(r"[&+]", " and ", s.casefold())
-    s = re.sub(r"[^\w\s]", " ", s, flags=re.UNICODE)
-    toks = [alias_name(_num_token(t)) for t in s.split()]
+    toks, _ = _tokens_around_ampersands(s.casefold(), alias_name)
     return " ".join(toks).strip()
 
 

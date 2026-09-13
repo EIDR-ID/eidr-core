@@ -85,6 +85,25 @@ or missing files; no residual `eidr_core` text. With `--resync` or
 directory and compared byte-for-byte, which catches a hand-edit that kept
 the hash table consistent by re-running `sync` against an edited checkout.
 
+## 4a. The consumer's own tests must not skip when eidr-core is absent
+
+Absent eidr-core is the SHIPPING configuration -- it is the whole reason the
+copy exists -- so a consumer test that `importorskip`s eidr-core passes on
+exactly the machines the copy is for. `check` needs eidr-core installed (it
+re-derives the closure), so it is the CI gate, not the deployment test.
+The consumer's suite should verify the manifest with nothing but the
+standard library: the pin equals `MANIFEST.json`'s commit, every SHA-256
+matches, nothing is extra or missing, no residual `eidr_core` text -- and
+run `check` as the authority *in addition* when eidr-core is importable.
+A third test that no module in the consumer's package imports `eidr_core`
+directly is the deployment promise itself, and it is otherwise invisible on
+a developer machine. (python-tools `tests/test_vendor_pin.py`, 2026-09-12;
+both paths mutation-tested against a hand edit.)
+
+A vendored module lands inside the consumer's own package and so meets the
+consumer's gate, including `mypy --strict` if that is what they run: keep
+every public function here fully annotated (`write_lines` was not, 0.33.0).
+
 ## 5. Guarantees
 
 * **The copy imports with no other eidr-core file present.** This is the

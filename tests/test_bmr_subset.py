@@ -288,7 +288,8 @@ def test_the_output_sheet_has_exactly_the_kept_rows_and_a_matching_dimension(sou
     rows = re.findall(r"<row ", xml)
     assert len(rows) == (DATA_START - 1) + rep.rows_kept, len(rows)
     dim = re.search(r'<dimension ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"', xml)
-    assert dim and int(dim.group(4)) == (DATA_START - 1) + rep.rows_kept, \n        (dim.group(0) if dim else None)
+    assert dim is not None, "no <dimension> element in the sheet XML"
+    assert int(dim.group(4)) == (DATA_START - 1) + rep.rows_kept, dim.group(0)
 
 
 def test_formula_text_survives_but_its_cached_value_does_not(source, tmp_path):

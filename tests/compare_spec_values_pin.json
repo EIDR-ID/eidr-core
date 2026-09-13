@@ -1,0 +1,4 @@
+{
+ "_doc": "sha256 of compare-spec.json `values` (sorted, compact JSON) per $spec.version. A regen that moves a value without bumping the version fails tests/test_compare_spec_values_pin.py; a bump adds a line here in the same commit (BMR-Review's S-22 mitigation, 2026-09-12).",
+ "2.11.0": "1b973ce94229f4876ed08e0a7d925916c8d4317251baedd1444a24839a5187ad"
+}

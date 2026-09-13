@@ -85,7 +85,7 @@ import logging
 import os
 import shutil
 import tempfile
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from eidr_core.bmr_io import DATA_START, fix_shared_strings, read_headers, transplant
@@ -93,8 +93,8 @@ from eidr_core.bmr_io.writer import SHEET_TO_TEMPLATE, TEMPLATES
 
 log = logging.getLogger(__name__)
 
-__all__ = ["TemplateMismatch", "SubsetReport", "SheetCheck", "subset_rows",
-           "check_sheet", "required_headers"]
+__all__ = ["TemplateMismatch", "SubsetReport", "SheetCheck", "FillReport", "subset_rows",
+           "check_sheet", "fill_column", "required_headers"]
 
 # Sheet mechanics: present on every template, written or read by the BMR
 # tool itself, so a sheet without them is not a BMR sheet.
@@ -237,6 +237,84 @@ def check_sheet(src_xlsx: str, sheet_name: str) -> SheetCheck:
         return _inspect(wb, key, src_xlsx, sheet_name)
     finally:
         wb.close()
+
+
+@dataclass
+class FillReport:
+    path: str
+    template: str
+    sheet: str
+    rows_filled: int
+    # Keys of ``values`` that are not data rows on the sheet (below
+    # DATA_START or beyond the last row). Reported, never dropped silently:
+    # a caller's row numbers come from open_sheet on the same file, so a
+    # miss here means something is wrong that they want to see.
+    rows_absent: list[int] = field(default_factory=list)
+    extra_columns: list[str] = field(default_factory=list)
+    missing_optional: list[str] = field(default_factory=list)
+
+
+def fill_column(src_xlsx: str, dst_xlsx: str, sheet_name: str, column: str,
+                values: Mapping[int, object]) -> FillReport:
+    """Copy ``src_xlsx`` to ``dst_xlsx`` and write ``values`` into ONE column
+    of ``sheet_name``, keyed by absolute sheet row number.
+
+    The sibling of ``subset_rows`` for the other half of a round trip
+    (BMRtoAltID T5, 2026-09-12): a reviewed sheet comes back and the
+    confirmed IDs go into ``Assigned EIDR ID`` so the existing modes can run
+    on it. Same conformance rules as ``check_sheet`` (one ``_inspect``), same
+    transplant so formatting and every other cell survive byte-for-byte,
+    same refusal to leave a half-written file. Every data row is kept: this
+    is not a subset. A ``column`` that is not on the header row is a
+    ``ValueError`` (the caller named a column the sheet does not have -- a
+    programming error, not a template mismatch).
+    """
+    import openpyxl  # the `bmr` extra
+
+    key = _template_key(sheet_name)
+    if not os.path.exists(src_xlsx):
+        raise FileNotFoundError(f"BMR sheet not found: {src_xlsx}")
+
+    shutil.copyfile(src_xlsx, dst_xlsx)
+    try:
+        wb = openpyxl.load_workbook(dst_xlsx, data_only=False)
+        checked = _inspect(wb, key, src_xlsx, sheet_name)
+        ws = wb[sheet_name]
+        name_to_col = {h: c for c, h in checked.headers.items()}
+        if column not in name_to_col:
+            raise ValueError(f"column {column!r} is not on sheet {sheet_name!r}; "
+                             f"headers: {sorted(name_to_col)}")
+        col = name_to_col[column]
+        report = FillReport(path=dst_xlsx, template=key, sheet=sheet_name, rows_filled=0,
+                            extra_columns=checked.extra_columns,
+                            missing_optional=checked.missing_optional)
+        max_row = ws.max_row
+        for r in sorted(int(k) for k in values):
+            if r < DATA_START or r > max_row:
+                report.rows_absent.append(r)
+                continue
+            ws.cell(r, col).value = values[r]
+            report.rows_filled += 1
+
+        out_dir = os.path.dirname(os.path.abspath(dst_xlsx)) or "."
+        fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=out_dir)
+        os.close(fd)
+        try:
+            wb.save(tmp)
+            transplant(template_xlsx=dst_xlsx, edited_xlsx=tmp)
+            fix_shared_strings(dst_xlsx)
+        finally:
+            with contextlib.suppress(OSError):
+                if os.path.exists(tmp):
+                    os.remove(tmp)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.remove(dst_xlsx)
+        raise
+
+    log.info("fill_column: %d row(s) of %r -> %s [%s]%s", report.rows_filled, column,
+             dst_xlsx, sheet_name, f" absent={report.rows_absent}" if report.rows_absent else "")
+    return report
 
 
 def subset_rows(src_xlsx: str, dst_xlsx: str, sheet_name: str,

@@ -69,6 +69,9 @@ fact-dict contract above.
 """
 from __future__ import annotations
 
+import json
+import os
+import time
 from typing import Protocol, runtime_checkable
 
 from .failover import (
@@ -82,7 +85,7 @@ from .failover import (
 )
 
 __all__ = [
-    "FactCache", "NullFactCache", "DictFactCache", "Key", "Entry",
+    "FactCache", "NullFactCache", "DictFactCache", "JsonFactCache", "Key", "Entry",
     # failover chassis (canonical home: eidr_core.external.failover)
     "RETRY", "NEXT_ENDPOINT", "OUTAGE", "FATAL",
     "call_with_failover", "classify_sparql_error", "endpoint_chain",
@@ -122,6 +125,57 @@ class NullFactCache:
 
     def store(self, results: dict[Key, Entry]) -> None:
         return None
+
+
+class JsonFactCache:
+    """A file-backed cache: one JSON file, optional expiry, no database.
+
+    Added 0.35.0 for the second consumer that wanted persistence
+    (BMR-Review T25; eidr-dq keeps its own ``DbFactCache`` because that one
+    lives in the DQ schema). Entries are written with the time they were
+    stored; ``ttl_seconds`` makes older ones invisible to ``load`` -- absent
+    means "fetch it", exactly as the protocol says. Writes are whole-file
+    and atomic (write to a sibling, then replace), so a crash mid-store
+    leaves the previous file. Not safe for two writers at once; that is a
+    database's job, not this one's.
+    """
+
+    def __init__(self, path: str | os.PathLike[str], *, ttl_seconds: float | None = None) -> None:
+        self._path = os.fspath(path)
+        self._ttl = ttl_seconds
+        self._d: dict[Key, tuple[float, Entry]] = {}
+        if os.path.exists(self._path):
+            with open(self._path, encoding="utf-8") as fh:
+                for source, ext_id, stored_at, entry in json.load(fh):
+                    self._d[(source, ext_id)] = (float(stored_at), entry)
+
+    def _live(self, key: Key) -> Entry | None:
+        hit = self._d.get(key)
+        if hit is None:
+            return None
+        stored_at, entry = hit
+        if self._ttl is not None and time.time() - stored_at > self._ttl:
+            return None
+        return entry
+
+    def load(self, keys: list[Key], *, refresh: bool = False) -> dict[Key, Entry]:
+        if refresh:
+            return {}
+        out: dict[Key, Entry] = {}
+        for k in keys:
+            e = self._live(k)
+            if e is not None:
+                out[k] = e
+        return out
+
+    def store(self, results: dict[Key, Entry]) -> None:
+        now = time.time()
+        for k, e in results.items():
+            self._d[k] = (now, e)
+        tmp = self._path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump([[s, i, t, e] for (s, i), (t, e) in self._d.items()], fh)
+        os.replace(tmp, self._path)
 
 
 class DictFactCache:

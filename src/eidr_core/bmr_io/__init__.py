@@ -115,7 +115,8 @@ __all__ = ["HEADER_ROW", "DATA_START", "read_headers", "count_family",
            "CREATION_TYPES", "families_for", "template_for_creation_type",
            "max_counts", "WriteReport", "write_sheet",
            # row-subset copy (bmr_io/subset.py)
-           "TemplateMismatch", "SubsetReport", "SheetCheck", "subset_rows", "check_sheet",
+           "TemplateMismatch", "SubsetReport", "SheetCheck", "FillReport", "subset_rows",
+           "check_sheet", "fill_column",
            # the header-row policy over a plain row of values (BMR-Review
            # discovers the header row itself and then needs THE same policy)
            "header_map"]
@@ -783,10 +784,12 @@ def parent_chain(row: Mapping[str, Any],
 # ``from eidr_core.bmr_io import write_sheet`` without a second import path
 # to remember. Bottom-of-file by necessity, not by accident (E402).
 from eidr_core.bmr_io.subset import (  # noqa: E402
+    FillReport,
     SheetCheck,
     SubsetReport,
     TemplateMismatch,
     check_sheet,
+    fill_column,
     subset_rows,
 )
 from eidr_core.bmr_io.writer import (  # noqa: E402

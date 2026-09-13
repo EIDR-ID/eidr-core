@@ -91,7 +91,7 @@ never pay for the SDK import or the httpx transport.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 # Re-exported so callers get the factory and the verdict reader from one
 # import. Stdlib-only, so this costs nothing to consumers that never write
@@ -210,7 +210,7 @@ def build_registry_credentials(secrets: dict | None = None) -> _SDKCredentials:
     return Credentials.load()
 
 
-def _transport_config_with_trust(trust: str) -> Any | None:
+def _transport_config_with_trust(trust: Literal["certifi", "system"]) -> Any | None:
     """``TransportConfig(trust=trust)`` if the installed SDK has that
     parameter; None otherwise (the 1.2.0 surface has no trust policy, and
     guessing a keyword it does not know would fail every call)."""
@@ -240,7 +240,7 @@ def get_registry_client(
     tracing: Any | None = None,
     enforce_superparty_gate: bool = True,
     writable: bool | None = None,
-    trust: str | None = "system",
+    trust: Literal["certifi", "system"] | None = "system",
     # type-ignore: the SDK exports Client conditionally (the [client] extra),
     # so mypy sees a variable, not a class, whenever `eidr` is installed.
 ) -> _SDKClient:  # type: ignore[valid-type]

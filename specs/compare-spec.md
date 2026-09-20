@@ -199,16 +199,21 @@ system") wherever it is not reproducing an emitted value.
 * **Supplemental short-form guard** (`SUPPLEMENTAL_SHORT_RATIO`): a
   Supplemental much shorter than an otherwise-matching record is its
   trailer/promo, not its duplicate.
-* **Cross-season / cross-type matches** (`CROSS_SEASON_*`, `CROSS_TYPE_*`,
-  `GATE_*`): allowed under narrow conditions and ALWAYS capped to Review
-  (`GATE_CROSS_REVIEW_CAP`) — a human resolves; ineligible type pairs clamp
-  to Reject (`GATE_INELIGIBLE_CEILING`).
+* **Cross-type matches** (`GATE_EPISODE_CROSS_BASIC_CLASSES`,
+  `GATE_ANTHOLOGY_CLASSES`, `GATE_COMPILATION_SERIES_CLASSES`): allowed under
+  narrow conditions and ALWAYS capped to Review — a human resolves; ineligible
+  type pairs clamp to Reject (`GATE_INELIGIBLE_CEILING`). `GATE_CROSS_REVIEW_CAP`
+  stays in the spec as recorded intent (S-4) and is not applied as a value.
+  The cross-season and cross-type knobs this bullet used to name were removed
+  at 2.12.0 (T19): nothing read them; season adjacency is a candidate-recovery
+  question.
 * **IMDb reconciliation** (`IMDB_*`): an isolated date/length outlier on an
   otherwise-agreeing pair with a shared non-conflicting IMDb id is checked
   against IMDb and lifted rather than penalized when IMDb confirms same-work.
 * **`NAME_MATCH_MIN = 0.80`:** below it, names are DIFFERENT people and score
   0 — different directors must not earn partial credit from incidental letter
   overlap ("Rosi" vs "Faggione").
-* **System-generated titles** contribute at `SYSTEM_TITLE_DISCOUNT` and are
-  ignored when real titles exist on both sides (they restate structure already
-  compared via parent/sequence fields).
+* **System-generated titles** are dropped from the title comparison only when
+  BOTH sides are system-generated (a one-sided one is compared; 0.19.0+). The
+  system-title discount knob this bullet used to name was removed at 2.12.0
+  (T19): it was shipped but read by nothing.

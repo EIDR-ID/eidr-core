@@ -1,8 +1,8 @@
 {
  "$spec": {
   "name": "compare-spec",
-  "version": "2.11.0",
-  "updated": "2026-09-07",
+  "version": "2.12.0",
+  "updated": "2026-09-20",
   "doc": "Versioned runtime configuration of the unified match-candidate evaluation engine (eidr-core/specs/unified-scoring.md). THE portfolio's cross-tool tuning artifact, GENERATED from BMR-Review eidr_dedup_score/config.py by that repo's regen_compare_spec.py — config.py is the authoring surface (tune THERE, bump COMPARE_SPEC_VERSION, regenerate; direction inverted 2026-08-05). A version change is the cross-tool signal to regenerate golden-pair expectations. Curated rationale in compare-spec.md; full inline annotations live in config.py itself.",
   "loader": "eidr_core.compare.spec.load_spec",
   "consumers": [
@@ -13,7 +13,6 @@
  "types": {
   "ALWAYS_APPLICABLE": "set",
   "CHILD_CREATION_TYPES": "set",
-  "CROSS_TYPE_EPISODE_CLASSES": "set",
   "GATE_ANTHOLOGY_CLASSES": "set",
   "GATE_COMPILATION_SERIES_CLASSES": "set",
   "GATE_EPISODE_CROSS_BASIC_CLASSES": "set",
@@ -172,15 +171,6 @@
   "CROSSTYPE_RELATED_MIN_AGREE": 2,
   "CROSSTYPE_REVIEW_FLOOR": true,
   "CROSSTYPE_TITLE_STRONG": 1.0,
-  "CROSS_SEASON_SEASON_TOL": 1,
-  "CROSS_SEASON_TITLE_SIM": 0.8,
-  "CROSS_SEASON_YEAR_TOL": 1,
-  "CROSS_TYPE_EPISODE_CLASSES": [
-   "pilot",
-   "special",
-   "standalone"
-  ],
-  "CROSS_TYPE_SERIES_CLASS": "anthology",
   "DATE_EPISODE_YEAR_MATCH_CREDIT": 0.6,
   "DATE_EPOCH_MATCH_CREDIT": 0.5,
   "DATE_EPOCH_MISMATCH_FLOOR": 0.4,
@@ -284,9 +274,7 @@
   "SERIES_REQUIRE_COUNTRY_MATCH": true,
   "SHARED_TITLE_SIM": 0.5,
   "SUPPLEMENTAL_SHORT_RATIO": 0.5,
-  "SUPPLEMENTAL_TRAILER_CEILING": 20.0,
-  "SYSTEM_TITLE_DISCOUNT": 0.5,
-  "YEAR_PLUS_MINUS_ONE": 0.5
+  "SUPPLEMENTAL_TRAILER_CEILING": 20.0
  },
  "states": {
   "$doc": "q->state banding for the De-Dupe UI presentation layer (per unified-scoring: the four comparison states are BANDS over the engine's per-field continuous quality q). Consumed by the work-list producer / scoring service when building payloads (dedupe-worklist.md section 4); NOT used in scoring itself. identical: q >= identical_at (or exact match after normalization); similar: q >= similar_at; below similar_at the state is mismatch when the field is discriminative (conflict-bearing), else neutral; a field absent on either side (quality None) is neutral. Per-field overrides win over defaults.",

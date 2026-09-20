@@ -761,7 +761,7 @@
     "recall": "10.5240/6FA0-27BD-1C7D-890F-5777-B"
   },
   "expected": {
-    "spec_version": "2.11.0",
+    "spec_version": "2.12.0",
     "returned": [
       "10.5240/0705-F9A2-78AC-7368-AC29-P",
       "10.5240/2B38-71EF-2FCF-8A4F-AF2F-E",

@@ -210,6 +210,33 @@ def build_registry_credentials(secrets: dict | None = None) -> _SDKCredentials:
     return Credentials.load()
 
 
+def _warn_if_callers_config_lost_system_trust(transport_config: Any) -> None:
+    """Say so when a caller's own ``TransportConfig`` is back on certifi.
+
+    A caller's config is passed through untouched -- it is theirs, and an
+    explicit ``trust="certifi"`` cannot be told from the SDK default, so
+    rewriting it would override a choice we cannot see. But a consumer that
+    builds a config for an unrelated reason (timeouts, tracing) silently
+    drops the factory's system-trust default and is one keyword away from
+    the ``CERTIFICATE_VERIFY_FAILED`` this default exists to close
+    (BMR-Review, 2026-09-20). Every EIDR host serves a leaf-only chain
+    (python-sdk, measured per host 2026-09-20), so certifi alone cannot
+    verify any of them. Warn, never mutate; ``trust=None`` on the factory
+    says the choice is deliberate and silences this. A config carrying its
+    own ``ca_bundle`` has plainly made a trust decision already.
+    """
+    if getattr(transport_config, "trust", None) != "certifi":
+        return
+    if getattr(transport_config, "ca_bundle", None) is not None:
+        return
+    log.warning(
+        "registry_client: the caller-supplied TransportConfig has "
+        "trust='certifi'; EIDR hosts serve a leaf-only certificate chain "
+        "that certifi cannot verify. Set trust='system' on your config, or "
+        "pass trust=None to get_registry_client to mark this deliberate."
+    )
+
+
 def _transport_config_with_trust(trust: Literal["certifi", "system"]) -> Any | None:
     """``TransportConfig(trust=trust)`` if the installed SDK has that
     parameter; None otherwise (the 1.2.0 surface has no trust policy, and
@@ -283,7 +310,10 @@ def get_registry_client(
         transport_config: Optional SDK ``TransportConfig`` for
             timeouts / retries / TLS verification. When given it is
             passed through UNTOUCHED (``trust`` is then the caller's
-            to set on it); when None, one is built from ``trust``.
+            to set on it); when None, one is built from ``trust``. A
+            supplied config still on ``trust="certifi"`` with no
+            ``ca_bundle`` draws a WARNING, because it has silently lost
+            the default below; ``trust=None`` silences it.
         trust: TLS trust policy, default ``"system"``: verify against
             the operating system's trust store, which is what every
             EIDR host needs -- the registry does not serve its full
@@ -369,6 +399,8 @@ def get_registry_client(
 
     if transport_config is None and trust is not None:
         transport_config = _transport_config_with_trust(trust)
+    elif transport_config is not None and trust == "system":
+        _warn_if_callers_config_lost_system_trust(transport_config)
 
     return Client(  # type: ignore[operator]  # same conditional-export story as above
         registry=registry_target,

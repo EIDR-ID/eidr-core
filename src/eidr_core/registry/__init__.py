@@ -219,11 +219,13 @@ def _warn_if_callers_config_lost_system_trust(transport_config: Any) -> None:
     builds a config for an unrelated reason (timeouts, tracing) silently
     drops the factory's system-trust default and is one keyword away from
     the ``CERTIFICATE_VERIFY_FAILED`` this default exists to close
-    (BMR-Review, 2026-09-20). Every EIDR host serves a leaf-only chain
-    (python-sdk, measured per host 2026-09-20), so certifi alone cannot
-    verify any of them. Warn, never mutate; ``trust=None`` on the factory
-    says the choice is deliberate and silences this. A config carrying its
-    own ``ca_bundle`` has plainly made a trust decision already.
+    (BMR-Review, 2026-09-20). Where TLS is inspected locally the issuer
+    is a root only the OS store holds, so certifi cannot verify ANY host
+    (see ``trust`` on ``get_registry_client`` for what was measured, and
+    what was wrongly concluded first). Warn, never mutate; ``trust=None``
+    on the factory says the choice is deliberate and silences this. A
+    config carrying its own ``ca_bundle`` has plainly made a trust decision
+    already.
     """
     if getattr(transport_config, "trust", None) != "certifi":
         return
@@ -231,9 +233,11 @@ def _warn_if_callers_config_lost_system_trust(transport_config: Any) -> None:
         return
     log.warning(
         "registry_client: the caller-supplied TransportConfig has "
-        "trust='certifi'; EIDR hosts serve a leaf-only certificate chain "
-        "that certifi cannot verify. Set trust='system' on your config, or "
-        "pass trust=None to get_registry_client to mark this deliberate."
+        "trust='certifi'; behind local TLS inspection (antivirus or a "
+        "corporate proxy) the issuer is in the OS trust store only, and "
+        "every call fails CERTIFICATE_VERIFY_FAILED. Set trust='system' on "
+        "your config, or pass trust=None to get_registry_client to mark "
+        "this deliberate."
     )
 
 
@@ -315,21 +319,31 @@ def get_registry_client(
             ``ca_bundle`` draws a WARNING, because it has silently lost
             the default below; ``trust=None`` silences it.
         trust: TLS trust policy, default ``"system"``: verify against
-            the operating system's trust store, which is what every
-            EIDR host needs -- the registry does not serve its full
-            intermediate chain and certifi cannot obtain the missing
-            issuer (python-sdk Finding 4, 2026-09-12; BMR-Review hit
-            ``CERTIFICATE_VERIFY_FAILED`` on every sandbox2 call,
-            2026-09-13). Ruled into THIS factory rather than each
+            the operating system's trust store. WHY, as measured on
+            2026-09-20: the machine this portfolio runs on has its TLS
+            inspected by antivirus (every host -- EIDR's, github.com,
+            pypi.org -- presents ONE certificate issued by ``Norton
+            Web/Mail Shield Root``). That root is installed in the OS
+            store and can never be in certifi, so certifi fails every
+            call (``CERTIFICATE_VERIFY_FAILED``, BMR-Review 2026-09-13)
+            and system trust passes. CORRECTION: 0.36.0/0.36.1 said here
+            that "the registry does not serve its full intermediate
+            chain" (python-sdk Finding 4). That was the same single
+            certificate read as the registry's; nothing about EIDR's
+            real chain can be measured from behind the inspection, and
+            nothing here should be taken as a registry defect. The
+            default is right for the general reason: a consumer behind
+            ANY TLS inspection needs the OS store. Ruled into THIS
+            factory rather than each
             consumer's first sandbox call, because target, credentials
             and the write gate already live here. Passed through
             ``TransportConfig(trust=...)`` only when the installed SDK
             declares that parameter (1.3.0+; feature-detected, so 1.2.0
             is unchanged). ``None`` leaves the SDK default. Keep
             ``truststore`` installed (the ``registry`` extra declares
-            it): with it the platform verifier fetches a missing
-            intermediate the way a browser does; without it the SDK
-            falls back to the stdlib context, which fetches nothing.
+            it): with it verification is the platform's own, exactly
+            what a browser on this machine does; without it the SDK
+            falls back to a stdlib context loaded from the OS store.
         tracing: Optional SDK ``TraceSink`` (or ``True`` for the
             default file sink) to capture request / response
             diagnostics. Off by default.

@@ -67,7 +67,7 @@ name = "eidr-core"
 # moved, but T6 makes this repo's CI gate the precondition for consumers
 # pinning @main, so WHICH checker verified the py.typed annotations is part
 # of what that version identifies.
-version = "0.36.2"
+version = "0.36.3"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers
@@ -104,7 +104,9 @@ bmr = ["openpyxl>=3.1"]
 # portfolio's machine: Norton Web/Mail Shield, measured 2026-09-20) because
 # the inspecting root is in the OS store and never in certifi. An earlier
 # comment blamed a missing registry intermediate; that was the inspection's
-# single certificate misread as the registry's (corrected 0.36.2).
+# single certificate misread as the registry's (corrected 0.36.2). Measured
+# with the inspection off: the registry's chain is complete and certifi
+# verifies it (0.36.3).
 registry = ["eidr[client]>=1.2.0", "truststore>=0.9"]
 # Test runner. eidr-core's own test suite is deliberately thin — spec-driven
 # modules are verified by the siblings' conformance tests (CLAUDE.md) — but

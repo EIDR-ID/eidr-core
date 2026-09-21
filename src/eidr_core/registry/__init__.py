@@ -329,9 +329,10 @@ def get_registry_client(
             and system trust passes. CORRECTION: 0.36.0/0.36.1 said here
             that "the registry does not serve its full intermediate
             chain" (python-sdk Finding 4). That was the same single
-            certificate read as the registry's; nothing about EIDR's
-            real chain can be measured from behind the inspection, and
-            nothing here should be taken as a registry defect. The
+            certificate read as the registry's. With the inspection
+            switched off the same day, every EIDR host sent a complete
+            three-certificate chain (Amazon RSA 2048 M01) and certifi
+            alone verified all five: there is no registry defect. The
             default is right for the general reason: a consumer behind
             ANY TLS inspection needs the OS store. Ruled into THIS
             factory rather than each

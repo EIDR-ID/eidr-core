@@ -49,7 +49,7 @@
     ]
   },
   "expected": {
-    "spec_version": "2.12.0",
+    "spec_version": "2.13.0",
     "confidence": 30.0,
     "verdict": "Review",
     "field_qualities": {

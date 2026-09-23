@@ -1,0 +1,91 @@
+{
+  "id": "inherited-date-mismatch-does-not-eliminate",
+  "added": "2026-09-21",
+  "why": "T3 (compare-spec 2.13.0). The submitted Episode carries its SERIES' release year, inherited when the registry built its full record (provenance ReleaseDate: inherited), and the candidate -- same parent, same distribution number, same title, director and length -- has its own air date four years later. A series' date on an episode says nothing about WHICH episode it is, so the mismatch must not eliminate the candidate (operator rule, CLAUDE.md Future work 2): the field leaves the denominator and the pair scores on what the episode itself asserts. Before 2.13.0 the same pair scored 57.9 Review on a date that was never the episode's. score_min 90 pins the exemption: a scorer that still penalises an inherited mismatch cannot reach it. The `provenance` block is the shared builder's map, added to the fixture format in the same cycle.",
+  "submitted": {
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-0011-0000-X",
+    "distribution_number": "7",
+    "titles": [
+      {
+        "text": "Home Again",
+        "lang": "en",
+        "is_resource": true,
+        "system_generated": false
+      }
+    ],
+    "release_date": "1999",
+    "length_minutes": "44",
+    "directors": [
+      "Ann Lee"
+    ],
+    "countries": [
+      "US"
+    ],
+    "provenance": {
+      "ReleaseDate": "inherited"
+    }
+  },
+  "candidate": {
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-0011-0000-X",
+    "distribution_number": "7",
+    "titles": [
+      {
+        "text": "Home Again",
+        "lang": "en",
+        "is_resource": true,
+        "system_generated": false
+      }
+    ],
+    "release_date": "2003-04-02",
+    "length_minutes": "44",
+    "directors": [
+      "Ann Lee"
+    ],
+    "countries": [
+      "US"
+    ],
+    "eidr_id": "10.5240/FEED-0000-0000-0014-0000-B"
+  },
+  "invariants": {
+    "verdict_in": [
+      "Accept"
+    ],
+    "score_min": 90
+  },
+  "expected": {
+    "spec_version": "2.13.0",
+    "confidence": 100.0,
+    "verdict": "Accept",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": null,
+      "distribution_number": 1.0,
+      "length": 1.0,
+      "house_sequence": null,
+      "time_slot": null,
+      "director": 1.0,
+      "actor": null,
+      "assoc_org": null,
+      "original_language": null,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "neutral",
+      "episode_distribution_number": "identical",
+      "duration": "identical",
+      "episode_house_sequence": "neutral",
+      "episode_time_slot": "neutral",
+      "director": "identical",
+      "actor": "neutral",
+      "associated_org": "neutral",
+      "original_language": "neutral",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

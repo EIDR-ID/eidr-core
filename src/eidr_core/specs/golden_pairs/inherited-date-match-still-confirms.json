@@ -1,0 +1,93 @@
+{
+  "id": "inherited-date-match-still-confirms",
+  "added": "2026-09-21",
+  "why": "T3's other half: an inherited value that MATCHES may still confirm. The same pair with the inherited date agreeing. field_quality_min release_date 0.9 pins that the field is COUNTED (a dropped field reports null quality, which fails the bound), so an implementation that exempts every inherited field regardless of agreement -- simpler, and wrong -- fails here while passing the mismatch pair.",
+  "submitted": {
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-0011-0000-X",
+    "distribution_number": "7",
+    "titles": [
+      {
+        "text": "Home Again",
+        "lang": "en",
+        "is_resource": true,
+        "system_generated": false
+      }
+    ],
+    "release_date": "2003-04-02",
+    "length_minutes": "44",
+    "directors": [
+      "Ann Lee"
+    ],
+    "countries": [
+      "US"
+    ],
+    "provenance": {
+      "ReleaseDate": "inherited"
+    }
+  },
+  "candidate": {
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-0011-0000-X",
+    "distribution_number": "7",
+    "titles": [
+      {
+        "text": "Home Again",
+        "lang": "en",
+        "is_resource": true,
+        "system_generated": false
+      }
+    ],
+    "release_date": "2003-04-02",
+    "length_minutes": "44",
+    "directors": [
+      "Ann Lee"
+    ],
+    "countries": [
+      "US"
+    ],
+    "eidr_id": "10.5240/FEED-0000-0000-0014-0000-B"
+  },
+  "invariants": {
+    "verdict_in": [
+      "Accept"
+    ],
+    "field_quality_min": {
+      "release_date": 0.9
+    }
+  },
+  "expected": {
+    "spec_version": "2.13.0",
+    "confidence": 100.0,
+    "verdict": "Accept",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 1.0,
+      "distribution_number": 1.0,
+      "length": 1.0,
+      "house_sequence": null,
+      "time_slot": null,
+      "director": 1.0,
+      "actor": null,
+      "assoc_org": null,
+      "original_language": null,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "identical",
+      "episode_distribution_number": "identical",
+      "duration": "identical",
+      "episode_house_sequence": "neutral",
+      "episode_time_slot": "neutral",
+      "director": "identical",
+      "actor": "neutral",
+      "associated_org": "neutral",
+      "original_language": "neutral",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

@@ -1,19 +1,20 @@
 {
-  "id": "episode-part-number-one-sided",
-  "added": "2026-09-16",
-  "why": "A part number on ONE side only, bases agreeing: 'The Trial Part 1' against 'The Trial'. The un-numbered title may be any one part or all parts combined -- 'you can't be sure which part' (operator, 2026-09-01) -- so this is neither a match nor a conflict, and it must never reach Accept on the title. Everything else here is identical AND the pair shares an identity Alt ID, which is the point: before 0.26.0 the title scored 1.000 and the Alt-ID bonus could carry the pair over 80. Now the comparator scores 0.70, cmp_titles sets meta part_ambiguous, and the scorer caps at REVIEW_TOP on it. verdict_not_in Accept pins the CAP, which is the part a value could not.",
+  "id": "system-title-mismatch-does-not-eliminate",
+  "added": "2026-09-21",
+  "why": "System-generated titles count as inherited (operator rule). A Season or Episode registered without a supplied title carries one the registry built from its parent -- 'The Series: Season 1, Episode 7' -- which no real episode title will match. Since 0.19.0 a one-sided system-generated title is COMPARED (0.45 here), and before 2.13.0 that comparison dragged this pair, identical on parent, number, date, length and director, to 53.2 Review. With T3 the title leaves the denominator; the pair then rests at 79.0 Review under the standing rule that a pair with no title evidence never auto-accepts -- held for a human, not eliminated, which is exactly the rule. score_min 70 pins the exemption; verdict_not_in Accept pins that it does not overreach into an auto-match on a title the record never asserted.",
   "submitted": {
     "creation_type": "Episode",
     "parent_id": "10.5240/FEED-0000-0000-0011-0000-X",
     "distribution_number": "7",
     "titles": [
       {
-        "text": "The Trial Part 1",
+        "text": "The Series: Season 1, Episode 7",
         "lang": "en",
-        "is_resource": true
+        "is_resource": true,
+        "system_generated": true
       }
     ],
-    "release_date": "2019-04-02",
+    "release_date": "2003-04-02",
     "length_minutes": "44",
     "directors": [
       "Ann Lee"
@@ -21,27 +22,23 @@
     "countries": [
       "US"
     ],
-    "alt_ids": [
-      {
-        "value": "tt7001",
-        "id_type": "IMDB",
-        "relation": "IsSameAs"
-      }
-    ]
+    "provenance": {
+      "ResourceName": "system"
+    }
   },
   "candidate": {
-    "eidr_id": "10.5240/FEED-0000-0000-0014-0000-B",
     "creation_type": "Episode",
     "parent_id": "10.5240/FEED-0000-0000-0011-0000-X",
     "distribution_number": "7",
     "titles": [
       {
-        "text": "The Trial",
+        "text": "The Long Goodbye",
         "lang": "en",
-        "is_resource": true
+        "is_resource": true,
+        "system_generated": false
       }
     ],
-    "release_date": "2019-04-02",
+    "release_date": "2003-04-02",
     "length_minutes": "44",
     "directors": [
       "Ann Lee"
@@ -49,28 +46,21 @@
     "countries": [
       "US"
     ],
-    "alt_ids": [
-      {
-        "value": "tt7001",
-        "id_type": "IMDB",
-        "relation": "IsSameAs"
-      }
-    ]
+    "eidr_id": "10.5240/FEED-0000-0000-0014-0000-B"
   },
   "invariants": {
+    "score_min": 70,
     "verdict_not_in": [
-      "Accept"
-    ],
-    "field_quality_max": {
-      "title": 0.85
-    }
+      "Accept",
+      "Reject"
+    ]
   },
   "expected": {
     "spec_version": "2.13.0",
     "confidence": 79.0,
     "verdict": "Review",
     "field_qualities": {
-      "title": 0.7,
+      "title": null,
       "release_date": 1.0,
       "distribution_number": 1.0,
       "length": 1.0,
@@ -81,7 +71,7 @@
       "assoc_org": null,
       "original_language": null,
       "version_language": null,
-      "alt_id": 1.0
+      "alt_id": null
     },
     "field_states": {
       "titles": "neutral",
@@ -95,7 +85,7 @@
       "associated_org": "neutral",
       "original_language": "neutral",
       "version_language": "neutral",
-      "alternate_id": "identical"
+      "alternate_id": "neutral"
     },
     "alt_id_conflicts": 0
   }

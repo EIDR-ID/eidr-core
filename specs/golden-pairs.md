@@ -70,6 +70,20 @@ confirms No Match, and the match stays in the registry.
   the absent-info branch and `edit-info-absent-holds-for-review` would have
   **passed for the wrong reason** — the exact failure §6 exists to prevent.
   A conforming JavaScript loader has the same obligation.
+* **Records may carry a `provenance` map where the lesson needs it**
+  (2.13.0, 2026-09-23): `"provenance": {"<EIDR field>": "self" | "inherited"
+  | "system"}` -- the shared builder's map, which the loader sets on the
+  attribute `eidr_core.inheritance.provenance()` reads. The
+  inherited-vs-self-defined asymmetry (an inherited value that mismatches
+  must not eliminate; system-generated titles count as inherited) cannot be
+  pinned by any fixture without it. A loader that ignores the block makes
+  the two mismatch pairs (`inherited-date-mismatch-does-not-eliminate`,
+  `system-title-mismatch-does-not-eliminate`) FAIL LOUDLY -- 57.9 and 53.2
+  against `score_min` 90 / 70 -- rather than pass; and
+  `inherited-date-match-still-confirms` exists so a loader that exempts
+  everything inherited fails too. A record with no map is self-asserted
+  throughout: unknown never earns the exemption. A conforming JavaScript
+  loader has the same obligation.
 * **A `mode` the evaluator does not yet implement must fail LOUDLY**, naming
   what it waits for, rather than being absent. (`recovery_pool` raised
   `NotImplementedError` for the one day between ratification and its first

@@ -1,4 +1,4 @@
-# AltIDTool Input File Format (SPEC v1.1)
+# AltIDTool Input File Format (SPEC v1.2)
 
 **Status:** landed 2026-08-04 (register R9 / Phase 3 item 3). The reference
 implementation is **`eidr_core.altidtool_io`** (`format_line` / `write_lines`
@@ -51,6 +51,47 @@ lines and lines starting with `//` are comments.
 removal, comment); `parse_line` stays strict so a feed generator can never
 produce a removal by accident. Added so that the tools can vendor this
 module (`specs/vendoring.md`) without losing their removal path.
+
+## Identity, relation and what "already on the record" means (v1.2, 2026-09-23)
+
+Stated by the operator for IMDb on 2026-09-23 and generalised here because the
+shape is the same for every external identifier scheme; the rules are what a
+producer or reader must hold to reason correctly, and each has already cost a
+consumer a wrong answer.
+
+1. **An identity claim is `IsSameAs` OR an absent relation.** Required Data
+   Fields v1.15: a blank Relation reads as `IsSameAs`. The two are one class
+   for every counting and lookup purpose. A reader that tests the literal
+   string alone undercounts identity claims by ~70% (403,410 of 579,621 IMDb
+   links carry no relation; eidr-imdb's crosswalk did this, 2026-09-23).
+   **In the mirror an absent relation is stored as `NULL` since 2026-09-23;
+   before that day it was the empty string**, so a predicate must admit
+   `NULL`, `''` and `'IsSameAs'` alike — every one of
+   `relation IS NULL OR relation = 'IsSameAs'`'s consumers (BMR-Review,
+   eidr-dq, BMRtoAltID) was seeing 30% of the links until the repair.
+2. **Identity is many-to-one from the external ID to EIDR, never
+   one-to-many.** One external identifier names one thing; at most one EIDR
+   record may claim it as identity. Several records claiming one identifier
+   under `IsSameAs` is the defect the contested batches repair.
+3. **`Deprecated` and `Duplicate` are unbounded and are not identity.** They
+   coexist with an identity claim on the same record legitimately (543 IMDb
+   records do). A validator enforcing "one identifier per record" flags them
+   all wrongly.
+4. **Containment and derivation relations (`IsEntirelyContainedBy`,
+   `ContainsAllOf`, `IsDerivedFrom`, ...) are legitimate, are other tools' to
+   create, and are every producer's to tolerate and never to invent.** A
+   second record referencing the identifier under one of these is not a
+   rule-2 violation.
+5. **"Already on the target record" is Kind + value + relation** (operator
+   rule 7, 2026-09-21). Presence is Kind `(Type, Domain)` + value under ANY
+   relation; what a producer does with it depends on the relation: the same
+   relation → nothing to write; a different relation → a finding for human
+   reconciliation, per Alt ID, and never a second line for the same value.
+   Producers implementing it: BMRtoAltID (`ALT_ID_RELATION_CONFLICT`),
+   eidr-wikidata (`relation_conflict`).
+6. **A second `IsSameAs` of one Kind with a DIFFERENT value contradicts the
+   first** (eidr-wikidata, 2026-08-09; ruled portfolio-wide 2026-09-23 for the
+   merge engine): withheld and reported, never written.
 
 ## For consumers/readers
 

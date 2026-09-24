@@ -1,0 +1,59 @@
+{
+  "id": "recovered-review-band-find-is-reviewed",
+  "added": "2026-09-24",
+  "mode": "case",
+  "creation_type": "Basic",
+  "tamr_kind": "NOMATCH",
+  "why": "A NOMATCH row carries candidates only when registry-search recovery supplied them, and a recovered candidate that scores in the REVIEW band must reach a reviewer -- it must not close the row as a terminal no-match. The verdict layer's NOMATCH branch had an Accept case ('Disagree: Tamr missed') and a terminal case and nothing between them, so from 2026-08-22 to 2026-09-24 every Review-band find was discarded with the note 'N candidate(s) scored, none credible' and nobody saw it. BMRtoAltID's first batch (731 rows, every one of them reaching recovery because nothing is asserted) exposed it: 88 rows closed as no-match, and on 83 of them the discarded candidate was the very record the row's own Alt IDs resolve to -- a mini-series held Series<->Basic at 79.0, a film with a matching identity Alt ID and an eight-year date gap at 70-75.\n\nThis case: same title, eight years apart, different director, no Alt IDs -- about 76, squarely Review. Mutation-tested: with the Review case removed from the NOMATCH branch the assessment is 'Agree: no match' and the fixture fails on assessment_in, proposed_id_is and clears_without_review together.\n\nSCOPE: pins that a Review-band recovered find is REVIEWED. It says nothing about the Reject band below NOMATCH_REVIEW_FLOOR, which the two shortlist branches surface and this branch deliberately does not (the recovery pool is a trigram net, not a vendor shortlist).",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Stolen",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2003",
+    "length_minutes": 95,
+    "directors": [
+      "Ann Lee"
+    ]
+  },
+  "candidates": [
+    {
+      "creation_type": "Basic",
+      "titles": [
+        {
+          "text": "Stolen",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2011",
+      "length_minutes": 95,
+      "directors": [
+        "Bob Roe"
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0005-K"
+    }
+  ],
+  "invariants": {
+    "assessment_in": [
+      "Review"
+    ],
+    "proposed_id_is": "10.5240/FEED-0001-0002-0003-0005-K",
+    "clears_without_review": false,
+    "notes_not_match": [
+      "none credible"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.13.0",
+    "assessment": "Review",
+    "proposed_id": "10.5240/FEED-0001-0002-0003-0005-K",
+    "confidence": 67.2,
+    "clears_without_review": false,
+    "notes": []
+  }
+}

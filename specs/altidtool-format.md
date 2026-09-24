@@ -1,4 +1,4 @@
-# AltIDTool Input File Format (SPEC v1.2)
+# AltIDTool Input File Format (SPEC v1.3)
 
 **Status:** landed 2026-08-04 (register R9 / Phase 3 item 3). The reference
 implementation is **`eidr_core.altidtool_io`** (`format_line` / `write_lines`
@@ -89,9 +89,26 @@ consumer a wrong answer.
    reconciliation, per Alt ID, and never a second line for the same value.
    Producers implementing it: BMRtoAltID (`ALT_ID_RELATION_CONFLICT`),
    eidr-wikidata (`relation_conflict`).
-6. **A second `IsSameAs` of one Kind with a DIFFERENT value contradicts the
-   first** (eidr-wikidata, 2026-08-09; ruled portfolio-wide 2026-09-23 for the
-   merge engine): withheld and reported, never written.
+6. **A second `IsSameAs` of one SINGLE-FORM Kind with a DIFFERENT value
+   contradicts the first** (eidr-wikidata, 2026-08-09; ruled portfolio-wide
+   2026-09-23 for the merge engine; **scope narrowed 2026-09-24**): withheld
+   and reported, never written. *Single-form* means the Kind admits one
+   identifier form: every named type (`IMDB`, `ISAN`, ...), and a Proprietary
+   Kind to which exactly one `uri_mapping.json` entry collapses. A Kind to
+   which SEVERAL entries collapse is **multi-form** and legitimately carries
+   one identity value per form -- `trakt.tv` holds a numeric ID (entry
+   `trakt.tv`) AND a slug (entry `trakt.tv/movies`, collapsed to the bare
+   domain with the path in the value); likewise `cinematografo.it`,
+   `disneyplus.com`, `fandom.com`. Rule 6 does not fire on a multi-form Kind.
+   Measured by BMRtoAltID on eidr-wikidata's sheet 029: 2,741 of 5,000 rows
+   carry two identity values of one Kind, 2,657 of them `trakt.tv`; and
+   eidr-wikidata's own writer had withheld 133,223 `trakt.tv` proposals as
+   conflicts under the unnarrowed rule. A single-form Kind with two values
+   (`dvdcompare.net` 441 rows, `kinobox.cz`, `youtube.com`) IS a rule-6 case:
+   the source lists two, the registry may hold one as identity, a human
+   decides. The form is not recoverable from a stored value, so consumers
+   derive the multi-form set from `uri_mapping.json` (eidr-wikidata
+   `DomainMapper.multi_form_domains()` is the reference).
 
 ## For consumers/readers
 

@@ -74,7 +74,7 @@
     },
     "field_states": {
       "titles": "identical",
-      "release_date": "neutral",
+      "release_date": "mismatch",
       "episode_distribution_number": "identical",
       "duration": "identical",
       "episode_house_sequence": "neutral",

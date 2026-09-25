@@ -2,7 +2,7 @@
 
 **Status:** all three modes LANDED — `pair` 2026-07-29; `case` ratified 2026-09-10 (S-26),
 evaluator 2026-09-11; `recovery_pool` ratified 2026-09-10 (S-9), first captured instance and
-evaluator 2026-09-11 (BMR-Review T17). Corpus: 17 `pair`, 4 `case`, 1 `recovery_pool` (22).
+evaluator 2026-09-11 (BMR-Review T17). Corpus: 20 `pair`, 5 `case`, 1 `recovery_pool` (26) at compare-spec 2.14.0.
 **Owner of the format:** eidr-core. **Owner of the evaluator:** BMR-Review
 (`eidr_dedup_score/golden.py`). **Conforming implementation:** De-Dupe UI,
 in JavaScript, with no database.
@@ -111,7 +111,13 @@ confirms No Match, and the match stays in the registry.
 
 Invariant vocabulary: `verdict_in`, `verdict_not_in`, `score_min`,
 `score_max`, `field_quality_min {field: q}`, `field_quality_max {field: q}`,
-`alt_id_conflicts_min`. Prefer `verdict_not_in` over `verdict_in` and a
+`alt_id_conflicts_min`. `expected.field_qualities` holds the engine's **counted**
+qualities: `null` on a field that left the denominator (not applicable). That is
+deliberately NOT the payload's post-0.38.0 semantics, where the glyph bands on
+the quality whatever `applicable` says: `inherited-date-match-still-confirms` can
+only pin "a matching inherited field is counted" because a dropped field reads
+`null` here and fails its `field_quality_min`. Do not align the two blocks.
+Prefer `verdict_not_in` over `verdict_in` and a
 `field_quality_max` over a pinned value: **a property survives a retune, a
 value must be re-approved at each one.**
 

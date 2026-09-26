@@ -1,0 +1,92 @@
+{
+  "id": "tie-break-identical-evidence-falls-back-to-id",
+  "added": "2026-09-26",
+  "mode": "case",
+  "creation_type": "Basic",
+  "tamr_kind": "CANDIDATES",
+  "why": "The other direction of the tie-break (golden-pairs.md section 6 rule 2): when two candidates are identical on EVERY evidence term -- confidence, raw score, identity Alt-ID matches, Alt-ID conflicts -- the order must still be total, so the lower id is proposed, whatever order the candidates arrived in. Before 2026-09-25 the arrival order decided, and BMR-Review measured what that costs: re-running one 731-row batch against the same mirror a day apart changed the proposal between exact-tie duplicates on 5 rows (and the candidate LIST on 327, fixed separately by ordering every capped pool query).\n\nThis case: two candidates with identical metadata and no Alt IDs, listed in REVERSE id order. Mutation-tested 2026-09-26: fails under a confidence-only (arrival-order) key; passes under any key that ends in the id, which is the property it pins.\n\nSCOPE: determinism of the proposal among fully tied candidates. Which evidence outranks which is the sibling fixture's job (tie-break-evidence-decides-between-duplicates).",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Quiet Harbor",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1994-09-23",
+    "directors": [
+      "Frank Darabont"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "length_minutes": "142"
+  },
+  "candidates": [
+    {
+      "creation_type": "Basic",
+      "titles": [
+        {
+          "text": "Quiet Harbor",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "1994-09-23",
+      "directors": [
+        "Frank Darabont"
+      ],
+      "countries": [
+        "US"
+      ],
+      "original_languages": [
+        "en"
+      ],
+      "length_minutes": "142",
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0009-D"
+    },
+    {
+      "creation_type": "Basic",
+      "titles": [
+        {
+          "text": "Quiet Harbor",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "1994-09-23",
+      "directors": [
+        "Frank Darabont"
+      ],
+      "countries": [
+        "US"
+      ],
+      "original_languages": [
+        "en"
+      ],
+      "length_minutes": "142",
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0008-C"
+    }
+  ],
+  "invariants": {
+    "proposed_id_is": "10.5240/FEED-0001-0002-0003-0008-C",
+    "clears_without_review": false,
+    "notes_match": [
+      "registry duplicates"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.15.0",
+    "assessment": "Review",
+    "proposed_id": "10.5240/FEED-0001-0002-0003-0008-C",
+    "confidence": 100.0,
+    "clears_without_review": false,
+    "notes": [
+      "2 candidates score Accept: likely registry duplicates of each other -- merge review, not a pick"
+    ]
+  }
+}

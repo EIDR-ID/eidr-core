@@ -50,7 +50,7 @@
     "score_max": 20.0
   },
   "expected": {
-    "spec_version": "2.14.0",
+    "spec_version": "2.15.0",
     "confidence": 10.7,
     "verdict": "Reject",
     "field_qualities": {

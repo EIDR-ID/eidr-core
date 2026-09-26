@@ -1,0 +1,105 @@
+{
+  "id": "tie-break-evidence-decides-between-duplicates",
+  "added": "2026-09-26",
+  "mode": "case",
+  "creation_type": "Basic",
+  "tamr_kind": "NOMATCH",
+  "why": "Two registry duplicates both sit at the 100 cap, and the engine must propose the one the SUBMISSION's own identity Alt ID points at. Until 2026-09-25 candidates were sorted by confidence alone with a stable sort, so among equal scores the ARRIVAL order decided; it was right by accident, because recovery seeds Alt-ID matches into the pool first. The obvious deterministic fix, breaking ties by id, was measured before it shipped and moved the proposal AWAY from the Alt-ID-linked duplicate on 20 of BMRtoAltID's 731 rows. The rule order had been standing in for is corroboration: confidence, then raw score, then identity Alt-ID matches, then fewer Alt-ID conflicts, then the id (BMR-Review `report._rank_key`, BMR-20260925-1).\n\nThis case: identical metadata on both candidates, so confidence (100) and raw score (100) tie exactly; only the second-listed, HIGHER-id candidate shares the submission's IMDb identity. Arrival order and id order therefore both pick the wrong record. Mutation-tested 2026-09-26: the proposal moves to the other duplicate under a confidence-only key, under a confidence-then-id key, and under the full key with the Alt-ID-match term removed -- so the fixture pins that term, not merely determinism.\n\nSCOPE: the ORDER among equal scores and therefore which record is proposed. It does not pin the assessment label for duplicate Accepts (that is the controversial path, covered elsewhere), only that the row reaches a reviewer and says why. Requested by De-Dupe UI as S-30: before this pair, a JavaScript engine with no tie-break at all passed the whole corpus.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Quiet Harbor",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1994-09-23",
+    "directors": [
+      "Frank Darabont"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "length_minutes": "142",
+    "alt_ids": [
+      {
+        "value": "tt0111161",
+        "id_type": "IMDB"
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "creation_type": "Basic",
+      "titles": [
+        {
+          "text": "Quiet Harbor",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "1994-09-23",
+      "directors": [
+        "Frank Darabont"
+      ],
+      "countries": [
+        "US"
+      ],
+      "original_languages": [
+        "en"
+      ],
+      "length_minutes": "142",
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0006-A"
+    },
+    {
+      "creation_type": "Basic",
+      "titles": [
+        {
+          "text": "Quiet Harbor",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "1994-09-23",
+      "directors": [
+        "Frank Darabont"
+      ],
+      "countries": [
+        "US"
+      ],
+      "original_languages": [
+        "en"
+      ],
+      "length_minutes": "142",
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0007-B",
+      "alt_ids": [
+        {
+          "value": "tt0111161",
+          "id_type": "IMDB"
+        }
+      ]
+    }
+  ],
+  "invariants": {
+    "proposed_id_is": "10.5240/FEED-0001-0002-0003-0007-B",
+    "clears_without_review": false,
+    "notes_match": [
+      "registry duplicates"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.15.0",
+    "assessment": "Disagree: Tamr missed",
+    "proposed_id": "10.5240/FEED-0001-0002-0003-0007-B",
+    "confidence": 100.0,
+    "clears_without_review": false,
+    "notes": [
+      "alt-id match: +8.0",
+      "2 candidates score Accept: likely registry duplicates of each other -- merge review, not a pick"
+    ]
+  }
+}

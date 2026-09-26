@@ -2,7 +2,7 @@
 
 **Status:** all three modes LANDED — `pair` 2026-07-29; `case` ratified 2026-09-10 (S-26),
 evaluator 2026-09-11; `recovery_pool` ratified 2026-09-10 (S-9), first captured instance and
-evaluator 2026-09-11 (BMR-Review T17). Corpus: 20 `pair`, 5 `case`, 1 `recovery_pool` (26) at compare-spec 2.14.0.
+evaluator 2026-09-11 (BMR-Review T17). Corpus: 20 `pair`, 7 `case`, 1 `recovery_pool` (28) at compare-spec 2.15.0.
 **Owner of the format:** eidr-core. **Owner of the evaluator:** BMR-Review
 (`eidr_dedup_score/golden.py`). **Conforming implementation:** De-Dupe UI,
 in JavaScript, with no database.
@@ -311,3 +311,13 @@ own bump, its own fixtures, and an ENGINE_SYNC handoff naming the corpus
 *content* that changed — not just the count. Two pairs were replaced and an
 invariant added on 2026-09-08 while the count stayed at 14 and the summary
 said "regenerated: no"; that is the failure this paragraph exists to prevent.
+
+**An ORDER change among equal scores is reviewer-visible** (it decides which
+record is proposed; S-4) **and becomes a rule change the moment a fixture pins
+it** (ruled 2026-09-26, BMR-20260925-1 / De-Dupe UI S-30). BMR-Review's
+evidence-first tie-break moved no verdict and no existing fixture, so on its own
+there was nothing for a stamp to distinguish; but a behaviour the corpus cannot
+see is a behaviour a second engine need not have, so the two fixtures that pin it
+landed with it, and the version moved with the fixtures (2.15.0). Test for any
+future change: if reverting it would leave the whole corpus green, add the
+fixture before deciding the bump.

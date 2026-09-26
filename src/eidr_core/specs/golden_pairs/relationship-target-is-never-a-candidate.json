@@ -1,0 +1,79 @@
+{
+  "id": "relationship-target-is-never-a-candidate",
+  "added": "2026-09-26",
+  "mode": "case",
+  "creation_type": "Basic",
+  "tamr_kind": "AUTO",
+  "why": "Operator ruling, 2026-09-26 (compare-spec 2.16.0): a record the submission TARGETS by a Compilation, Composite or Lightweight relationship -- the film a trailer promotes, an entry of a compilation -- is related to it by assertion and is never its duplicate. Excluded from EVERY comparison, not only cross-type ones, and before scoring. Here the vendor auto-matched the submission to the very record it targets, and the two agree on every field: without the exclusion this is a clean Agree at 100. With it, the vendor's match reads as no match and a reviewer confirms. New fixture field: `related_targets` on the submitted record, `[[eidr_id, kind]]`.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Stolen",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2003",
+    "length_minutes": 95,
+    "directors": [
+      "Ann Lee"
+    ],
+    "alt_ids": [
+      {
+        "value": "tt0777777",
+        "id_type": "IMDB",
+        "relation": "IsSameAs"
+      }
+    ],
+    "related_targets": [
+      [
+        "10.5240/FEED-0001-0002-0003-0005-K",
+        "Lightweight"
+      ]
+    ]
+  },
+  "candidates": [
+    {
+      "creation_type": "Basic",
+      "titles": [
+        {
+          "text": "Stolen",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2003",
+      "length_minutes": 95,
+      "directors": [
+        "Ann Lee"
+      ],
+      "alt_ids": [
+        {
+          "value": "tt0777777",
+          "id_type": "IMDB",
+          "relation": "IsSameAs"
+        }
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0005-K"
+    }
+  ],
+  "invariants": {
+    "assessment_not_in": [
+      "Agree"
+    ],
+    "notes_match": [
+      "explicit relationship"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.16.0",
+    "assessment": "Disagree: no match",
+    "proposed_id": "NO MATCH",
+    "confidence": 0.0,
+    "clears_without_review": false,
+    "notes": [
+      "1 candidate(s) excluded: the submission targets them by an explicit relationship (10.5240/FEED-0001-0002-0003-0005-K Lightweight), so they are related, never duplicates"
+    ]
+  }
+}

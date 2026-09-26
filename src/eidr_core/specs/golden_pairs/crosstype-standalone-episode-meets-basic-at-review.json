@@ -1,0 +1,89 @@
+{
+  "id": "crosstype-standalone-episode-meets-basic-at-review",
+  "added": "2026-09-26",
+  "why": "Operator cross-type rules, 2026-09-26: an Episode with a USER-SUPPLIED title whose episode class is Pilot, Special or Standalone is a candidate for a Basic record, and every cross-type pair is scored on the Basic profile and forced to Review -- never auto-matched. This is the theatrical-short-vs-registry-Episode shape: a cartoon released theatrically and registered as an episode of a shorts collection. Pins BOTH halves: eligible (confidence at or above the Review floor) and capped (never Accept, even with every field agreeing). Pair with crosstype-related-altid-review-ceiling, which is the same pair without the class and must stay ineligible; a gate that ignores episode class passes one of them and fails the other.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Little Red Rodent Hood",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1952",
+    "length_minutes": "7",
+    "directors": [
+      "Friz Freleng"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": []
+  },
+  "candidate": {
+    "eidr_id": "10.5240/FEED-0000-0000-0009-0000-Q",
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-0009-0001-O",
+    "titles": [
+      {
+        "text": "Little Red Rodent Hood",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1952",
+    "length_minutes": "7",
+    "distribution_number": "12",
+    "directors": [
+      "Friz Freleng"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": [],
+    "episode_class": "Standalone"
+  },
+  "invariants": {
+    "verdict_in": [
+      "Review"
+    ],
+    "score_min": 30.0
+  },
+  "expected": {
+    "spec_version": "2.16.0",
+    "confidence": 79.0,
+    "verdict": "Review",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 1.0,
+      "director": 1.0,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": 1.0,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "identical",
+      "director": "identical",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "identical",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

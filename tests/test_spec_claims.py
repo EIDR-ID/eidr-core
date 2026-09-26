@@ -160,8 +160,11 @@ def test_every_numeric_value_the_prose_claims_matches_the_spec():
 
 _MEMBERSHIP_CLAIMS = [
     # (constant, member, where the prose says it)
-    ("ALWAYS_APPLICABLE", "release_date",
-     "compare-spec.md: 'ALWAYS_APPLICABLE keeps release_date in regardless'"),
+    # ALWAYS_APPLICABLE / release_date was the first row; the claim became
+    # false by ruling at 2.16.0 (a one-sided release date stopped penalising)
+    # and the prose was corrected in the same commit.
+    ("GATE_EDIT_SPLIT_CLASSES", "split",
+     "compare-spec.md: 'its class is in GATE_EDIT_SPLIT_CLASSES (split)'"),
 ]
 
 

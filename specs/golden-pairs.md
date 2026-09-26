@@ -2,7 +2,7 @@
 
 **Status:** all three modes LANDED — `pair` 2026-07-29; `case` ratified 2026-09-10 (S-26),
 evaluator 2026-09-11; `recovery_pool` ratified 2026-09-10 (S-9), first captured instance and
-evaluator 2026-09-11 (BMR-Review T17). Corpus: 20 `pair`, 7 `case`, 1 `recovery_pool` (28) at compare-spec 2.15.0.
+evaluator 2026-09-11 (BMR-Review T17). Corpus: 21 `pair`, 10 `case`, 1 `recovery_pool` (32) at compare-spec 2.16.0.
 **Owner of the format:** eidr-core. **Owner of the evaluator:** BMR-Review
 (`eidr_dedup_score/golden.py`). **Conforming implementation:** De-Dupe UI,
 in JavaScript, with no database.
@@ -84,6 +84,12 @@ confirms No Match, and the match stays in the registry.
   everything inherited fails too. A record with no map is self-asserted
   throughout: unknown never earns the exemption. A conforming JavaScript
   loader has the same obligation.
+* **A submitted record may carry `related_targets`** (2.16.0, 2026-09-26):
+  `[[eidr_id, kind]]`, kind `Compilation` | `Composite` | `Lightweight` --
+  the records it TARGETS by an explicit relationship, which are excluded from
+  every comparison before scoring (`relationship-target-is-never-a-candidate`).
+  A loader that ignores the field makes that fixture fail loudly (the vendor's
+  match to the target reads `Agree` at 100), not pass.
 * **A `mode` the evaluator does not yet implement must fail LOUDLY**, naming
   what it waits for, rather than being absent. (`recovery_pool` raised
   `NotImplementedError` for the one day between ratification and its first

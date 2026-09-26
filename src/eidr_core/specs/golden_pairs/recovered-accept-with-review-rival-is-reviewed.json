@@ -1,0 +1,106 @@
+{
+  "id": "recovered-accept-with-review-rival-is-reviewed",
+  "added": "2026-09-26",
+  "mode": "case",
+  "creation_type": "Basic",
+  "tamr_kind": "NOMATCH",
+  "why": "The recovered sole-Accept rule (compare-spec 2.16.0) is deliberately STRICTER than the shortlist branch's weak-rival exception: the operator's words are 'on its own or accompanied only by Rejects', and the recovery pool is a trigram net rather than a vendor shortlist, so ANY Review-band rival -- however weak -- keeps the row with a reviewer. An implementation that reuses the shortlist branch's weak-rival test (rivals at or below 45 do not count) would clear this row, because the rival here scores about 39, below that exception's 45; this fixture refuses it.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Stolen",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2003",
+    "length_minutes": 95,
+    "directors": [
+      "Ann Lee"
+    ],
+    "alt_ids": [
+      {
+        "value": "tt0777777",
+        "id_type": "IMDB",
+        "relation": "IsSameAs"
+      }
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ]
+  },
+  "candidates": [
+    {
+      "creation_type": "Basic",
+      "titles": [
+        {
+          "text": "Stolen",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2003",
+      "length_minutes": 95,
+      "directors": [
+        "Ann Lee"
+      ],
+      "alt_ids": [
+        {
+          "value": "tt0777777",
+          "id_type": "IMDB",
+          "relation": "IsSameAs"
+        }
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0005-K",
+      "countries": [
+        "US"
+      ],
+      "original_languages": [
+        "en"
+      ]
+    },
+    {
+      "creation_type": "Basic",
+      "titles": [
+        {
+          "text": "Stone",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "1995",
+      "length_minutes": 95,
+      "directors": [
+        "Zed Q"
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0007-G",
+      "countries": [
+        "US"
+      ],
+      "original_languages": [
+        "en"
+      ]
+    }
+  ],
+  "invariants": {
+    "assessment_in": [
+      "Disagree: Tamr missed"
+    ],
+    "proposed_id_is": "10.5240/FEED-0001-0002-0003-0005-K",
+    "clears_without_review": false
+  },
+  "expected": {
+    "spec_version": "2.16.0",
+    "assessment": "Disagree: Tamr missed",
+    "proposed_id": "10.5240/FEED-0001-0002-0003-0005-K",
+    "confidence": 100.0,
+    "clears_without_review": false,
+    "notes": [
+      "alt-id match: +8.0"
+    ]
+  }
+}

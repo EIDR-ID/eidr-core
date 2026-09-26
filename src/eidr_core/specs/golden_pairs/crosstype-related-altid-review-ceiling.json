@@ -1,7 +1,7 @@
 {
   "id": "crosstype-related-altid-review-ceiling",
   "added": "2026-09-04",
-  "why": "Identity and RELATEDNESS are different questions. A shared Alt ID whose relation is IsDerivedFrom says the identifier names a DIFFERENT work, so it is not evidence the two records are the same and must never carry a cross-type pair to Accept. But it IS evidence they are ABOUT each other, so when other metadata already agrees the pair is lifted into Review for a human rather than discarded. This is the theatrical-short-vs-registry-Episode shape: seven NE4 rows regressed to a terminal no-match when eidr-core 0.22.0 made matches identity-only, and human review had confirmed every one as a match. The floor can only raise a score INTO the Review band, never to Accept -- that asymmetry is why a relatedness signal is safe here and would not be safe in the corroboration path. Guard ordering is what this pins: the cross-type gate must cap first and the floor must lift second.",
+  "why": "Identity and RELATEDNESS are different questions. A shared Alt ID whose relation is IsDerivedFrom says the identifier names a DIFFERENT work, so it is not evidence the two records are the same and must never carry a cross-type pair to Accept. But it IS evidence they are ABOUT each other, so when other metadata already agrees the pair is lifted into Review for a human rather than discarded. This is the theatrical-short-vs-registry-Episode shape: seven NE4 rows regressed to a terminal no-match when eidr-core 0.22.0 made matches identity-only, and human review had confirmed every one as a match. The floor can only raise a score INTO the Review band, never to Accept -- that asymmetry is why a relatedness signal is safe here and would not be safe in the corroboration path. Guard ordering is what this pins: the cross-type gate must cap first and the floor must lift second.\n\nAMENDED 2026-09-26 (compare-spec 2.16.0), consciously: the operator ruled which cross-type pairs are candidates, exhaustively, and withdrew the relatedness floor this fixture was written to pin. An Episode with no episode class, outside an anthology and sharing no IDENTITY Alt ID is no longer a candidate for a Basic submission, so this pair now reads as the ineligible ceiling (Reject) rather than being lifted to Review. What survives unchanged is the half that was always the point: a non-identity relation (IsDerivedFrom) never carries a cross-type pair to Accept, and it no longer makes one eligible either. The positive half -- the same theatrical short against a Standalone episode, which IS a candidate and is held at Review -- moved to crosstype-standalone-episode-meets-basic-at-review. The seven NE4 rows this fixture once protected are now reached by the Standalone/Pilot rules and by recovery's structural pools, not by a relatedness floor.",
   "submitted": {
     "creation_type": "Basic",
     "titles": [
@@ -63,14 +63,15 @@
   },
   "invariants": {
     "verdict_not_in": [
-      "Accept"
+      "Accept",
+      "Review"
     ],
-    "score_min": 30.0
+    "score_max": 29.9
   },
   "expected": {
-    "spec_version": "2.15.0",
-    "confidence": 30.0,
-    "verdict": "Review",
+    "spec_version": "2.16.0",
+    "confidence": 10.7,
+    "verdict": "Reject",
     "field_qualities": {
       "title": 1.0,
       "release_date": 1.0,

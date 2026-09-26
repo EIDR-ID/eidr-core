@@ -1,0 +1,88 @@
+{
+  "id": "recovered-sole-accept-auto-matches",
+  "added": "2026-09-26",
+  "mode": "case",
+  "creation_type": "Basic",
+  "tamr_kind": "NOMATCH",
+  "why": "Operator ruling, 2026-09-26 (compare-spec 2.16.0): a single Accept on its own or accompanied only by Rejects is processed as an auto-match decision -- also when registry-search recovery, not the vendor, supplied the candidates. Until then the NOMATCH branch sent every recovered Accept to a reviewer as 'Disagree: Tamr missed', even with an anchoring identity Alt ID and nothing else credible in the pool. The SAME auto-match gates apply as for a sole Accept on a vendor shortlist (anchor, participants, duration, year gap, registry-side Alt-ID multiplicity), so a gated sole Accept is still reported for review.\n\nSCOPE: pins that a clean sole Accept with only Reject rivals CLEARS. Its companion recovered-accept-with-review-rival-is-reviewed pins that any Review-band rival keeps the row with a reviewer.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Stolen",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2003",
+    "length_minutes": 95,
+    "directors": [
+      "Ann Lee"
+    ],
+    "alt_ids": [
+      {
+        "value": "tt0777777",
+        "id_type": "IMDB",
+        "relation": "IsSameAs"
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "creation_type": "Basic",
+      "titles": [
+        {
+          "text": "Stolen",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2003",
+      "length_minutes": 95,
+      "directors": [
+        "Ann Lee"
+      ],
+      "alt_ids": [
+        {
+          "value": "tt0777777",
+          "id_type": "IMDB",
+          "relation": "IsSameAs"
+        }
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0005-K"
+    },
+    {
+      "creation_type": "Basic",
+      "titles": [
+        {
+          "text": "Completely Different Picture",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "release_date": "1961",
+      "length_minutes": 95,
+      "directors": [
+        "Zed Q"
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0007-G"
+    }
+  ],
+  "invariants": {
+    "assessment_in": [
+      "Accept: sole match"
+    ],
+    "proposed_id_is": "10.5240/FEED-0001-0002-0003-0005-K",
+    "clears_without_review": true
+  },
+  "expected": {
+    "spec_version": "2.16.0",
+    "assessment": "Accept: sole match",
+    "proposed_id": "10.5240/FEED-0001-0002-0003-0005-K",
+    "confidence": 100.0,
+    "clears_without_review": true,
+    "notes": [
+      "alt-id match: +8.0"
+    ]
+  }
+}

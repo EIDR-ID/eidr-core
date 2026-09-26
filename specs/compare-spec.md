@@ -43,9 +43,22 @@ the reasoning, not just the number.
   extra matches add a diminishing bonus (`NL_MODIFIER` 0.75, Rovi lineage)
   capped by `FIELD_BONUS_CAP` so one long list can't dominate. Record level:
   weighted average over fields present on both sides; absent fields drop from
-  the denominator (`ALWAYS_APPLICABLE` keeps release_date in regardless);
+  the denominator (`ALWAYS_APPLICABLE` can keep a field in regardless; empty
+  since 2.16.0, when a one-sided release date stopped penalising);
   calibrated per creation type onto the shared bands (<30 Reject, 30–<80
   Review, ≥80 Accept).
+* **Cross-type candidates (2.16.0, operator ruling 2026-09-26).** Which pairs
+  of different creation types are compared at all is an exhaustive list in
+  BMR-Review's gate: a shared identity Alt ID (any pair; the only route for
+  Clips and Manifestations); a user-titled Pilot/Special/Standalone or
+  anthology Episode with Basic, and any Pilot also under its series title;
+  Season with Series when the Season has a real title; Series/Season with
+  Basic for mini/limited series; Series with a Series-class Compilation; an
+  Edit with the siblings of its nearest Abstraction ancestor when its user
+  title differs from the ancestor's or its class is in
+  `GATE_EDIT_SPLIT_CLASSES` (`split`). Every such pair is scored on the Basic
+  profile and capped at Review. `CROSSTYPE_REVIEW_FLOOR` is off: the older
+  title-strong / related-Alt-ID floors no longer lift an agreeing pair.
 ## Date profiles: the ANCHOR is per creation type, the SHAPE is measured
 
 `DATE_PROFILES` (compare-spec 2.8.0) gives each creation type a table:

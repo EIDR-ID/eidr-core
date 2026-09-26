@@ -1,0 +1,10 @@
+{
+  "_doc": "Proprietary Alt-ID Kinds exempt from altidtool-format rule 6 (a second IsSameAs of one Kind with a different value is a conflict). Read through eidr_core.altidtool_io.multi_form_domains(). A Kind is (type, domain AS THE REGISTRY STORES IT): 'trakt.tv', 'trakt.tv/movies' and 'trakt.tv/shows' are three Kinds. Declared, not derived: the uri_mapping.json derivation of v1.3 was measured wrong on 2026-09-26 (duplicate entries are alternate URL templates of ONE form, e.g. wikidata.org x5, dfi.dk/movie x3; and trakt.tv's numeric and slug forms are separate registry Kinds, not one).",
+  "criterion": "A Kind is listed when at least half of the registry records that carry it hold MORE THAN ONE identity value of it (relation NULL, '' or IsSameAs). The registry's own practice then says the Kind is multi-valued by design, and a rule-6 conflict there would contradict it. Measured values below; the next Kinds down were 14.2% (disney.com/mpm-p) and 11.6% (sho.com/editid), a clear break from 79.7%.",
+  "method_sql": "WITH ident AS (SELECT content_id, id_type, lower(coalesce(domain,'')) AS dom, alt_id FROM content_alternate_ids WHERE relation IS NULL OR relation = '' OR relation = 'IsSameAs'), per AS (SELECT id_type, dom, content_id, count(DISTINCT alt_id) AS n FROM ident GROUP BY 1, 2, 3) SELECT id_type, dom, count(*) AS records, count(*) FILTER (WHERE n > 1) AS multi FROM per GROUP BY 1, 2 HAVING count(*) FILTER (WHERE n > 1) > 0 ORDER BY multi DESC",
+  "measured": "2026-09-26",
+  "domains": [
+    {"domain": "pbs.org", "records": 4072, "multi": 4029},
+    {"domain": "decellc.com", "records": 6028, "multi": 4807}
+  ]
+}

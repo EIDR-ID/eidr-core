@@ -30,6 +30,7 @@ from collections.abc import Iterable
 from typing import NamedTuple
 
 __all__ = ["AltIdRow", "AltIdRemoval", "format_line", "write_lines", "parse_line",
+           "multi_form_domains",
            "parse_edit_line"]
 
 
@@ -118,3 +119,31 @@ def parse_edit_line(line: str) -> AltIdRow | AltIdRemoval | None:
         return AltIdRemoval(eidr_id, cols[1])
     cols += [""] * (5 - len(cols))
     return AltIdRow(*cols)
+
+
+def multi_form_domains() -> frozenset[str]:
+    """Proprietary domains exempt from rule 6 (altidtool-format v1.4), lowercase.
+
+    Rule 6 withholds a second ``IsSameAs`` value of one Kind as a conflict.
+    A handful of Kinds are multi-valued BY REGISTRY PRACTICE -- most records
+    carrying them already hold several identity values -- and rule 6 must not
+    fire there. The set is DECLARED in ``specs/multi_form_kinds.json`` with
+    the measurement that justifies each entry, because it cannot be derived:
+    v1.3 derived it from ``uri_mapping.json`` entry counts and that was wrong
+    on both counts measured 2026-09-26 (duplicate entries are alternate URL
+    templates of one form; ``trakt.tv`` numeric and ``trakt.tv/movies`` slug
+    are separate registry Kinds, and ``trakt.tv`` holds 20,931 numeric values
+    with two records carrying more than one).
+
+    Hosted here, not in a consumer, because it is portfolio data about the
+    registry: BMRtoAltID (row audit, T10) and eidr-wikidata (AltIDTool writer)
+    must exempt the same Kinds, and BMRtoAltID has no domain table of its own.
+    Compare a Kind's domain lowercased; named types (IMDB, ISAN, ...) are
+    never in the set.
+    """
+    import json
+    from importlib.resources import files
+
+    raw = json.loads((files("eidr_core") / "specs" / "multi_form_kinds.json")
+                     .read_text(encoding="utf-8"))
+    return frozenset(str(e["domain"]).strip().lower() for e in raw["domains"])

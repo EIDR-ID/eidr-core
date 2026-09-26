@@ -1,4 +1,4 @@
-# AltIDTool Input File Format (SPEC v1.3)
+# AltIDTool Input File Format (SPEC v1.4)
 
 **Status:** landed 2026-08-04 (register R9 / Phase 3 item 3). The reference
 implementation is **`eidr_core.altidtool_io`** (`format_line` / `write_lines`
@@ -89,26 +89,32 @@ consumer a wrong answer.
    reconciliation, per Alt ID, and never a second line for the same value.
    Producers implementing it: BMRtoAltID (`ALT_ID_RELATION_CONFLICT`),
    eidr-wikidata (`relation_conflict`).
-6. **A second `IsSameAs` of one SINGLE-FORM Kind with a DIFFERENT value
-   contradicts the first** (eidr-wikidata, 2026-08-09; ruled portfolio-wide
-   2026-09-23 for the merge engine; **scope narrowed 2026-09-24**): withheld
-   and reported, never written. *Single-form* means the Kind admits one
-   identifier form: every named type (`IMDB`, `ISAN`, ...), and a Proprietary
-   Kind to which exactly one `uri_mapping.json` entry collapses. A Kind to
-   which SEVERAL entries collapse is **multi-form** and legitimately carries
-   one identity value per form -- `trakt.tv` holds a numeric ID (entry
-   `trakt.tv`) AND a slug (entry `trakt.tv/movies`, collapsed to the bare
-   domain with the path in the value); likewise `cinematografo.it`,
-   `disneyplus.com`, `fandom.com`. Rule 6 does not fire on a multi-form Kind.
-   Measured by BMRtoAltID on eidr-wikidata's sheet 029: 2,741 of 5,000 rows
-   carry two identity values of one Kind, 2,657 of them `trakt.tv`; and
-   eidr-wikidata's own writer had withheld 133,223 `trakt.tv` proposals as
-   conflicts under the unnarrowed rule. A single-form Kind with two values
-   (`dvdcompare.net` 441 rows, `kinobox.cz`, `youtube.com`) IS a rule-6 case:
-   the source lists two, the registry may hold one as identity, a human
-   decides. The form is not recoverable from a stored value, so consumers
-   derive the multi-form set from `uri_mapping.json` (eidr-wikidata
-   `DomainMapper.multi_form_domains()` is the reference).
+6. **A second `IsSameAs` of one Kind with a DIFFERENT value contradicts the
+   first** (eidr-wikidata, 2026-08-09; ruled portfolio-wide 2026-09-23 for the
+   merge engine): withheld and reported, never written -- **except on the
+   Kinds listed by `eidr_core.altidtool_io.multi_form_domains()`** (v1.4,
+   2026-09-26). A Kind is `(type, domain AS THE REGISTRY STORES IT)`:
+   `trakt.tv`, `trakt.tv/movies` and `trakt.tv/shows` are three Kinds.
+   The exempt list is DECLARED in `src/eidr_core/specs/multi_form_kinds.json`,
+   each entry with its measurement: a Kind is listed when at least half the
+   registry records carrying it already hold more than one identity value of
+   it, so the registry's own practice says it is multi-valued (2026-09-26:
+   `pbs.org` 98.9%, `decellc.com` 79.7%; the next Kind down is 14.2%).
+   **v1.3 derived the set from `uri_mapping.json` entry counts and was wrong,
+   measured 2026-09-26:** duplicate entries are alternate URL templates of ONE
+   form (`wikidata.org` x5, `dfi.dk/movie` x3), and v1.3's worked example was
+   false -- the registry stores the `trakt.tv` slug under the separate Kind
+   `trakt.tv/movies` (85,036 values), while `trakt.tv` holds 20,931 numeric
+   values with two records carrying more than one. The derivation as built
+   in eidr-wikidata returned `{thetvdb.com/movie}` (a canonical alias, not a
+   second form) and exempted nothing v1.3 intended. The 2,657 `trakt.tv`
+   doubles in sheet 029 and the 133,223 withheld proposals v1.3 cited
+   predate eidr-wikidata's 2026-08-29 Tier 0 (P8013 slug to
+   `trakt.tv/movies`, P12492 numeric to `trakt.tv`); the current writer
+   withholds no `trakt.tv` proposal. A Kind with two values from one source
+   (`dvdcompare.net`, `kinobox.cz`, `youtube.com`) IS a rule-6 case: the
+   source lists two, the registry may hold one as identity, a human decides.
+   Consumers call the function; none keeps its own copy of the list.
 
 ## For consumers/readers
 

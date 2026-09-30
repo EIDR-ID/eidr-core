@@ -1,0 +1,87 @@
+{
+  "mode": "case",
+  "creation_type": "Episode",
+  "tamr_kind": "CANDIDATES",
+  "added": "2026-09-30",
+  "id": "sibling-title-lookalike-sharing-the-anchor-is-held",
+  "why": "The other direction of the 2026-09-30 refinement of blocker (7). Two siblings under one parent with look-alike titles AND the same full date, no numbers: the date cannot pick one, so the gate must still hold the sole Accept for a reviewer. Also pins the part-designator rule the first measurement found on the 16k drift guard: a submission 'Finale (part 1)' numbered 21 must not auto-clear to the whole 'Finale' (21) because its halves carry 21A / 21B -- a trailing part letter is the SAME number for ambiguity. The gate reason must appear in the row's reason.",
+  "submitted": {
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0001-0002-0003-0009-C",
+    "titles": [
+      {
+        "text": "Finale (part 1)",
+        "lang": "pt",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2011",
+    "length_minutes": 45,
+    "distribution_number": "21",
+    "directors": [
+      "Ana Lima"
+    ],
+    "countries": [
+      "BR"
+    ]
+  },
+  "candidates": [
+    {
+      "creation_type": "Episode",
+      "parent_id": "10.5240/FEED-0001-0002-0003-0009-C",
+      "titles": [
+        {
+          "text": "Finale",
+          "lang": "pt",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2011-05-13",
+      "length_minutes": 45,
+      "distribution_number": "21",
+      "directors": [
+        "Ana Lima"
+      ],
+      "countries": [
+        "BR"
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0005-K"
+    },
+    {
+      "creation_type": "Episode",
+      "parent_id": "10.5240/FEED-0001-0002-0003-0009-C",
+      "titles": [
+        {
+          "text": "Finale Part 1",
+          "lang": "pt",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2011",
+      "length_minutes": 45,
+      "distribution_number": "21A",
+      "directors": [
+        "Ana Lima"
+      ],
+      "countries": [
+        "BR"
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0007-G"
+    }
+  ],
+  "invariants": {
+    "assessment_not_in": [
+      "Accept: sole match",
+      "Agree"
+    ],
+    "clears_without_review": false
+  },
+  "expected": {
+    "spec_version": "2.17.0",
+    "assessment": "Disagree: other match",
+    "proposed_id": "10.5240/FEED-0001-0002-0003-0005-K",
+    "confidence": 89.7,
+    "clears_without_review": false,
+    "notes": []
+  }
+}

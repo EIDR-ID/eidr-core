@@ -59,6 +59,36 @@ the reasoning, not just the number.
   `GATE_EDIT_SPLIT_CLASSES` (`split`). Every such pair is scored on the Basic
   profile and capped at Review. `CROSSTYPE_REVIEW_FLOOR` is off: the older
   title-strong / related-Alt-ID floors no longer lift an agreeing pair.
+* **Sibling-title ambiguity needs a shared anchor (2.17.0, BMR-Review T37,
+  2026-09-30).** The auto-match blocker "multiple siblings under the same
+  parent share this title" holds a sole Accept only when a look-alike sibling
+  ALSO carries the submission's anchor -- the same full date or the same
+  distribution number, where a trailing part letter is the same number (21A
+  and 21B share 21) -- because a daily programme's episodes differ only by a
+  date prefix the fuzzy title comparator cannot see, and the blocker had held
+  20 rows a reviewer confirmed 20 of 20. A rule change with no value moved;
+  pinned both ways by `sibling-title-lookalike-with-distinct-anchor-clears`
+  and `sibling-title-lookalike-sharing-the-anchor-is-held`.
+
+**Porting requirements** (from BMR-Review's ENGINE_SYNC `BMR-20260926-1` for
+2.16.0, lifted verbatim at 2.17.0 as ruled 2026-09-26). These are the places a
+second engine can pass most of the corpus and still be wrong; "our" is
+BMR-Review.
+
+1. **Ancestry climbing is load-bearing.** The anthology and pilot rules test
+   the SERIES, reached by climbing Episode -> Season -> Series. An engine that
+   cannot climb loses real matches silently: 12 labelled anthology matches
+   (Looney Tunes, Beck, Screen One, Unter Verdacht, Halifax f.p., Cinema 16)
+   read as terminal no-matches in our own mirror-less harness and reach
+   Review at 79.0 live.
+2. **The recovered sole-Accept uses only-Rejects, never the weak-rival test.**
+   A port that reuses the shortlist branch's weak-rival exception clears
+   `recovered-accept-with-review-rival-is-reviewed` wrongly; that fixture
+   exists to refuse it.
+3. **The relationship exclusion runs BEFORE scoring**, so a targeted record
+   can never become the proposal by elimination; the vendor's own candidate
+   list is kept for the AUTO labels.
+
 ## Date profiles: the ANCHOR is per creation type, the SHAPE is measured
 
 `DATE_PROFILES` (compare-spec 2.8.0) gives each creation type a table:

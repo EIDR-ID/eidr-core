@@ -2,7 +2,7 @@
 
 **Status:** all three modes LANDED — `pair` 2026-07-29; `case` ratified 2026-09-10 (S-26),
 evaluator 2026-09-11; `recovery_pool` ratified 2026-09-10 (S-9), first captured instance and
-evaluator 2026-09-11 (BMR-Review T17). Corpus: 21 `pair`, 10 `case`, 1 `recovery_pool` (32) at compare-spec 2.16.0.
+evaluator 2026-09-11 (BMR-Review T17). Corpus: 21 `pair`, 12 `case`, 1 `recovery_pool` (34) at compare-spec 2.17.0.
 **Owner of the format:** eidr-core. **Owner of the evaluator:** BMR-Review
 (`eidr_dedup_score/golden.py`). **Conforming implementation:** De-Dupe UI,
 in JavaScript, with no database.
@@ -90,6 +90,26 @@ confirms No Match, and the match stays in the registry.
   every comparison before scoring (`relationship-target-is-never-a-candidate`).
   A loader that ignores the field makes that fixture fail loudly (the vendor's
   match to the target reads `Agree` at 100), not pass.
+* **A `pair` or `case` fixture may carry a top-level `ancestry` block**
+  (defined at 2.17.0, 2026-09-30; De-Dupe UI S-32):
+  `"ancestry": [ { "eidr_id": "...", <rendered view> }, ... ]` -- the parent
+  chain of the submitted record and of any candidate (Episode -> Season ->
+  Series; an Edit's nearest Abstraction ancestor and that ancestor's
+  siblings), inline, in the SAME rendered-view shape `recovery_pool.pool`
+  uses (§5: captured views, not EIDR-JSON), keyed by `eidr_id` and resolved
+  by id when the engine climbs. It exists because the 2.16.0 cross-type rules
+  (anthology series, a pilot under its Series' title, an Edit against its
+  ancestor's siblings) are decided by records that are neither the
+  submission nor a candidate, so without it no fixture can pin them and a
+  port that cannot climb loses those matches silently (compare-spec.md,
+  porting requirement 1). Rule, as for `related_targets`: a loader that
+  ignores the block must make its fixture FAIL loudly, never pass. **No
+  fixture carries it yet:** BMR-Review's evaluator support in `golden.py` and
+  the three fixtures that use it (an Anthology Episode meets a Basic at
+  Review; a Pilot with only a system title meets its Basic under the Series'
+  title; a retitled Edit meets a sibling of its Episode/Abstraction ancestor)
+  arrive as their own compare-spec version, because they pin behaviour the
+  corpus cannot see today (§7).
 * **A `mode` the evaluator does not yet implement must fail LOUDLY**, naming
   what it waits for, rather than being absent. (`recovery_pool` raised
   `NotImplementedError` for the one day between ratification and its first

@@ -74,7 +74,7 @@
     ]
   },
   "expected": {
-    "spec_version": "2.16.0",
+    "spec_version": "2.17.0",
     "assessment": "Disagree: all candidates rejected",
     "proposed_id": "NO MATCH",
     "confidence": 100.0,

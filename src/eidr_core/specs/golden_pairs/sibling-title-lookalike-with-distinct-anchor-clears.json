@@ -1,0 +1,90 @@
+{
+  "mode": "case",
+  "creation_type": "Episode",
+  "tamr_kind": "CANDIDATES",
+  "added": "2026-09-30",
+  "id": "sibling-title-lookalike-with-distinct-anchor-clears",
+  "why": "Blocker (7), sibling-title ambiguity, refined 2026-09-30 after audit rounds 1 and 2: it held 20 sole Accepts a reviewer confirmed 20 of 20, every one a daily programme whose episodes are titled '13/08/2026 - Quem Ama Nao Esquece', '18/08/2026 - ...'. The date is a small fraction of the string, so the fuzzy comparator reads every sibling as one title, while the exact full date and the distribution number pick the proposal out unambiguously. RULE: a look-alike sibling is ambiguous only when it ALSO carries the submission's anchor (the same full date or number); one that does not is a different episode wearing the programme's name. Here the sibling has a different date and number, so the sole Accept clears. Pair with sibling-title-lookalike-sharing-the-anchor-is-held, the other direction: an implementation that simply drops the gate passes this one and fails that one.",
+  "submitted": {
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0001-0002-0003-0009-C",
+    "titles": [
+      {
+        "text": "13/08/2026 - Quem Ama Nao Esquece",
+        "lang": "pt",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2026-08-13",
+    "length_minutes": 45,
+    "distribution_number": "161",
+    "directors": [
+      "Ana Lima"
+    ],
+    "countries": [
+      "BR"
+    ]
+  },
+  "candidates": [
+    {
+      "creation_type": "Episode",
+      "parent_id": "10.5240/FEED-0001-0002-0003-0009-C",
+      "titles": [
+        {
+          "text": "13/08/2026 - Quem Ama Nao Esquece",
+          "lang": "pt",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2026-08-13",
+      "length_minutes": 45,
+      "distribution_number": "161",
+      "directors": [
+        "Ana Lima"
+      ],
+      "countries": [
+        "BR"
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0005-K"
+    },
+    {
+      "creation_type": "Episode",
+      "parent_id": "10.5240/FEED-0001-0002-0003-0009-C",
+      "titles": [
+        {
+          "text": "18/08/2026 - Quem Ama Nao Esquece",
+          "lang": "pt",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2026-08-18",
+      "length_minutes": 45,
+      "distribution_number": "164",
+      "directors": [
+        "Ana Lima"
+      ],
+      "countries": [
+        "BR"
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-0007-G"
+    }
+  ],
+  "invariants": {
+    "assessment_in": [
+      "Accept: sole match"
+    ],
+    "proposed_id_is": "10.5240/FEED-0001-0002-0003-0005-K",
+    "clears_without_review": true,
+    "notes_not_match": [
+      "share this title"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.17.0",
+    "assessment": "Accept: sole match",
+    "proposed_id": "10.5240/FEED-0001-0002-0003-0005-K",
+    "confidence": 100.0,
+    "clears_without_review": true,
+    "notes": []
+  }
+}

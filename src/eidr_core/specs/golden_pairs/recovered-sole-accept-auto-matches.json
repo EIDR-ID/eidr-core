@@ -76,7 +76,7 @@
     "clears_without_review": true
   },
   "expected": {
-    "spec_version": "2.16.0",
+    "spec_version": "2.17.0",
     "assessment": "Accept: sole match",
     "proposed_id": "10.5240/FEED-0001-0002-0003-0005-K",
     "confidence": 100.0,

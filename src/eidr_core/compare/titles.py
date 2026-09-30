@@ -20,6 +20,11 @@ Title matching with episode-aware rules.
     single "Segment A" only partially matches "Segment A / Segment B".
   * System-generated titles are ignored when real titles exist on both sides,
     and used only as a last resort.
+  * Internal-class titles (system-generated machine translations) are, by
+    default, treated like system-generated ones: used only as a fallback.
+    When the registered parameters carry INTERNAL_TITLE_DISCOUNT they are
+    included instead, at a discount (``select_titles(include_internal=True)``
+    here; the discount itself is applied in ``compare.cmp_titles``).
 
 Part/segment rules apply to all creation types (part numbering shows up in
 non-episodic titles too); system-generated filtering is most relevant to
@@ -233,16 +238,47 @@ def title_similarity(a_raw, b_raw, *, episodic=False):
     return _fuzzy(norm_title(a_raw), norm_title(b_raw))
 
 
-def select_titles(titles):
+def is_internal(t):
+    """True for an Internal-class title that is not also system-generated.
+
+    Internal = system-generated, a machine translation (operator, 2026-09-30,
+    via LanguageTool). A title flagged BOTH ways is treated as system-generated:
+    that flag is the stronger statement (the registry built the text from the
+    record's own structure) and keeps the 2026-08-30 both-sides drop intact.
+    """
+    if not t.text or getattr(t, "system_generated", False):
+        return False
+    return (getattr(t, "title_class", "") or "").strip().lower() == "internal"
+
+
+def select_titles(titles, *, include_internal=False):
     """Return (titles_to_use, used_fallback). Prefer 'real' titles; fall back to
     system-generated or internal-class (auto-translated) titles only if there is
     nothing else. Internal titles are auto-generated translations for reviewer
-    convenience and must not carry full discriminating weight."""
+    convenience and must not carry full discriminating weight.
+
+    ``include_internal=True`` counts Internal titles as usable (not fallback);
+    the CALLER must then discount them -- ``compare.cmp_titles`` does, when the
+    registered parameters carry ``INTERNAL_TITLE_DISCOUNT``. Why the switch
+    exists: normalized-record.md section 4.1 (ratified 2026-07-29) says Internal
+    titles are "diminished, never ignored", and section 7 gap 1 records that
+    the default below ignores them whenever a real title exists. LanguageTool
+    (2026-09-30) measured ~450,000 Internal titles registry-wide (11% of a 2%
+    mirror sample) and showed they are the cross-language bridge: often the
+    only English on a French-registered record. The default stays False so the
+    behaviour is unchanged, byte for byte, until BMR-Review lands the knob and
+    measures it (the T3-style split: mechanism in eidr-core, knob and
+    measurement in BMR-Review). With the switch on, only system-generated
+    titles remain fallback-only, so the both-sides drop in ``cmp_titles``
+    applies to system-generated titles and never to Internal ones.
+    """
     def is_real(t):
         if not t.text:
             return False
         if getattr(t, "system_generated", False):
             return False
+        if include_internal:
+            return True
         return (getattr(t, "title_class", "") or "").strip().lower() != "internal"
     real = [t for t in titles if is_real(t)]
     if real:

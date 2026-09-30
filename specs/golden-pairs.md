@@ -70,6 +70,14 @@ confirms No Match, and the match stays in the registry.
   the absent-info branch and `edit-info-absent-holds-for-review` would have
   **passed for the wrong reason** — the exact failure §6 exists to prevent.
   A conforming JavaScript loader has the same obligation.
+* **A title may be a plain string or an object** `{"text", "lang",
+  "is_resource", "title_class", "system_generated"}` (documented 0.40.0,
+  2026-09-30; the evaluator already read every one of them): `title_class`
+  is the registry's `titleClass` (`Internal` = a system-generated machine
+  translation, operator 2026-09-30) and `system_generated` marks a title the
+  registry built from the record's structure -- the two flags the title
+  comparator's inclusion and both-sides-drop rules read, so a loader that
+  drops either scores a different pair than the fixture states.
 * **Records may carry a `provenance` map where the lesson needs it**
   (2.13.0, 2026-09-23): `"provenance": {"<EIDR field>": "self" | "inherited"
   | "system"}` -- the shared builder's map, which the loader sets on the

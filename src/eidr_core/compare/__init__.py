@@ -38,6 +38,7 @@ from . import _params as config
 from . import nonlinear
 from ._params import set_source as set_params  # noqa: F401 — public registration API, re-exported
 from .titles import (
+    is_internal,
     parts_ambiguous,
     parts_conflict,
     select_titles,
@@ -90,9 +91,52 @@ def _title_base_ratio(a, b):
         return 1.0
     return max(_f.token_set_ratio(a, b), _f.WRatio(a, b)) / 100.0
 
+def _internal_title_discount():
+    """The Internal-title discount from the registered parameters, or ``None``.
+
+    ``None`` (knob absent) means today's behaviour, byte for byte: Internal
+    titles are fallback-only. The knob is read OPTIONALLY -- unlike every
+    other constant, its absence is not an error -- because BMR-Review
+    registers its config.py as the source and does not define it yet: the
+    mechanism ships inert and BMR-Review adds the knob in its own measured
+    cycle (eidr-core ruling on LanguageTool's handoff of 2026-09-30, split as
+    T3 was). No registered source at all also reads as absent, so a caller
+    that reaches the drop branch below without params behaves as before.
+
+    A present value must be a number in (0, 1]: zero would be exclusion under
+    another name (section 4.1: "never ignored"), and above one would make a
+    machine translation outweigh a real title. Malformed tuning fails loudly,
+    as ``compare.spec.load_spec`` does, rather than scoring with a guess.
+    """
+    if config.get_source() is None:
+        return None
+    d = getattr(config, "INTERNAL_TITLE_DISCOUNT", None)
+    if d is None:
+        return None
+    if isinstance(d, bool) or not isinstance(d, (int, float)) or not 0.0 < d <= 1.0:
+        raise ValueError(
+            f"INTERNAL_TITLE_DISCOUNT must be a number in (0, 1], got {d!r}")
+    return float(d)
+
+
 def cmp_titles(a, b):
-    a_use, a_fb = select_titles(a.titles)
-    b_use, b_fb = select_titles(b.titles)
+    # Internal-class titles (LanguageTool, 2026-09-30: Internal = system-
+    # generated, a machine translation; ~450,000 registry-wide, 11% of a 2%
+    # mirror sample) are the cross-language bridge -- often the only English on
+    # a French-registered record. normalized-record.md section 4.1 (ratified
+    # 2026-07-29) says they are diminished, never ignored; section 7 gap 1
+    # records that select_titles ignores them whenever a real title exists.
+    # With INTERNAL_TITLE_DISCOUNT registered they are INCLUDED and every pair
+    # involving one is multiplied by the discount -- on the normal path and on
+    # what used to be the fallback path alike (a record whose only titles are
+    # Internal was compared at FULL weight via the fallback; with the knob it
+    # is discounted like any Internal title, for consistency). Without the
+    # knob nothing below changes. Mechanism here, knob + measurement in
+    # BMR-Review (the T3 split).
+    discount = _internal_title_discount()
+    inc = discount is not None
+    a_use, a_fb = select_titles(a.titles, include_internal=inc)
+    b_use, b_fb = select_titles(b.titles, include_internal=inc)
     a_raw = [t.text for t in a_use if t.text]
     b_raw = [t.text for t in b_use if t.text]
     if not a_raw or not b_raw or (a_fb and b_fb):
@@ -120,13 +164,50 @@ def cmp_titles(a, b):
         # its scorer._inherited_discount, which drops a field both records
         # inherited from the SAME parent. Keeping that here would duplicate the
         # rule and make the comparator depend on more than its two arguments.
+        #
+        # With INTERNAL_TITLE_DISCOUNT set, Internal titles are not fallback
+        # (select_titles(include_internal=True)), so this drop fires only when
+        # both sides hold system-generated titles alone -- the ruling's own
+        # scope. Two records whose only titles are Internal translations ARE
+        # compared (discounted): a translation is not derived from the
+        # record's structure, so the double-counting argument does not apply.
         why = ("no real title to compare" if (not a_raw or not b_raw)
                else "system-generated titles only - ignored")
         return FieldResult("title", None, why, meta={})
     _ep = ((getattr(a, "creation_type", None) or "") in ("Episode", "Season")
            and (getattr(b, "creation_type", None) or "") in ("Episode", "Season"))
-    qs = _greedy_align(a_raw, b_raw, simf=partial(title_similarity, episodic=_ep))
+    simf = partial(title_similarity, episodic=_ep)
+    internal_used = False
+    if discount is None:
+        qs = _greedy_align(a_raw, b_raw, simf=simf)
+    else:
+        # Discount every pair that involves an Internal title, THEN align. The
+        # greedy alignment takes the global best pair first, so a real-title
+        # match is never reduced by Internal titles beside it: the Internal
+        # pair only wins when its DISCOUNTED similarity beats every real pair.
+        # A further aligned Internal pair may add the usual diminishing bonus
+        # (nonlinear.accumulate) -- included at diminished value, per 4.1.
+        a_int = [is_internal(t) for t in a_use if t.text]
+        b_int = [is_internal(t) for t in b_use if t.text]
+        sims = [[simf(x, y) * (discount if (a_int[i] or b_int[j]) else 1.0)
+                 for j, y in enumerate(b_raw)]
+                for i, x in enumerate(a_raw)]
+        qs = _greedy_align(range(len(a_raw)), range(len(b_raw)),
+                           simf=lambda i, j: sims[i][j])
+        pairs = [(sims[i][j], a_int[i] or b_int[j])
+                 for i in range(len(a_raw)) for j in range(len(b_raw))]
+        best_real = max((q for q, via in pairs if not via), default=0.0)
+        best_int = max((q for q, via in pairs if via), default=0.0)
+        # Strictly greater: on a tie the real title carries the match, so the
+        # flag (and a reviewer's reading of the rationale) never credits a
+        # translation with what a real title already established.
+        internal_used = best_int > best_real
     best = max(qs) if qs else 0.0
+    # parts_conflict / parts_ambiguous / the base-match loop read the same raw
+    # lists as scoring. With the knob absent those are exactly today's lists;
+    # with it present they include Internal texts too, so a translated
+    # "Part 2" can raise a part conflict. Deliberate, and part of what
+    # BMR-Review measures before the knob lands.
     pconf = parts_conflict(a_raw, b_raw)
     # When a part conflict is present, record whether the two sides share the
     # same BASE title (the numbered serial case, e.g. "<Show> Part 2" vs
@@ -147,12 +228,20 @@ def cmp_titles(a, b):
                     continue
                 base_match = max(base_match, _title_base_ratio(x[0], y[0]))
     pamb = _ep and (not pconf) and parts_ambiguous(a_raw, b_raw)
-    return FieldResult("title", nonlinear.accumulate(qs),
-                       f"best={best:.2f} matches={sum(1 for q in qs if q>0)}"
-                       + (" part-ambiguous" if pamb else ""),
-                       meta={"best_sim": best, "part_conflict": pconf,
-                             "part_base_match": base_match,
-                             "part_ambiguous": pamb})
+    detail = (f"best={best:.2f} matches={sum(1 for q in qs if q>0)}"
+              + (" part-ambiguous" if pamb else ""))
+    meta = {"best_sim": best, "part_conflict": pconf,
+            "part_base_match": base_match,
+            "part_ambiguous": pamb}
+    if inc:
+        # Only with the knob present, so the knob-absent meta and rationale
+        # stay identical to 0.39.0. best_sim above is the DISCOUNTED value:
+        # any gate that reads it sees the diminished evidence, which is the
+        # point of a discount (BMR-Review measures the gates too).
+        meta["internal_title_used"] = internal_used
+        if internal_used:
+            detail += " internal title, discounted"
+    return FieldResult("title", nonlinear.accumulate(qs), detail, meta=meta)
 
 
 def _proportional(qs, n_a, n_b):

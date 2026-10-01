@@ -206,3 +206,148 @@ def test_case_folding_did_not_break_the_precedence_order():
     exc = RuntimeError("HTTP 429: Aggressively rate-limiting to 1 req / min "
                        "- this rule was created during active WDQS Outage")
     assert classify_sparql_error(exc) == OUTAGE
+
+
+# --- Retry-After (0.41.0; eidr-metadata-sources 2026-09-30) -----------------
+# The chassis must wait what a 429/503 asks before retrying the same
+# endpoint, and later calls must not probe that endpoint inside the window.
+# Sleeps and the monotonic clock are faked: these tests take no real time.
+
+import email.utils as _eu  # noqa: E402
+import urllib.error  # noqa: E402
+from datetime import datetime, timedelta, timezone  # noqa: E402
+from email.message import Message  # noqa: E402
+
+from eidr_core.external import failover as fo  # noqa: E402
+
+
+def _http_error(code, retry_after=None):
+    hdrs = Message()
+    if retry_after is not None:
+        hdrs["Retry-After"] = str(retry_after)
+    return urllib.error.HTTPError("https://q.example/sparql", code, "x", hdrs, None)
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    """Fake time: sleep advances a monotonic clock and is recorded."""
+    state = {"now": 1000.0, "sleeps": []}
+
+    def sleep(sec):
+        state["sleeps"].append(sec)
+        state["now"] += max(0.0, sec)
+
+    monkeypatch.setattr(fo.time, "sleep", sleep)
+    monkeypatch.setattr(fo.time, "monotonic", lambda: state["now"])
+    fo.reset_cooldowns()
+    yield state
+    fo.reset_cooldowns()
+
+
+def test_retry_after_seconds_reads_urllib_headers():
+    assert fo.retry_after_seconds(_http_error(429, 12)) == 12.0
+    assert fo.retry_after_seconds(_http_error(429)) is None
+
+
+def test_retry_after_seconds_reads_http_date():
+    now = datetime(2026, 9, 30, 12, 0, 0, tzinfo=timezone.utc)
+    when = _eu.format_datetime(now + timedelta(seconds=90), usegmt=True)
+    assert fo.retry_after_seconds(_http_error(503, when), now=now) == 90.0
+
+
+def test_retry_after_seconds_prefers_an_explicit_attribute():
+    exc = RuntimeError("rate limited")
+    exc.retry_after = 7  # type: ignore[attr-defined]
+    assert fo.retry_after_seconds(exc) == 7.0
+
+
+def test_garbage_retry_after_is_ignored():
+    assert fo.retry_after_seconds(_http_error(429, "soon")) is None
+
+
+def test_http_status_from_attributes_never_from_text():
+    assert fo.http_status(_http_error(503)) == 503
+    assert fo.http_status(RuntimeError("HTTP 429 Too Many Requests")) is None
+
+    class Boto(Exception):
+        response = {"ResponseMetadata": {"HTTPStatusCode": 503}}
+
+    assert fo.http_status(Boto()) == 503
+
+
+def test_a_429_with_retry_after_is_waited_before_the_retry(clock):
+    script = Script({"a": [_http_error(429, 30), "ok"]})
+    res, used, exc = call_with_failover(["a"], script, classify_all(RETRY), **FAST)
+    assert (res, used, exc) == ("ok", "a", None)
+    assert max(clock["sleeps"]) == 30.0
+
+
+def test_a_429_without_retry_after_waits_the_floor(clock):
+    script = Script({"a": [_http_error(429), "ok"]})
+    call_with_failover(["a"], script, classify_all(RETRY), **FAST)
+    assert max(clock["sleeps"]) == fo.DEFAULT_RATE_LIMIT_FLOOR
+
+
+def test_computed_backoff_wins_when_larger(clock):
+    script = Script({"a": [_http_error(429, 1), "ok"]})
+    call_with_failover(["a"], script, classify_all(RETRY),
+                       backoff=10.0, jitter=0.0, delay_seconds=0.0)
+    assert max(clock["sleeps"]) == 20.0          # 10 * 2**1 > 1
+
+
+def test_a_plain_transient_error_keeps_the_old_schedule(clock):
+    script = Script({"a": [RuntimeError("HTTP 502"), "ok"]})
+    call_with_failover(["a"], script, classify_all(RETRY), **FAST)
+    assert clock["sleeps"] == [0.0]               # no floor without a status
+
+
+def test_an_oversized_retry_after_leaves_the_endpoint(clock):
+    script = Script({"a": [_http_error(429, 3600)], "b": ["ok"]})
+    res, used, _ = call_with_failover(["a", "b"], script, classify_all(RETRY), **FAST)
+    assert (res, used) == ("ok", "b")
+    assert script.calls == ["a", "b"]
+    assert all(s < 3600 for s in clock["sleeps"])
+
+
+def test_a_later_call_skips_a_cooling_endpoint_when_another_is_usable(clock):
+    first = Script({"a": [_http_error(429, 120)] * 5, "b": ["ok"]})
+    call_with_failover(["a", "b"], first, classify_all(NEXT_ENDPOINT), **FAST)
+    second = Script({"a": ["primary"], "b": ["fallback"]})
+    res, used, _ = call_with_failover(["a", "b"], second, classify_all(RETRY), **FAST)
+    assert (res, used) == ("fallback", "b")
+    assert second.calls == ["b"], "the cooling primary must not be probed"
+
+
+def test_the_last_usable_endpoint_waits_out_its_window(clock):
+    first = Script({"a": [_http_error(429, 40)]})
+    call_with_failover(["a"], first, classify_all(NEXT_ENDPOINT), **FAST)
+    clock["sleeps"].clear()
+    second = Script({"a": ["ok"]})
+    res, _, _ = call_with_failover(["a"], second, classify_all(RETRY), **FAST)
+    assert res == "ok"
+    assert clock["sleeps"] == [40.0]
+
+
+def test_the_window_expires(clock):
+    first = Script({"a": [_http_error(429, 10)]})
+    call_with_failover(["a"], first, classify_all(NEXT_ENDPOINT), **FAST)
+    clock["now"] += 11
+    assert fo.cooldown_remaining("a") == 0.0
+    second = Script({"a": ["ok"], "b": ["unused"]})
+    assert call_with_failover(["a", "b"], second, classify_all(RETRY), **FAST)[1] == "a"
+
+
+def test_cooldowns_can_be_ignored(clock):
+    first = Script({"a": [_http_error(429, 120)]})
+    call_with_failover(["a"], first, classify_all(NEXT_ENDPOINT), **FAST)
+    second = Script({"a": ["ok"], "b": ["unused"]})
+    res, used, _ = call_with_failover(["a", "b"], second, classify_all(RETRY),
+                                      honour_cooldowns=False, **FAST)
+    assert used == "a"
+
+
+def test_an_outage_429_still_records_its_window(clock):
+    script = Script({"a": [_http_error(429, 60)], "b": ["ok"]})
+    call_with_failover(["a", "b"], script, classify_all(OUTAGE), **FAST)
+    assert fo.cooldown_remaining("a") == 60.0
+

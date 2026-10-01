@@ -59,6 +59,40 @@ pacer would be a fresh implementation, not an extraction — deferred until
 the planned rate-managed IMDb client actually needs one (R13 rule: a
 piece moves here when its second consumer appears).
 
+RETRY-AFTER (2026-09-30)
+------------------------
+A 429 or 503 is the endpoint telling the client how long to stay away.
+Wikimedia's access rules, which its Terms of Use incorporate, require a
+client to wait the ``Retry-After`` interval of a 429, and at least five
+seconds when the header is absent; continuing inside the window risks a
+temporary ban from the query service. Until 0.41.0 this loop ignored the
+header and retried after ``backoff * 2**attempt + jitter`` -- about 2-3 s on
+the first retry with the defaults (raised by eidr-metadata-sources from its
+Wikidata licence review, 2026-09-30).
+
+The chassis never sees a response, only the exception the provider raised,
+so it reads the interval from the exception (``retry_after_seconds``):
+
+* an explicit ``exc.retry_after`` (seconds), for a provider whose transport
+  hides the headers -- set it when raising;
+* else the ``Retry-After`` header of ``exc.headers`` (urllib's ``HTTPError``,
+  which SPARQLWrapper re-raises unchanged for 429 and 503) or of
+  ``exc.response.headers`` (requests), as seconds or an HTTP-date.
+
+Before the next attempt on the SAME endpoint the loop sleeps
+``max(Retry-After, the computed backoff)``. With no header on a 429 or 503
+(status read from the exception, ``http_status``) it sleeps at least
+``rate_limit_floor`` (5 s). An interval longer than ``max_retry_after`` is
+not slept inside one call: the endpoint is left for the rest of the call.
+
+The interval is a fact about the ENDPOINT, so it outlives the call: it is
+kept in a process-wide cooldown table. A later call that reaches a cooling
+endpoint skips it when another endpoint in its chain is usable, and
+otherwise waits out the remainder (up to ``max_retry_after``) before the
+first request -- eidr-wikidata's ``pairs_batch`` re-probes WDQS at the start
+of every batch, and that probe must not land inside the window. Failing
+over to a DIFFERENT endpoint is never delayed.
+
 WHAT STAYS PER-PROVIDER
 -----------------------
 Transport construction (SPARQLWrapper vs urllib), authentication, query
@@ -67,10 +101,13 @@ per-source clients keep their single homes (R13: one home per source).
 """
 from __future__ import annotations
 
+import email.utils
 import logging
 import random
+import threading
 import time
 from collections.abc import Callable, Iterable, Sequence
+from datetime import datetime, timezone
 from typing import Any
 
 __all__ = [
@@ -85,6 +122,13 @@ __all__ = [
     "classify_sparql_error",
     "endpoint_chain",
     "call_with_failover",
+    "RATE_LIMIT_STATUSES",
+    "DEFAULT_RATE_LIMIT_FLOOR",
+    "DEFAULT_MAX_RETRY_AFTER",
+    "http_status",
+    "retry_after_seconds",
+    "cooldown_remaining",
+    "reset_cooldowns",
 ]
 
 log = logging.getLogger(__name__)
@@ -192,6 +236,136 @@ def classify_sparql_error(exc: Exception) -> str:
     return NEXT_ENDPOINT
 
 
+# ---------------------------------------------------------------------------
+# Retry-After (see the module docstring, "RETRY-AFTER").
+# ---------------------------------------------------------------------------
+
+# The statuses by which a server says "slow down": 429 Too Many Requests and
+# 503 Service Unavailable. Both may carry Retry-After (RFC 9110 section 10.2.3).
+RATE_LIMIT_STATUSES = frozenset({429, 503})
+
+# Wikimedia Robot Policy: with no Retry-After on a 429, "wait at least five
+# seconds". Applied to 503 too: a server that is unavailable is not helped by
+# a faster retry, and the cost of the floor is bounded by max_retries.
+DEFAULT_RATE_LIMIT_FLOOR = 5.0
+
+# The longest wait the loop will sleep inside ONE call. A larger Retry-After
+# (WDQS has sent minutes during outages) leaves the endpoint for the rest of
+# the call instead of blocking a batch job for the whole interval; the
+# cooldown table still keeps later calls off it until the interval passes.
+DEFAULT_MAX_RETRY_AFTER = 600.0
+
+
+def http_status(exc: BaseException) -> int | None:
+    """The HTTP status an exception carries, read from its attributes only.
+
+    ``code`` (urllib ``HTTPError``), ``status`` / ``status_code`` (common
+    provider exceptions, eidr-dq's ``_Transient``), ``response.status_code``
+    (requests) or ``response["ResponseMetadata"]["HTTPStatusCode"]``
+    (botocore). Never parsed from the message text: a digit run in echoed
+    query text is not a status, and the text-based classification stays in
+    ``classify_sparql_error`` where the order of checks guards it.
+    """
+    for attr in ("code", "status", "status_code"):
+        val = getattr(exc, attr, None)
+        if isinstance(val, int) and not isinstance(val, bool):
+            return val
+    resp = getattr(exc, "response", None)
+    if resp is not None:
+        val = getattr(resp, "status_code", None)
+        if isinstance(val, int) and not isinstance(val, bool):
+            return val
+        if isinstance(resp, dict):
+            val = (resp.get("ResponseMetadata") or {}).get("HTTPStatusCode")
+            if isinstance(val, int) and not isinstance(val, bool):
+                return val
+    return None
+
+
+def _parse_retry_after(raw: Any, now: datetime | None = None) -> float | None:
+    """Seconds from a Retry-After value: delta-seconds or an HTTP-date."""
+    if raw is None:
+        return None
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return max(0.0, float(raw))
+    text = str(raw).strip()
+    if not text:
+        return None
+    try:
+        return max(0.0, float(text))
+    except ValueError:
+        pass
+    try:
+        when = email.utils.parsedate_to_datetime(text)
+    except (TypeError, ValueError, IndexError):
+        return None
+    if when is None:
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    ref = now or datetime.now(timezone.utc)
+    return max(0.0, (when - ref).total_seconds())
+
+
+def retry_after_seconds(exc: BaseException, now: datetime | None = None) -> float | None:
+    """The Retry-After interval an exception carries, in seconds, or None.
+
+    An explicit ``exc.retry_after`` wins (a provider that cannot expose
+    headers sets it when raising); otherwise the header is read from
+    ``exc.headers`` (urllib) or ``exc.response.headers`` (requests).
+    ``now`` exists for tests of the HTTP-date form.
+    """
+    explicit = getattr(exc, "retry_after", None)
+    if explicit is not None:
+        return _parse_retry_after(explicit, now)
+    headers = getattr(exc, "headers", None)
+    if headers is None:
+        headers = getattr(getattr(exc, "response", None), "headers", None)
+    if headers is None:
+        return None
+    try:
+        raw = headers.get("Retry-After")
+    except AttributeError:
+        return None
+    return _parse_retry_after(raw, now)
+
+
+# Process-wide: endpoint -> time.monotonic() before which it is not called.
+# A lock because eidr-wikidata resolves records on a thread pool.
+_cooldowns: dict[str, float] = {}
+_cooldown_lock = threading.Lock()
+
+
+def _note_cooldown(endpoint: str, seconds: float) -> None:
+    if seconds <= 0:
+        return
+    until = time.monotonic() + seconds
+    with _cooldown_lock:
+        if until > _cooldowns.get(endpoint, 0.0):
+            _cooldowns[endpoint] = until
+
+
+def cooldown_remaining(endpoint: str) -> float:
+    """Seconds this process must still stay away from ``endpoint`` (0 if none)."""
+    with _cooldown_lock:
+        until = _cooldowns.get(endpoint)
+    if until is None:
+        return 0.0
+    left = until - time.monotonic()
+    if left <= 0:
+        with _cooldown_lock:
+            if _cooldowns.get(endpoint) == until:
+                del _cooldowns[endpoint]
+        return 0.0
+    return left
+
+
+def reset_cooldowns() -> None:
+    """Forget every cooldown (tests; a long-running service after an operator check)."""
+    with _cooldown_lock:
+        _cooldowns.clear()
+
+
 def endpoint_chain(
     primary: str | None, fallbacks: Iterable[str] | None = None
 ) -> list[str]:
@@ -222,6 +396,9 @@ def call_with_failover(
     outage_endpoints: set[str] | None = None,
     op_label: str = "",
     chunk_label: str = "",
+    rate_limit_floor: float = DEFAULT_RATE_LIMIT_FLOOR,
+    max_retry_after: float = DEFAULT_MAX_RETRY_AFTER,
+    honour_cooldowns: bool = True,
 ) -> tuple[Any, str | None, Exception | None]:
     """Execute one operation across the endpoint chain with full
     fallback + retry semantics.
@@ -243,6 +420,14 @@ def call_with_failover(
 
     ``op_label`` / ``chunk_label`` tag the log lines so operators can see
     which operation succeeded or failed where.
+
+    Retry-After (0.41.0; module docstring "RETRY-AFTER"): a RETRY verdict on
+    an exception carrying a Retry-After interval, or a 429/503 status,
+    makes the next attempt on that endpoint wait at least that interval
+    (``rate_limit_floor`` when the header is absent); an interval over
+    ``max_retry_after`` leaves the endpoint for this call. Every interval is
+    recorded in the process-wide cooldown table, which later calls honour
+    unless ``honour_cooldowns=False``.
     """
     endpoints = list(endpoints)
     skip_outage: set[str] = (
@@ -252,15 +437,39 @@ def call_with_failover(
     last_exc: Exception | None = None
     label_suffix = f" ({chunk_label})" if chunk_label else ""
 
-    for endpoint in endpoints:
+    for idx, endpoint in enumerate(endpoints):
         if endpoint in skip_outage:
             continue
 
+        if honour_cooldowns:
+            left = cooldown_remaining(endpoint)
+            if left > 0:
+                # Another endpoint can take the request now: use it rather
+                # than wait. Only the last usable endpoint waits its window
+                # out, and only up to max_retry_after.
+                others = [e for e in endpoints[idx + 1:]
+                          if e not in skip_outage and cooldown_remaining(e) <= 0]
+                if others or left > max_retry_after:
+                    log.warning(
+                        "%s skipping %s%s: Retry-After window has %.1f s left",
+                        op_label or "call", endpoint, label_suffix, left,
+                    )
+                    continue
+                log.warning(
+                    "%s waiting %.1f s for the Retry-After window on %s%s",
+                    op_label or "call", left, endpoint, label_suffix,
+                )
+                time.sleep(left)
+
+        # The wait owed before the NEXT attempt on this endpoint, from the
+        # last Retry-After or rate-limit status; 0 when there was none.
+        owed = 0.0
         for attempt_no in range(max_retries):
             if delay_seconds and delay_seconds > 0:
                 time.sleep(delay_seconds)
             if attempt_no > 0:
-                time.sleep(backoff * (2 ** attempt_no) + random.uniform(0, jitter))
+                computed = backoff * (2 ** attempt_no) + random.uniform(0, jitter)
+                time.sleep(max(computed, owed))
 
             try:
                 result = attempt(endpoint)
@@ -268,6 +477,19 @@ def call_with_failover(
                 last_exc = exc
                 first_line = str(exc).split("\n", 1)[0][:200]
                 verdict = classify(exc)
+
+                # Retry-After is recorded whatever the verdict: an outage 429
+                # still tells later calls how long to stay away.
+                ra = retry_after_seconds(exc)
+                status = http_status(exc)
+                if ra is not None:
+                    owed = ra
+                elif status in RATE_LIMIT_STATUSES:
+                    owed = rate_limit_floor
+                else:
+                    owed = 0.0
+                if owed > 0:
+                    _note_cooldown(endpoint, owed)
 
                 if verdict == FATAL:
                     log.warning(
@@ -284,6 +506,14 @@ def call_with_failover(
                     skip_outage.add(endpoint)
                     break
                 if verdict == RETRY:
+                    if owed > max_retry_after:
+                        log.warning(
+                            "%s %s%s asked for a %.0f s wait (over %.0f s): "
+                            "leaving it for this call",
+                            op_label or "call", endpoint, label_suffix,
+                            owed, max_retry_after,
+                        )
+                        break
                     if attempt_no + 1 < max_retries:
                         log.warning(
                             "%s transient error on %s%s (attempt %d/%d): %s "

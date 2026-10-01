@@ -239,9 +239,7 @@ def clock(monkeypatch):
 
     monkeypatch.setattr(fo.time, "sleep", sleep)
     monkeypatch.setattr(fo.time, "monotonic", lambda: state["now"])
-    fo.reset_cooldowns()
-    yield state
-    fo.reset_cooldowns()
+    return state
 
 
 def test_retry_after_seconds_reads_urllib_headers():
@@ -310,44 +308,53 @@ def test_an_oversized_retry_after_leaves_the_endpoint(clock):
 
 
 def test_a_later_call_skips_a_cooling_endpoint_when_another_is_usable(clock):
+    memo: dict[str, float] = {}
     first = Script({"a": [_http_error(429, 120)] * 5, "b": ["ok"]})
-    call_with_failover(["a", "b"], first, classify_all(NEXT_ENDPOINT), **FAST)
+    call_with_failover(["a", "b"], first, classify_all(NEXT_ENDPOINT), cooldowns=memo, **FAST)
     second = Script({"a": ["primary"], "b": ["fallback"]})
-    res, used, _ = call_with_failover(["a", "b"], second, classify_all(RETRY), **FAST)
+    res, used, _ = call_with_failover(["a", "b"], second, classify_all(RETRY),
+                                      cooldowns=memo, **FAST)
     assert (res, used) == ("fallback", "b")
     assert second.calls == ["b"], "the cooling primary must not be probed"
 
 
 def test_the_last_usable_endpoint_waits_out_its_window(clock):
+    memo: dict[str, float] = {}
     first = Script({"a": [_http_error(429, 40)]})
-    call_with_failover(["a"], first, classify_all(NEXT_ENDPOINT), **FAST)
+    call_with_failover(["a"], first, classify_all(NEXT_ENDPOINT), cooldowns=memo, **FAST)
     clock["sleeps"].clear()
     second = Script({"a": ["ok"]})
-    res, _, _ = call_with_failover(["a"], second, classify_all(RETRY), **FAST)
+    res, _, _ = call_with_failover(["a"], second, classify_all(RETRY), cooldowns=memo, **FAST)
     assert res == "ok"
     assert clock["sleeps"] == [40.0]
 
 
 def test_the_window_expires(clock):
+    memo: dict[str, float] = {}
     first = Script({"a": [_http_error(429, 10)]})
-    call_with_failover(["a"], first, classify_all(NEXT_ENDPOINT), **FAST)
+    call_with_failover(["a"], first, classify_all(NEXT_ENDPOINT), cooldowns=memo, **FAST)
     clock["now"] += 11
-    assert fo.cooldown_remaining("a") == 0.0
+    assert fo.cooldown_remaining(memo, "a") == 0.0
+    assert memo == {}, "an expired entry is removed"
     second = Script({"a": ["ok"], "b": ["unused"]})
-    assert call_with_failover(["a", "b"], second, classify_all(RETRY), **FAST)[1] == "a"
+    assert call_with_failover(["a", "b"], second, classify_all(RETRY),
+                              cooldowns=memo, **FAST)[1] == "a"
 
 
-def test_cooldowns_can_be_ignored(clock):
+def test_without_a_memo_no_state_outlives_the_call(clock):
+    """0.41.0 kept a process-wide table, and a mocked 429 in one eidr-dq test
+    kept the real endpoint cooling in the next. No memo, no memory."""
     first = Script({"a": [_http_error(429, 120)]})
     call_with_failover(["a"], first, classify_all(NEXT_ENDPOINT), **FAST)
     second = Script({"a": ["ok"], "b": ["unused"]})
-    res, used, _ = call_with_failover(["a", "b"], second, classify_all(RETRY),
-                                      honour_cooldowns=False, **FAST)
+    res, used, _ = call_with_failover(["a", "b"], second, classify_all(RETRY), **FAST)
     assert used == "a"
+    assert not hasattr(fo, "_cooldowns")
 
 
 def test_an_outage_429_still_records_its_window(clock):
+    memo: dict[str, float] = {}
     script = Script({"a": [_http_error(429, 60)], "b": ["ok"]})
-    call_with_failover(["a", "b"], script, classify_all(OUTAGE), **FAST)
-    assert fo.cooldown_remaining("a") == 60.0
+    call_with_failover(["a", "b"], script, classify_all(OUTAGE), cooldowns=memo, **FAST)
+    assert fo.cooldown_remaining(memo, "a") == 60.0
 

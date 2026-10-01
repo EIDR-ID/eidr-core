@@ -85,13 +85,22 @@ Before the next attempt on the SAME endpoint the loop sleeps
 ``rate_limit_floor`` (5 s). An interval longer than ``max_retry_after`` is
 not slept inside one call: the endpoint is left for the rest of the call.
 
-The interval is a fact about the ENDPOINT, so it outlives the call: it is
-kept in a process-wide cooldown table. A later call that reaches a cooling
+The interval is a fact about the ENDPOINT, so it should outlive the call.
+A caller that makes several calls in one operation passes one
+``cooldowns`` dict to all of them -- the same shape as the outage memo --
+and every interval is recorded there. A later call that reaches a cooling
 endpoint skips it when another endpoint in its chain is usable, and
 otherwise waits out the remainder (up to ``max_retry_after``) before the
-first request -- eidr-wikidata's ``pairs_batch`` re-probes WDQS at the start
+first request: eidr-wikidata's ``pairs_batch`` re-probes WDQS at the start
 of every batch, and that probe must not land inside the window. Failing
-over to a DIFFERENT endpoint is never delayed.
+over to a DIFFERENT endpoint is never delayed. Without a memo, the wait is
+still honoured inside the call.
+
+Why a caller-owned memo and not a process-wide table (0.41.0 had one for
+an hour): hidden module state leaks between independent callers -- a mocked
+429 in one eidr-dq test kept the real WDQS endpoint "cooling" in the next
+test, and the suite went red. Explicit state is the portfolio's convention
+(``outage_endpoints``, the fact caches).
 
 WHAT STAYS PER-PROVIDER
 -----------------------
@@ -104,7 +113,6 @@ from __future__ import annotations
 import email.utils
 import logging
 import random
-import threading
 import time
 from collections.abc import Callable, Iterable, Sequence
 from datetime import datetime, timezone
@@ -128,7 +136,6 @@ __all__ = [
     "http_status",
     "retry_after_seconds",
     "cooldown_remaining",
-    "reset_cooldowns",
 ]
 
 log = logging.getLogger(__name__)
@@ -330,40 +337,32 @@ def retry_after_seconds(exc: BaseException, now: datetime | None = None) -> floa
     return _parse_retry_after(raw, now)
 
 
-# Process-wide: endpoint -> time.monotonic() before which it is not called.
-# A lock because eidr-wikidata resolves records on a thread pool.
-_cooldowns: dict[str, float] = {}
-_cooldown_lock = threading.Lock()
-
-
-def _note_cooldown(endpoint: str, seconds: float) -> None:
-    if seconds <= 0:
+def _note_cooldown(cooldowns: dict[str, float] | None, endpoint: str,
+                   seconds: float) -> None:
+    """Record that ``endpoint`` must not be called for ``seconds`` (memo only)."""
+    if cooldowns is None or seconds <= 0:
         return
     until = time.monotonic() + seconds
-    with _cooldown_lock:
-        if until > _cooldowns.get(endpoint, 0.0):
-            _cooldowns[endpoint] = until
+    if until > cooldowns.get(endpoint, 0.0):
+        cooldowns[endpoint] = until
 
 
-def cooldown_remaining(endpoint: str) -> float:
-    """Seconds this process must still stay away from ``endpoint`` (0 if none)."""
-    with _cooldown_lock:
-        until = _cooldowns.get(endpoint)
+def cooldown_remaining(cooldowns: dict[str, float] | None, endpoint: str) -> float:
+    """Seconds still to wait before calling ``endpoint``, per a ``cooldowns`` memo.
+
+    The memo maps endpoint -> ``time.monotonic()`` deadline; ``call_with_failover``
+    fills it. An expired entry is removed. No memo, or no entry: 0.
+    """
+    if not cooldowns:
+        return 0.0
+    until = cooldowns.get(endpoint)
     if until is None:
         return 0.0
     left = until - time.monotonic()
     if left <= 0:
-        with _cooldown_lock:
-            if _cooldowns.get(endpoint) == until:
-                del _cooldowns[endpoint]
+        cooldowns.pop(endpoint, None)
         return 0.0
     return left
-
-
-def reset_cooldowns() -> None:
-    """Forget every cooldown (tests; a long-running service after an operator check)."""
-    with _cooldown_lock:
-        _cooldowns.clear()
 
 
 def endpoint_chain(
@@ -398,7 +397,7 @@ def call_with_failover(
     chunk_label: str = "",
     rate_limit_floor: float = DEFAULT_RATE_LIMIT_FLOOR,
     max_retry_after: float = DEFAULT_MAX_RETRY_AFTER,
-    honour_cooldowns: bool = True,
+    cooldowns: dict[str, float] | None = None,
 ) -> tuple[Any, str | None, Exception | None]:
     """Execute one operation across the endpoint chain with full
     fallback + retry semantics.
@@ -425,9 +424,10 @@ def call_with_failover(
     an exception carrying a Retry-After interval, or a 429/503 status,
     makes the next attempt on that endpoint wait at least that interval
     (``rate_limit_floor`` when the header is absent); an interval over
-    ``max_retry_after`` leaves the endpoint for this call. Every interval is
-    recorded in the process-wide cooldown table, which later calls honour
-    unless ``honour_cooldowns=False``.
+    ``max_retry_after`` leaves the endpoint for this call. ``cooldowns`` is
+    the cross-call memo (endpoint -> monotonic deadline): pass one dict to
+    every call in an operation, as with ``outage_endpoints``, and a later
+    call will not probe an endpoint inside its window.
     """
     endpoints = list(endpoints)
     skip_outage: set[str] = (
@@ -441,14 +441,15 @@ def call_with_failover(
         if endpoint in skip_outage:
             continue
 
-        if honour_cooldowns:
-            left = cooldown_remaining(endpoint)
+        if cooldowns is not None:
+            left = cooldown_remaining(cooldowns, endpoint)
             if left > 0:
                 # Another endpoint can take the request now: use it rather
                 # than wait. Only the last usable endpoint waits its window
                 # out, and only up to max_retry_after.
                 others = [e for e in endpoints[idx + 1:]
-                          if e not in skip_outage and cooldown_remaining(e) <= 0]
+                          if e not in skip_outage
+                          and cooldown_remaining(cooldowns, e) <= 0]
                 if others or left > max_retry_after:
                     log.warning(
                         "%s skipping %s%s: Retry-After window has %.1f s left",
@@ -489,7 +490,7 @@ def call_with_failover(
                 else:
                     owed = 0.0
                 if owed > 0:
-                    _note_cooldown(endpoint, owed)
+                    _note_cooldown(cooldowns, endpoint, owed)
 
                 if verdict == FATAL:
                     log.warning(

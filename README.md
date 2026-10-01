@@ -98,7 +98,7 @@ after a later `git pull`. `eidr_core.__version__` reads the checkout's own
 | `eidr_core.secrets_loader` | One secrets loader (AWS Secrets Manager + local `.secrets.json`, one section layout) |
 | `eidr_core.verify` | External-fact verification primitives — categorical, precision-aware comparison (release-date precision is the asymmetry that makes this a separate engine from `compare`) |
 | `eidr_core.db_schemas` | Schema-contract assertions (`assert_tables`) against packaged manifests for the portfolio databases Four databases since 0.32.0: `imdb_snapshot_db` added (eidr-imdb) |
-| `eidr_core.external` | The shared external-source chassis: `FactCache` protocol + `Null`/`Dict` implementations and the fact-dict contract; retry/backoff + endpoint failover (`external/failover.py`), which since 0.41.0 honours `Retry-After` on 429/503 (5 s floor without the header; a process-wide per-endpoint cooldown that later calls respect) |
+| `eidr_core.external` | The shared external-source chassis: `FactCache` protocol + `Null`/`Dict` implementations and the fact-dict contract; retry/backoff + endpoint failover (`external/failover.py`), which honours `Retry-After` on 429/503 (0.42.0: 5 s floor without the header; a caller-owned `cooldowns` memo, like the outage memo, keeps later calls in an operation off a cooling endpoint) |
 
 Per-source external clients (Wikidata, TMDb, IMDb) are deliberately **not**
 here — each source has exactly one implementation home until a genuine

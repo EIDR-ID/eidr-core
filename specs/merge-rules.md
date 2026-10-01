@@ -68,7 +68,8 @@ of the field key inside `changes` is open (section 5).
 | Class | Applies to | Rule |
 |---|---|---|
 | exact | controlled vocabularies: Mode, codes, classes, ReferentType, types, relations | equal after case-fold |
-| normalized-exact | Alt IDs (see rule 18), countries, language codes, org IDs, roles | strip diacritics and punctuation, normalize whitespace, upper-case, then equal |
+| normalized-exact | countries, language codes, org IDs, roles | strip diacritics and punctuation, normalize whitespace, upper-case, then equal |
+| per rule 18 | Alt IDs | NOT normalized-exact (the .NET class, deliberately not carried): the Kind `(Type, Domain)` is compared exactly, the domain as the registry stores it, and the value under BMRtoAltID's rules -- see 18.1 |
 | fuzzy | every other text field: titles, director/actor display names (nickname-in-quotes tolerant), org names | normalize as above, then Levenshtein distance; "different" means distance > `FUZZY_THRESHOLD` |
 
 | Constant | Value | Status |
@@ -188,11 +189,15 @@ The operator, 2026-09-30, verbatim (relayed by eidr-wikidata):
 
 ### 4.2 Inherited counts as present (eidr-core's reading, adopted pending the operator's confirmation)
 
-For rules 15 and 21, an INHERITED value counts as present: "add if EIDR has
-none" never fires on a record whose parent supplies the value, so a supplied
-value never overrides inheritance. Seasons and Episodes are where it bites:
-their own ApproximateLength or ReleaseDate element may be absent because the
-value comes from the parent. eidr-wikidata proposed the reading; the
+For rule 15 (ApproximateLength) and the release-date rules 4 to 6, an
+INHERITED value counts as present and is the record's value for the
+comparison: "add if EIDR has none" never fires on a record whose parent
+supplies the value, and a supplied date is compared against the inherited
+date, so a supplied value never overrides inheritance. Seasons and Episodes
+are where it bites: their own ApproximateLength or ReleaseDate element may
+be absent because the value comes from the parent. Rule 21
+(SeriesInfo/EndDate) is unaffected: it applies to a Series, which has no
+parent to inherit from. eidr-wikidata proposed the reading; the
 operator's "inherited or self-defined" supports it; eidr-core adopted it
 2026-09-30 and it stands until the operator says otherwise. The engine
 therefore needs the full record (`eidr_core.inheritance`), not only the

@@ -74,7 +74,7 @@ name = "eidr-core"
 # moved, but T6 makes this repo's CI gate the precondition for consumers
 # pinning @main, so WHICH checker verified the py.typed annotations is part
 # of what that version identifies.
-version = "0.40.0"
+version = "0.40.1"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers
@@ -170,6 +170,17 @@ python_version = "3.10"
 # Optional-extra imports (rapidfuzz, openpyxl, boto3, eidr) are absent in
 # the base install; the gate must not require installing every extra.
 ignore_missing_imports = true
+
+# eidr-core never imports numpy; mypy reaches its stubs through openpyxl's
+# optional import, and numpy >= 2.5 writes `type X = ...` statements that the
+# 3.10 target refuses to parse (measured 2026-09-30: a machine-wide numpy
+# upgrade turned the local gate red with zero code change). Skipping the
+# package keeps the gate about THIS code.
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+# numpy ships .pyi stubs, and follow_imports alone does not apply to stubs.
+follow_imports_for_stubs = true
 
 [tool.setuptools.packages.find]
 where = ["src"]

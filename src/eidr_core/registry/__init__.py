@@ -97,6 +97,7 @@ from typing import TYPE_CHECKING, Any, Literal
 # import. Stdlib-only, so this costs nothing to consumers that never write
 # — unlike the SDK itself, which stays lazily imported below.
 from .operation_status import (
+    CODE_PENDING,
     CODE_SUCCESS,
     OperationStatus,
     parse_operation_status,
@@ -105,6 +106,7 @@ from .operation_status import (
 )
 
 __all__ = [
+    "CODE_PENDING",
     "CODE_SUCCESS",
     "DEFAULT_REGISTRY",
     "OperationStatus",

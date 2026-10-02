@@ -49,6 +49,18 @@ only the *implementation* underneath is temporary. When the SDK surfaces
 operation status natively, rewrite the body of ``token_operation_status``
 to read it and leave this API alone — consumers should not have to change.
 
+"Pending" inside the block (2026-10-01)
+---------------------------------------
+The registry can also put its "still processing" state INSIDE the
+``<OperationStatus>`` block, as ``<Code>2</Code><Type>pending</Type>``.
+LanguageTool polled five sandbox1 writes on 2026-10-01: four came back that
+way, read as REJECTED (``is_failure`` is ``not is_success``), and a minute
+later all four were ``0 / success``. That is the 2026-07-18 incident
+inverted -- successes reported as rejections, and a caller that retries on
+``is_failure`` re-submits writes that already landed. Such a block is no
+verdict, so the parse skips it: "no verdict yet" again has exactly one
+representation, ``None`` (or absence from the batch list).
+
 The parse is deliberately regex-over-raw-XML rather than ElementTree:
 ``raw_body`` is the one field the SDK hands over untouched, so this keeps
 working even if the SDK's own parsing changes underneath us.
@@ -63,6 +75,7 @@ from dataclasses import dataclass
 from typing import Any
 
 __all__ = [
+    "CODE_PENDING",
     "CODE_SUCCESS",
     "OperationStatus",
     "parse_operation_status",
@@ -88,6 +101,11 @@ _OP_STATUS_RE = re.compile(
 # reason; there is no "partially applied" verdict — see register R5 on the
 # all-or-nothing transaction semantics.
 CODE_SUCCESS = 0
+
+# The registry's in-block "still processing" status (observed 2026-10-01 on
+# sandbox1: Code 2 / Type pending). Not a verdict: skipped by the parse.
+CODE_PENDING = 2
+_PENDING_TYPES = frozenset({"pending"})
 
 
 @dataclass(frozen=True)
@@ -131,9 +149,16 @@ def _iter_matches(raw_body: str | bytes | None) -> Iterator[OperationStatus]:
     text = (raw_body.decode("utf-8", "replace")
             if isinstance(raw_body, bytes) else raw_body)
     for m in _OP_STATUS_RE.finditer(text):
+        code = int(m.group("code"))
+        type_ = (m.group("type") or "").strip()
+        # A pending block is the registry saying "no verdict yet" in-band.
+        # Yielding it would make is_failure true for a write that may still
+        # succeed (see the module docstring, 2026-10-01).
+        if code == CODE_PENDING or type_.lower() in _PENDING_TYPES:
+            continue
         yield OperationStatus(
-            code=int(m.group("code")),
-            type=(m.group("type") or "").strip(),
+            code=code,
+            type=type_,
             details=(m.group("details") or "").strip(),
             token=(m.group("token") or "").strip(),
         )
@@ -149,7 +174,9 @@ def parse_operation_statuses(raw_body: str | bytes | None) -> list[OperationStat
     module exists to stop.
 
     Returns an empty list when the body carries no ``<OperationStatus>``
-    block at all — i.e. no verdict has been reached yet.
+    block at all — i.e. no verdict has been reached yet. A block that says
+    pending (code 2) is likewise left out: the list holds verdicts reached,
+    and a token missing from it is still in flight.
     """
     return list(_iter_matches(raw_body))
 
@@ -159,8 +186,8 @@ def parse_operation_status(raw_body: str | bytes | None,
     """Extract the FIRST operation status from a status-lookup body.
 
     The single-write convenience form. Returns ``None`` when the body
-    carries no ``<OperationStatus>`` block — read that as "still pending",
-    never as success or failure.
+    carries no ``<OperationStatus>`` block, or only a pending one (code 2) —
+    read that as "still pending", never as success or failure.
 
     ``token`` supplies the token value for bodies that omit it from the
     block; a token parsed out of the body always wins.

@@ -357,3 +357,46 @@ def test_writable_true_is_carried_through(monkeypatch):
     get_registry_client(registry="https://x/EIDR", credentials=object(),
                         writable=True)
     assert built["writable"] is True
+
+
+# --- 2026-10-01: "pending" INSIDE the OperationStatus block ------------------
+# Shape reported by LanguageTool from sandbox1 (token 1790870733251057671):
+# four of five writes polled as Code 2 / pending, which is_failure read as a
+# REJECTION; a minute later all four were 0 / success.
+
+PENDING_IN_BLOCK = """<Response>
+  <Status><Code>0</Code><Type>success</Type></Status>
+  <RequestStatusResults>
+    <OperationStatus>
+      <Token>1790870733251057671</Token>
+      <Status><Code>2</Code><Type>pending</Type></Status>
+    </OperationStatus>
+  </RequestStatusResults>
+</Response>"""
+
+
+def test_a_pending_block_is_no_verdict():
+    assert parse_operation_status(PENDING_IN_BLOCK) is None
+    assert parse_operation_status(PENDING_IN_BLOCK, token="x") is None
+
+
+def test_a_pending_block_is_left_out_of_a_batch():
+    mixed = PENDING_IN_BLOCK.replace(
+        "</RequestStatusResults>",
+        "<OperationStatus><Token>1790870733251057672</Token>"
+        "<Status><Code>0</Code><Type>success</Type></Status></OperationStatus>"
+        "</RequestStatusResults>")
+    got = parse_operation_statuses(mixed)
+    assert [s.token for s in got] == ["1790870733251057672"]
+    assert got[0].is_success
+
+
+def test_type_pending_with_another_code_is_also_no_verdict():
+    body = PENDING_IN_BLOCK.replace("<Code>2</Code>", "<Code>7</Code>")
+    assert parse_operation_status(body) is None
+
+
+def test_a_real_rejection_still_reads_as_failure():
+    status = parse_operation_status(REJECTED)
+    assert status is not None and status.is_failure
+

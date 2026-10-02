@@ -12,8 +12,9 @@ a design change, made by eidr-core, with no version to bump.
 
 Sources: eidr-wikidata's design handoff of 2026-09-23 (sections 2 to 5), its
 follow-up of the same day, python-tools' review of section 5 (no conflicts),
-the eidr-core ruling of 2026-09-23, and eidr-wikidata's two Pro-flag
-handoffs of 2026-09-30.
+the eidr-core ruling of 2026-09-23, eidr-wikidata's two Pro-flag
+handoffs of 2026-09-30, and the operator's confirmation of section 4.2
+(2026-10-02).
 
 ## 1. Purpose and placement
 
@@ -115,7 +116,7 @@ modifies rules 4, 5, 6, 15 and 17; read it with the table.
 | 18 | AddMissingAlternateID | AlternateID | BMRtoAltID's rules, section 3.1 (an intentional departure from verbatim) | add |
 | 19 | AddMissingSeriesInfo | SeriesInfo flags | skipped: SeriesInfo must already exist on a Series | - |
 | 20 | AddMissingSeriesClass | SeriesInfo/SeriesClass | add all when EIDR has none | add |
-| 21 | AddMissingEndDate | SeriesInfo/EndDate | add the supplied date when EIDR has none (an inherited value counts as present: section 4.2); fixes the dead .NET condition | add |
+| 21 | AddMissingEndDate | SeriesInfo/EndDate | add the supplied date when EIDR has none (a Series has no parent, so section 4.2 does not apply); fixes the dead .NET condition | add |
 | 22 | AddMissingSeasonNumber | SeasonInfo/SequenceNumber | add when EIDR has none | add |
 | 23 | AddMissingSeasonClasses | SeasonInfo/SeasonClass | add every supplied class not present (exact) | add |
 | 24 | AddMissingEpisodeClasses | EpisodeInfo/EpisodeClass | add every supplied class not present (exact; no fuzzy) | add |
@@ -136,7 +137,7 @@ cited, not restated; where this list and that file disagree, that file wins.
 | 18.2 | "Already present" is Kind + value + relation. A blank relation, the mirror's `''` and `NULL` all read as `IsSameAs` (ruled into this spec 2026-09-23; a consumer must be right under either stored value) |
 | 18.3 | Same Kind + value, same relation: skipped silently (no change) |
 | 18.4 | Same Kind + value, different relation: `ALT_ID_RELATION_CONFLICT` in `conflicts`, not written, per Alt ID; the row's other Alt IDs still go. Never re-add a present value under a second relation; never hide one |
-| 18.5 | Same-kind conflict (altidtool-format.md rule 6; ruled into the engine 2026-09-23): a supplied `IsSameAs` value whose Kind EIDR already holds under `IsSameAs` with a DIFFERENT value is withheld and reported as a conflict, never written, except on the Kinds `eidr_core.altidtool_io.multi_form_domains()` declares (v1.4, `src/eidr_core/specs/multi_form_kinds.json`). The engine calls the function; it keeps no copy of the list |
+| 18.5 | Same-kind conflict (altidtool-format.md rule 6; ruled into the engine 2026-09-23): a supplied `IsSameAs` value whose Kind EIDR already holds under `IsSameAs` with a DIFFERENT value is withheld and reported as a conflict, never written, except on the Kinds `eidr_core.altidtool_io.multi_form_domains()` declares (v1.4; ruled entries v1.5, `src/eidr_core/specs/multi_form_kinds.json`). The engine calls the function; it keeps no copy of the list |
 | 18.6 | Every AltIDTool-format line (the `--altids-only` report) is composed by `eidr_core.altidtool_io.format_line` |
 | 18.7 | Values are validated with the AltIDTool rule set already in the portfolio (URI-safe value, named-type regex after corrections, length); the engine reports, never silently drops |
 
@@ -187,7 +188,7 @@ The operator, 2026-09-30, verbatim (relayed by eidr-wikidata):
 | 17 | `RT:Podcast;`, `RT:MusicVideo;` | unaffected; still eligible |
 | all | a `Pro`-flagged supplied value against an empty EIDR field | no gap-fill branch exists: Release Date and Approximate Length are required and always present (inherited or self-defined) |
 
-### 4.2 Inherited counts as present (eidr-core's reading, adopted pending the operator's confirmation)
+### 4.2 Inherited counts as present (RULED by the operator, 2026-10-02)
 
 For rule 15 (ApproximateLength) and the release-date rules 4 to 6, an
 INHERITED value counts as present and is the record's value for the
@@ -197,9 +198,9 @@ date, so a supplied value never overrides inheritance. Seasons and Episodes
 are where it bites: their own ApproximateLength or ReleaseDate element may
 be absent because the value comes from the parent. Rule 21
 (SeriesInfo/EndDate) is unaffected: it applies to a Series, which has no
-parent to inherit from. eidr-wikidata proposed the reading; the
-operator's "inherited or self-defined" supports it; eidr-core adopted it
-2026-09-30 and it stands until the operator says otherwise. The engine
+parent to inherit from. eidr-wikidata proposed the reading and eidr-core
+adopted it on 2026-09-30; the operator confirmed it on 2026-10-02,
+verbatim: "Yes. Inherited counts as present." The engine
 therefore needs the full record (`eidr_core.inheritance`), not only the
 record's own elements, to decide presence.
 
@@ -211,7 +212,6 @@ record's own elements, to decide presence.
 | Replace-class rules 2, 4, 5, 6, 7 (whether and how they ship behind `--replace`) | 2026-09-23 | after S3's fixtures |
 | `FUZZY_THRESHOLD` 4 / `FUZZY_THRESHOLD_ORG` 6 | 2026-09-23 | reviewable knobs; any change is a versioned change once this spec has a version |
 | The field key in `ChangeReport.changes`: eidr-wikidata asked for a key stable across sheet and record (`alt_id:<type>\|<domain>` for Alt IDs, the ledger's convention, and a documented equivalent per family) plus the normalized value | 2026-09-23 | with S3, before the report shape is versioned |
-| Section 4.2's reading | 2026-09-30 | the operator's confirmation |
 
 ## 6. .NET defects the engine must not carry
 

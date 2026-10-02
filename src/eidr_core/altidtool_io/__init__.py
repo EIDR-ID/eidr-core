@@ -122,7 +122,7 @@ def parse_edit_line(line: str) -> AltIdRow | AltIdRemoval | None:
 
 
 def multi_form_domains() -> frozenset[str]:
-    """Proprietary domains exempt from rule 6 (altidtool-format v1.4), lowercase.
+    """Proprietary domains exempt from rule 6 (altidtool-format v1.5), lowercase.
 
     Rule 6 withholds a second ``IsSameAs`` value of one Kind as a conflict.
     A handful of Kinds are multi-valued BY REGISTRY PRACTICE -- most records
@@ -140,6 +140,14 @@ def multi_form_domains() -> frozenset[str]:
     must exempt the same Kinds, and BMRtoAltID has no domain table of its own.
     Compare a Kind's domain lowercased; named types (IMDB, ISAN, ...) are
     never in the set.
+
+    An entry is listed on one of two bases, each recorded in the file
+    (v1.5, 2026-10-02): ``measured`` (the registry's own practice, above) or
+    ``ruled`` -- the operator declares a Kind two-form when its identifiers
+    come in two forms nobody outside the registrant can reconcile
+    (``mediafilm.ca``: numeric and ``mf-tt-N``, disjoint number ranges).
+    Callers see one set either way; the basis matters only to whoever
+    reviews the list.
     """
     import json
     from importlib.resources import files

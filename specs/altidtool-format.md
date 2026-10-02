@@ -1,4 +1,4 @@
-# AltIDTool Input File Format (SPEC v1.4)
+# AltIDTool Input File Format (SPEC v1.5)
 
 **Status:** landed 2026-08-04 (register R9 / Phase 3 item 3). The reference
 implementation is **`eidr_core.altidtool_io`** (`format_line` / `write_lines`
@@ -93,7 +93,7 @@ consumer a wrong answer.
    first** (eidr-wikidata, 2026-08-09; ruled portfolio-wide 2026-09-23 for the
    merge engine): withheld and reported, never written -- **except on the
    Kinds listed by `eidr_core.altidtool_io.multi_form_domains()`** (v1.4,
-   2026-09-26). A Kind is `(type, domain AS THE REGISTRY STORES IT)`:
+   2026-09-26; ruled entries v1.5, 2026-10-02). A Kind is `(type, domain AS THE REGISTRY STORES IT)`:
    `trakt.tv`, `trakt.tv/movies` and `trakt.tv/shows` are three Kinds.
    The exempt list is DECLARED in `src/eidr_core/specs/multi_form_kinds.json`,
    each entry with its measurement: a Kind is listed when at least half the
@@ -115,6 +115,21 @@ consumer a wrong answer.
    (`dvdcompare.net`, `kinobox.cz`, `youtube.com`) IS a rule-6 case: the
    source lists two, the registry may hold one as identity, a human decides.
    Consumers call the function; none keeps its own copy of the list.
+   **v1.5 (2026-10-02): a Kind may also be listed by operator RULING.** When
+   a Kind's identifiers come in two forms that cannot be told apart from
+   outside the registrant, the operator may declare it two-form; the entry
+   quotes the ruling and records the measurement taken when it was made.
+   First entry: `mediafilm.ca` -- operator: "We can't tell, so accept both
+   for now." Measured 2026-10-02: 7,681 `mf-tt-N` values (`mf-tt-1624656` to
+   `mf-tt-9999443355`) and 3,534 numeric values (127 to 91228), DISJOINT
+   ranges, so neither is a rendering of the other; 3 of 11,212 records hold
+   one of each and none holds two of one form; the published URL template
+   returns 404 for both. Raised by BMRtoAltID's first batch (T6: 77 of 731
+   rows carried a numeric value against a record holding `mf-tt-...`, all
+   withheld under v1.4). Provisional: reviewed if Mediafilm says the forms
+   are one identifier or one is retired. The separate Kind
+   `mediafilm.ca/film` (727 values, all `mf-tt`) is single-form and not
+   listed.
 
 ## For consumers/readers
 

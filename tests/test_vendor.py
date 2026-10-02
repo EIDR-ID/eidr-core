@@ -255,7 +255,8 @@ def test_cli_exit_codes(tmp_path, source, capsys):
 # the refusal only appears when someone tries to move the pin. This runs the
 # real module through sync, so the next such edit fails HERE.
 
-REAL_ALTIDTOOL = Path(__file__).resolve().parent.parent / "src" / "eidr_core" / "altidtool_io" / "__init__.py"
+REAL_ALTIDTOOL = (Path(__file__).resolve().parent.parent
+                  / "src" / "eidr_core" / "altidtool_io" / "__init__.py")
 
 
 def test_real_altidtool_io_vendors_and_works_without_eidr_core(tmp_path, source):

@@ -4,6 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
+# 0.46.0 (2026-10-02, operator-accepted suggestions): every public module now
+# declares __all__ (exactly the documented names), so star-imports stop
+# leaking stdlib/third-party names and the compare `config` alias; new module
+# eidr_core.dictionary (`python -m eidr_core.dictionary <name>`) reads the
+# DICTIONARY.md shipped with the installed code; the dictionary's Used-by
+# lines are generated from a consumer scan.
 # 0.45.1 (2026-10-02): altidtool_io is vendorable again. multi_form_domains()
 # finds its data through the module's parent package instead of naming it, so
 # the vendoring tool no longer refuses the module (python-tools' pin had been
@@ -92,7 +98,7 @@ name = "eidr-core"
 # moved, but T6 makes this repo's CI gate the precondition for consumers
 # pinning @main, so WHICH checker verified the py.typed annotations is part
 # of what that version identifies.
-version = "0.45.1"
+version = "0.46.0"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers
@@ -210,7 +216,9 @@ where = ["src"]
 # tuning surface of the unified engine — and the golden-pair corpus ship
 # inside the package so eidr_core.compare.spec / BMR-Review's golden.py
 # locate them via importlib.resources in any install mode.
-"eidr_core" = ["py.typed", "specs/*.json", "specs/golden_pairs/*.json",
+# DICTIONARY.md ships too, so `python -m eidr_core.dictionary` answers for
+# exactly the installed version (0.46.0).
+"eidr_core" = ["py.typed", "DICTIONARY.md", "specs/*.json", "specs/golden_pairs/*.json",
                "specs/db_schemas/*/manifest.json",
                "specs/db_schemas/*/schema.sql",
                "specs/db_schemas/*/CHANGES.md"]

@@ -36,7 +36,7 @@ from eidr_core.normalize import (
 
 from . import _params as config
 from . import nonlinear
-from ._params import set_source as set_params  # noqa: F401 — public registration API, re-exported
+from ._params import set_source as set_params  # the public registration API, re-exported
 from .titles import (
     is_internal,
     parts_ambiguous,
@@ -44,6 +44,36 @@ from .titles import (
     select_titles,
     title_similarity,
 )
+
+# The public surface, as DICTIONARY.md documents it (2026-10-02).
+# BMR-Review's compare shim star-imports this module; without an __all__
+# it also handed the shim `config` (this package's _params alias, easily
+# mistaken there for BMR-Review's own config), `fuzz`, `partial`, `dataclass`
+# and the normalize helpers.
+__all__ = [
+    "COMPARATORS",
+    "DATE_PROFILE_DEFAULT",
+    "alt_source",
+    "cmp_actors",
+    "cmp_alt_ids",
+    "cmp_assoc_orgs",
+    "cmp_countries",
+    "cmp_directors",
+    "cmp_distribution_number",
+    "cmp_end_date",
+    "cmp_house_sequence",
+    "cmp_length",
+    "cmp_original_language",
+    "cmp_release_date",
+    "cmp_sequence_number",
+    "cmp_time_slot",
+    "cmp_titles",
+    "cmp_version_language",
+    "date_profile",
+    "FieldResult",
+    "set_params",
+    "validate_date_profile",
+]
 
 
 @dataclass

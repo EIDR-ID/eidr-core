@@ -34,6 +34,14 @@ Longer-term this module also grows the year-aware validity reader over
 
 from __future__ import annotations
 
+# The public surface, as DICTIONARY.md documents it (2026-10-02).
+# Star-imports (BMR-Review's shims use them) now take only these names,
+# not the stdlib and third-party modules this file imports.
+__all__ = [
+    "OBSOLETE_ALPHA2_TO_ALPHA4",
+    "normalize_country_code",
+]
+
 # Former ISO 3166-1 alpha-2 codes of dissolved/renamed countries → alpha-4.
 OBSOLETE_ALPHA2_TO_ALPHA4: dict[str, str] = {
     "SU": "SUHH",   # U.S.S.R., dissolved 1991

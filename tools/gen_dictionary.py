@@ -27,34 +27,56 @@ the output is identical on every Python version.
 
 What counts as public: a module's ``__all__`` when it has one. Otherwise,
 its top-level functions, classes and UPPER_CASE constants without a leading
-underscore, plus the explicit re-exports in ``EXTRA_PUBLIC``. Modules whose
+underscore, plus any explicit re-exports in ``EXTRA_PUBLIC`` (none since every
+module declared an ``__all__``, 0.46.0). Modules whose
 own name starts with ``_`` are private and skipped. A name in a package's
 ``__all__`` that is imported from a submodule is documented once, under the
 package path the consumer imports it from.
 
+Two more generated parts (0.46.0, operator-accepted suggestions):
+
+* **The package copy.** ``src/eidr_core/DICTIONARY.md`` is a byte copy of the
+  root file, shipped as package data so ``python -m eidr_core.dictionary``
+  answers for exactly the installed version. ``--write`` refreshes it;
+  ``--check`` fails when it differs.
+* **"Used by." blocks**, generated from a scan of the consumer trees
+  (``--usage <targets.json>``, the eidr-core-ops publication list). The scan
+  needs the consumers on disk, so CI cannot rerun it: ``--check`` never
+  compares these blocks, and they are refreshed at each release instead.
+
 Usage:
     python tools/gen_dictionary.py --check   # exit 1 and list every problem
     python tools/gen_dictionary.py --write   # refresh blocks, add skeletons
+    python tools/gen_dictionary.py --write --usage \\
+        D:\\Software\\eidr-core-ops\\tools\\dictionary_targets.json
 """
 from __future__ import annotations
 
 import argparse
 import ast
+import datetime
+import json
 import re
 import sys
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "src" / "eidr_core"
 DICT = ROOT / "DICTIONARY.md"
+PKG_COPY = SRC / "DICTIONARY.md"
+USEDBY_RE = re.compile(
+    r"<!-- dict-usedby:(?P<qual>[\w.]+) -->\n(?P<body>.*?)<!-- /dict-usedby -->", re.S)
+# Directories a consumer scan never enters: environments, builds, and the
+# vendored copies (their use is reported from vendor.toml instead).
+SCAN_SKIP = {".venv", "venv", "node_modules", "build", "dist", "site-packages", ".git",
+             "_core", "__pycache__", ".tox", ".mypy_cache", ".pytest_cache"}
 
 # Re-exports that a module without __all__ makes public on purpose. Keep
 # this short. The better fix is an __all__ in the module, which makes the
 # public surface explicit for everyone, not only for this tool.
-EXTRA_PUBLIC: dict[str, list[str]] = {
-    "eidr_core.compare": ["set_params"],
-}
+EXTRA_PUBLIC: dict[str, list[str]] = {}   # empty since every module got an __all__ (0.46.0)
 
 TODO = "TODO"
 VALUE_MAX = 90  # longer constant values are shown truncated
@@ -582,7 +604,128 @@ def check(text: str) -> list[str]:
                         f"what changed for consumers")
     if not INDEX_RE.search(text):
         problems.append("no <!-- dict-index --> marker")
+    if not PKG_COPY.exists() or PKG_COPY.read_text(encoding="utf-8") != text:
+        problems.append(f"{PKG_COPY.relative_to(ROOT).as_posix()} differs from DICTIONARY.md: "
+                        f"run tools/gen_dictionary.py --write")
+    for qual in symbols:
+        if f"<!-- dict-usedby:{qual} -->" not in text:
+            problems.append(f"module {qual} has no generated 'Used by.' block: run "
+                            f"--write --usage <targets.json>")
     return problems
+
+
+# ---------------------------------------------------------------------------
+# "Used by." -- a scan of the consumer trees
+# ---------------------------------------------------------------------------
+
+def _vendored(root: Path) -> tuple[list[str], str]:
+    """Modules a consumer vendors (vendor.toml) and the pinned commit, or ([], "")."""
+    vt = root / "vendor.toml"
+    if not vt.is_file():
+        return [], ""
+    t = vt.read_text(encoding="utf-8")
+    mods = re.search(r"(?m)^modules\s*=\s*\[([^\]]*)\]", t)
+    pin = re.search(r'(?m)^commit\s*=\s*"([0-9a-f]+)"', t)
+    names = re.findall(r'"([^"]+)"', mods.group(1)) if mods else []
+    return names, (pin.group(1)[:7] if pin else "")
+
+
+def scan_usage(targets: list[dict], symbols: dict[str, list[Symbol]]
+               ) -> dict[str, dict[str, set[str]]]:
+    """section module -> project -> names it imports, by AST over each tree."""
+    quals = {s.qual for syms in symbols.values() for s in syms}
+    homes: dict[str, list[str]] = defaultdict(list)     # bare name -> documenting modules
+    for mod, syms in symbols.items():
+        for s in syms:
+            homes[s.name].append(mod)
+    usage: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+
+    def credit(project: str, module: str, name: str) -> None:
+        if not name or name.startswith("_") or name == "*":
+            return
+        if f"{module}.{name}" in quals:
+            usage[module][project].add(name)
+            return
+        if f"{module}.{name}" in symbols:                 # a submodule imported as a name
+            usage[f"{module}.{name}"][project].add("(the module)")
+            return
+        near = [m for m in homes.get(name, []) if module.startswith(m) or m.startswith(module)]
+        if near:
+            usage[near[0]][project].add(name)
+
+    for t in targets:
+        root, project = Path(t["path"]), t["name"]
+        if not root.is_dir():
+            continue
+        mods, pin = _vendored(root)
+        for m in mods:
+            if f"eidr_core.{m}" in symbols:
+                usage[f"eidr_core.{m}"][project].add(f"(vendors the module, pin `{pin}`)")
+        for p in root.rglob("*.py"):
+            if SCAN_SKIP & set(p.relative_to(root).parts):
+                continue
+            try:
+                tree = ast.parse(p.read_text(encoding="utf-8", errors="replace"))
+            except (SyntaxError, ValueError):
+                continue
+            alias: dict[str, str] = {}
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module \
+                        and (node.module == "eidr_core" or node.module.startswith("eidr_core.")):
+                    for a in node.names:
+                        credit(project, node.module, a.name)
+                        if f"{node.module}.{a.name}" in symbols:
+                            alias[a.asname or a.name] = f"{node.module}.{a.name}"
+                elif isinstance(node, ast.Import):
+                    for a in node.names:
+                        if a.name.startswith("eidr_core.") and a.name in symbols:
+                            alias[a.asname or a.name] = a.name
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) \
+                        and node.value.id in alias:
+                    credit(project, alias[node.value.id], node.attr)
+    return usage
+
+
+def render_usedby(qual: str, usage: dict[str, dict[str, set[str]]], when: str) -> str:
+    projects = usage.get(qual) or {}
+    if not projects:
+        return f"No consumer imports it directly (scan of {when}).\n"
+    lines = [f"Scan of {when}; regenerated at each release from the consumer trees."]
+    for project in sorted(projects, key=str.lower):
+        names = sorted(projects[project], key=lambda n: (n.startswith("("), n.lower()))
+        shown = ", ".join(n if n.startswith("(") else f"`{n}`" for n in names)
+        lines.append(f"* **{project}**: {shown}")
+    return "\n".join(lines) + "\n"
+
+
+def apply_usage(text: str, usage: dict[str, dict[str, set[str]]],
+                symbols: dict[str, list[Symbol]], when: str) -> str:
+    """Put a generated block under each module's 'Used by.' label, replacing
+    the authored paragraph the first time (it went stale on every adoption)."""
+    for qual in symbols:
+        span = _module_span(text, qual)
+        if span is None:
+            continue
+        start, end = span
+        section = text[start:end]
+        block = (f"<!-- dict-usedby:{qual} -->\n{render_usedby(qual, usage, when)}"
+                 f"<!-- /dict-usedby -->")
+        m = USEDBY_RE.search(section)
+        if m:
+            section = section[:m.start()] + block + section[m.end():]
+        else:
+            lab = re.search(r"\*\*Used by\.\*\*.*?(?=\n\*\*[A-Z][^*]*\.\*\*|\n#{2,3} |\Z)",
+                            section, re.S)
+            if lab:
+                section = (section[:lab.start()] + "**Used by.**\n" + block + "\n"
+                           + section[lab.end():])
+            else:
+                first = re.search(r"\n### ", section)
+                at = first.start() + 1 if first else len(section)
+                section = section[:at] + "**Used by.**\n" + block + "\n\n" + section[at:]
+        text = text[:start] + section + text[end:]
+    return text
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -590,15 +733,23 @@ def main(argv: list[str] | None = None) -> int:
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--check", action="store_true")
     g.add_argument("--write", action="store_true")
+    ap.add_argument("--usage", type=Path, help="targets JSON ([{name, path}]): refresh "
+                    "the 'Used by.' blocks from a scan of those trees")
     args = ap.parse_args(argv)
     text = DICT.read_text(encoding="utf-8") if DICT.exists() else ""
     if args.write:
         fresh, notes = regenerate(text)
+        if args.usage:
+            _, symbols = discover()
+            targets = json.loads(args.usage.read_text(encoding="utf-8"))
+            fresh = apply_usage(fresh, scan_usage(targets, symbols), symbols,
+                                datetime.date.today().isoformat())
         DICT.write_text(fresh, encoding="utf-8", newline="\n")
+        PKG_COPY.write_text(fresh, encoding="utf-8", newline="\n")
         for n in notes:
             print(n)
         todo = fresh.count(TODO)
-        print(f"wrote {DICT.name}; {todo} TODO marker(s) left")
+        print(f"wrote {DICT.name} and its package copy; {todo} TODO marker(s) left")
         return 0
     problems = check(text)
     for p in problems:

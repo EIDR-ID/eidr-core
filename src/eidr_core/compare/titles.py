@@ -36,6 +36,21 @@ from rapidfuzz import fuzz
 
 from eidr_core.normalize import norm_title
 
+# The public surface, as DICTIONARY.md documents it (2026-10-02).
+# Star-imports (BMR-Review's shims use them) now take only these names,
+# not the stdlib and third-party modules this file imports.
+__all__ = [
+    "COMBINATION_DIFFERS_QUALITY",
+    "PART_AMBIGUOUS_QUALITY",
+    "is_internal",
+    "parse_part",
+    "parts_ambiguous",
+    "parts_conflict",
+    "segments",
+    "select_titles",
+    "title_similarity",
+]
+
 _ROMAN = {"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6, "vii": 7,
           "viii": 8, "ix": 9, "x": 10, "xi": 11, "xii": 12}
 _SPELLED = {w: i for i, w in enumerate(

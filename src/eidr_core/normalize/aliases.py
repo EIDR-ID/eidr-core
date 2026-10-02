@@ -16,6 +16,15 @@ import csv
 import functools
 import os
 
+# The public surface, as DICTIONARY.md documents it (2026-10-02).
+# Star-imports (BMR-Review's shims use them) now take only these names,
+# not the stdlib and third-party modules this file imports.
+__all__ = [
+    "ORDINALS",
+    "alias_name",
+    "alias_title",
+]
+
 _DATA = os.path.join(os.path.dirname(__file__), "data", "word_alias.csv")
 
 # spelled ordinals -> cardinal digit (numeric ordinals like 1st/10th come from

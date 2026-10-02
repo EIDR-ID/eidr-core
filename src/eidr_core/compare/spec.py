@@ -31,6 +31,14 @@ import os
 from importlib.resources import files
 from pathlib import Path
 
+# The public surface, as DICTIONARY.md documents it (2026-10-02).
+# Star-imports (BMR-Review's shims use them) now take only these names,
+# not the stdlib and third-party modules this file imports.
+__all__ = [
+    "load_spec",
+    "spec_path",
+]
+
 _ENV_VAR = "EIDR_COMPARE_SPEC"
 
 _CONTAINER = {

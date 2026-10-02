@@ -26,6 +26,15 @@ dead code: it is a loaded trap for whoever reads the signature years later.
 """
 from . import _params as config
 
+# The public surface, as DICTIONARY.md documents it (2026-10-02).
+# Star-imports (BMR-Review's shims use them) now take only these names,
+# not the stdlib and third-party modules this file imports.
+__all__ = [
+    "accumulate",
+    "aggregate",
+    "corroborate",
+]
+
 
 def aggregate(qualities, n_opportunities, r=None, denom_basis=None):
     if r is None:

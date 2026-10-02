@@ -30,6 +30,16 @@ from __future__ import annotations
 
 import re
 
+# The public surface, as DICTIONARY.md documents it (2026-10-02).
+# Star-imports (BMR-Review's shims use them) now take only these names,
+# not the stdlib and third-party modules this file imports.
+__all__ = [
+    "band",
+    "field_not_counted",
+    "field_states",
+    "ui_field_key",
+]
+
 # Engine rationale field -> De-Dupe UI field-manifest key. Engine names not
 # listed map to themselves (they already coincide, e.g. release_date,
 # director, actor, original_language, version_language, edit_class).

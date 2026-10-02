@@ -40,6 +40,16 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any, overload
 
+# The public surface, as DICTIONARY.md documents it (2026-10-02).
+# Star-imports (BMR-Review's shims use them) now take only these names,
+# not the stdlib and third-party modules this file imports.
+__all__ = [
+    "load_aws",
+    "load_local",
+    "load_secrets",
+    "SecretsError",
+]
+
 
 class SecretsError(RuntimeError):
     pass

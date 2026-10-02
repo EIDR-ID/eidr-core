@@ -24,6 +24,17 @@ import json
 from functools import cache
 from importlib.resources import files
 
+# The public surface, as DICTIONARY.md documents it (2026-10-02).
+# Star-imports (BMR-Review's shims use them) now take only these names,
+# not the stdlib and third-party modules this file imports.
+__all__ = [
+    "DATABASES",
+    "assert_tables",
+    "contract_version",
+    "load_manifest",
+    "table_columns",
+]
+
 # Fourth entry added 2026-09-11 (eidr-imdb request): "all portfolio databases,
 # one pattern" was the 2026-08-03 approval; a fourth database is the pattern
 # applied, not a new decision.

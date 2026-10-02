@@ -17,6 +17,26 @@ from eidr_core.codes import normalize_country_code as canon_country
 
 from .aliases import alias_name, alias_title
 
+# The public surface, as DICTIONARY.md documents it (2026-10-02).
+# Star-imports (BMR-Review's shims use them) now take only these names,
+# not the stdlib and third-party modules this file imports.
+__all__ = [
+    "ascii_fold",
+    "canon_country",
+    "cmp_key",
+    "days_between",
+    "nfkc",
+    "norm_code",
+    "norm_country",
+    "norm_lang",
+    "norm_name",
+    "norm_title",
+    "parse_date",
+    "parse_minutes",
+    "parse_registrant_extra",
+    "sanitize_field",
+]
+
 # Leading articles to strip (extend per-language as needed).
 _ARTICLES = {
     "the", "a", "an",            # en

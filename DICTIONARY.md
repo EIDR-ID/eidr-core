@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.43.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.44.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -75,6 +75,24 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.44.0 (2026-10-02)
+
+* **compare-spec 2.18.0: Internal titles count, discounted.** The packaged
+  spec now defines `INTERNAL_TITLE_DISCOUNT` (0.8) and
+  `INTERNAL_TITLE_ACCEPT_REQUIRES_ALT_ID` (true). A consumer that registers
+  `load_spec()` with `compare.set_params` now gets Internal-class titles
+  (machine translations) in `compare.cmp_titles`, at the discount. Scores
+  move wherever a candidate carries an Internal title.
+* `compare.cmp_titles` with the discount registered: an Internal pair earns
+  first-match credit only, never the accumulation bonus. Without the knob,
+  nothing changes.
+* The Accept cap for an Internal-carried title is BMR-Review's scorer rule.
+  eidr-core carries only its constant in the spec.
+* The golden corpus has 38 fixtures (24 `pair`, 13 `case`, 1
+  `recovery_pool`). `case` fixtures' `notes_match` and `notes_not_match` now
+  read the assessment's notes AND its reason, and `expected` records
+  `reason`. See `specs/golden-pairs.md`.
 
 ### 0.43.0 (2026-10-02)
 
@@ -1365,7 +1383,7 @@ Source `src/eidr_core/compare/__init__.py`. Public names: 19 functions, 1 class,
 * eidr-imdb reserves the `[compare]` extra in `pyproject.toml` but imports nothing yet. No other consumer imports it. python-sdk does not vendor it (its `vendor.toml` lists only `ids`).
 
 **Specs.**
-* `specs/compare-spec.md` and `src/eidr_core/specs/compare-spec.json` (2.17.0): the constants the comparators read, `DATE_PROFILES`, and the definition of a common Alt ID (Kind, Value, identity relation; ShortDOI skipped).
+* `specs/compare-spec.md` and `src/eidr_core/specs/compare-spec.json` (2.18.0): the constants the comparators read, `DATE_PROFILES`, and the definition of a common Alt ID (Kind, Value, identity relation; ShortDOI skipped).
 * `specs/unified-scoring.md`: the L1/L2/L3 layering that makes this the single comparator library.
 * `specs/normalized-record.md` section 4.1: Internal and system-generated titles are diminished, never ignored (the `INTERNAL_TITLE_DISCOUNT` mechanism).
 * `specs/golden-pairs.md`: the corpus that pins comparator output across Python and JavaScript.
@@ -1407,7 +1425,7 @@ Defined in `src/eidr_core/compare/__init__.py`.
 **Returns** not annotated -- `FieldResult` with field `"actor"`: quality in [0, 1], or `None` (detail `absent`) when either side has no named entry.
 <!-- /dict -->
 
-**Does.** Compares actors lists by greedy one-to-one name alignment; quality is matched strength over the smaller list's size. Names go through `norm_name` ("Last, First" becomes "first last"), then fuzzy similarity: space-insensitive equality is 1.0, otherwise the larger of rapidfuzz `token_set_ratio` and `WRatio`. A pair below `NAME_MATCH_MIN` (0.80 at compare-spec 2.17.0) scores 0, so different people earn no partial credit. The result is capped at 1.0: people use proportional credit, not `accumulate`, so two 4-name lists sharing one name score 0.25, while a 1-name list matched inside a 4-name list scores 1.0.
+**Does.** Compares actors lists by greedy one-to-one name alignment; quality is matched strength over the smaller list's size. Names go through `norm_name` ("Last, First" becomes "first last"), then fuzzy similarity: space-insensitive equality is 1.0, otherwise the larger of rapidfuzz `token_set_ratio` and `WRatio`. A pair below `NAME_MATCH_MIN` (0.80 at compare-spec 2.18.0) scores 0, so different people earn no partial credit. The result is capped at 1.0: people use proportional credit, not `accumulate`, so two 4-name lists sharing one name score 0.25, while a 1-name list matched inside a 4-name list scores 1.0.
 
 **Notes.** Needs registered parameters (`NAME_MATCH_MIN`), else RuntimeError. Entries with an empty `display` are ignored on both sides.
 
@@ -1487,7 +1505,7 @@ Defined in `src/eidr_core/compare/__init__.py`.
 **Returns** not annotated -- `FieldResult` with field `"director"`: quality in [0, 1], or `None` (detail `absent`) when either side has no named entry.
 <!-- /dict -->
 
-**Does.** Compares directors lists by greedy one-to-one name alignment; quality is matched strength over the smaller list's size. Names go through `norm_name` ("Last, First" becomes "first last"), then fuzzy similarity: space-insensitive equality is 1.0, otherwise the larger of rapidfuzz `token_set_ratio` and `WRatio`. A pair below `NAME_MATCH_MIN` (0.80 at compare-spec 2.17.0) scores 0, so different people earn no partial credit. The result is capped at 1.0: people use proportional credit, not `accumulate`, so two 4-name lists sharing one name score 0.25, while a 1-name list matched inside a 4-name list scores 1.0.
+**Does.** Compares directors lists by greedy one-to-one name alignment; quality is matched strength over the smaller list's size. Names go through `norm_name` ("Last, First" becomes "first last"), then fuzzy similarity: space-insensitive equality is 1.0, otherwise the larger of rapidfuzz `token_set_ratio` and `WRatio`. A pair below `NAME_MATCH_MIN` (0.80 at compare-spec 2.18.0) scores 0, so different people earn no partial credit. The result is capped at 1.0: people use proportional credit, not `accumulate`, so two 4-name lists sharing one name score 0.25, while a 1-name list matched inside a 4-name list scores 1.0.
 
 **Notes.** Needs registered parameters (`NAME_MATCH_MIN`), else RuntimeError. Entries with an empty `display` are ignored on both sides.
 
@@ -1529,7 +1547,7 @@ Defined in `src/eidr_core/compare/__init__.py`.
 **Returns** not annotated -- `FieldResult` with field `"end_date"`: 1.0 for the same year, else 0.5 ** (year gap / `DATE_YEAR_HALFLIFE_YEARS`); `None` (detail `absent`) when either year is unparseable.
 <!-- /dict -->
 
-**Does.** Compares series or season end dates at year precision with an exponential half-life decay. Month and day are ignored, and the quality never goes negative. It reads `DATE_YEAR_HALFLIFE_YEARS` (4.0 at compare-spec 2.17.0), so a 4-year gap scores 0.5; `DATE_PROFILES` do not apply here.
+**Does.** Compares series or season end dates at year precision with an exponential half-life decay. Month and day are ignored, and the quality never goes negative. It reads `DATE_YEAR_HALFLIFE_YEARS` (4.0 at compare-spec 2.18.0), so a 4-year gap scores 0.5; `DATE_PROFILES` do not apply here.
 
 ### `cmp_house_sequence`
 
@@ -1607,7 +1625,7 @@ Defined in `src/eidr_core/compare/__init__.py`.
 
 **Does.** Scores two release dates by precision, comparing full dates by day distance and anything coarser by year gap. With `DATE_PROFILES` registered, full dates use the profile's `full_date_bands` and, beyond the last band, its year table keyed on the larger of the calendar year gap and the distance-equivalent gap (at least 1), clamped to the last band; year-level pairs use `year_gap_credit` and `year_gap_floor`. Without profiles, or when a table cannot answer, the legacy half-life curves (`DATE_FULL_HALFLIFE_DAYS`, `DATE_YEAR_HALFLIFE_YEARS*`) apply. Epoch suspects (year-only 1970, or 1970-01-01) get the `DATE_EPOCH_*` credits instead of a full match and a floor on a mismatch.
 
-**Notes.** The estimated flag acts differently by path: in the year-table path it multiplies the credit by `DATE_ESTIMATED_LENIENCY` (capped at 1.0, so at 2.0 a one-year gap scores 1.0, which for Episode beats the 0.80 a year match earns at compare-spec 2.17.0); in the legacy curves it lengthens the half-life; the day-band and fall-through paths ignore it apart from the ` est` detail suffix. A month-precision date (`YYYY-MM`) compares at year level. An impossible full ISO date such as `2001-02-30` against a different full date raises ValueError (from `days_between`).
+**Notes.** The estimated flag acts differently by path: in the year-table path it multiplies the credit by `DATE_ESTIMATED_LENIENCY` (capped at 1.0, so at 2.0 a one-year gap scores 1.0, which for Episode beats the 0.80 a year match earns at compare-spec 2.18.0); in the legacy curves it lengthens the half-life; the day-band and fall-through paths ignore it apart from the ` est` detail suffix. A month-precision date (`YYYY-MM`) compares at year level. An impossible full ISO date such as `2001-02-30` against a different full date raises ValueError (from `days_between`).
 
 ### `cmp_sequence_number`
 
@@ -1664,7 +1682,7 @@ Defined in `src/eidr_core/compare/__init__.py`.
 **Returns** not annotated -- `FieldResult` with field `"title"`: quality from `accumulate` over the aligned pairs (above 1.0 when several titles match), or `None` with `meta={}` when a side has no title text or both sides hold only fallback titles. Otherwise `meta` has `best_sim`, `part_conflict`, `part_base_match`, `part_ambiguous`, plus `internal_title_used` when the Internal knob is registered.
 <!-- /dict -->
 
-**Does.** Compares two records' title lists with part and segment rules, greedy one-to-one alignment, and diminishing credit for extra matches. Real titles are preferred (`select_titles`): system-generated and, by default, Internal titles are fallback only, and the field is dropped when both sides fall back. Pair similarity is `titles.title_similarity`, with the episode rules on only when both records are Episode or Season. With `INTERNAL_TITLE_DISCOUNT` registered (a number in (0, 1]), Internal titles are included and every pair touching one is multiplied by it; any other non-None value raises ValueError. No compare-spec version defines that knob yet, so the path is inert for every consumer today.
+**Does.** Compares two records' title lists with part and segment rules, greedy one-to-one alignment, and diminishing credit for extra matches. Real titles are preferred (`select_titles`): system-generated and, by default, Internal titles are fallback only, and the field is dropped when both sides fall back. Pair similarity is `titles.title_similarity`, with the episode rules on only when both records are Episode or Season. With `INTERNAL_TITLE_DISCOUNT` registered (a number in (0, 1]; compare-spec 2.18.0 sets 0.8), Internal titles are included, every pair touching one is multiplied by it, and an Internal pair counts only as the best aligned pair, never as an accumulation bonus; any other non-None value raises ValueError.
 
 **Notes.** Needs registered parameters unless the field is dropped (`accumulate` reads `NL_MODIFIER`, `FIELD_BONUS_CAP`). `part_ambiguous` is reported only for episodic pairs with no part conflict, and `parts_conflict` already flags a numbered title against its bare base, so two episodes titled `Show Part 2` and `Show` report `part_conflict: True`, `part_ambiguous: False` while scoring `PART_AMBIGUOUS_QUALITY` (0.70). The detail strings `no real title to compare` and `system-generated titles only - ignored` are pinned by De-Dupe UI's spec audit; do not reword them casually.
 
@@ -1747,7 +1765,7 @@ Defined in `src/eidr_core/compare/__init__.py`.
 
 **Does.** Checks a date profile for authoring defects and returns them as messages rather than raising them. It reports a year table that rises with distance, a floor above the last credit, and a last full-date band below the gap-1 credit (the band-to-year boundary would step up). Non-integer year keys return a single problem immediately. Call it from tests or when loading a spec; scoring never calls it, and the clamp in `cmp_release_date` covers only the band-to-year step, so a non-monotonic year table scores exactly as authored.
 
-**Notes.** Needs no registered parameters. Both profiles shipped in compare-spec 2.17.0 validate clean; the docstring's remark that `Basic` fails by 0.01 describes 2.8.0. A year key that parses as an integer but is not written canonically (`"01"`, `" 1"`) raises KeyError instead of being reported.
+**Notes.** Needs no registered parameters. Both profiles shipped in compare-spec 2.18.0 validate clean; the docstring's remark that `Basic` fails by 0.01 describes 2.8.0. A year key that parses as an integer but is not written canonically (`"01"`, `" 1"`) raises KeyError instead of being reported.
 
 ### `FieldResult` (class)
 
@@ -1809,7 +1827,7 @@ Source `src/eidr_core/compare/nonlinear.py`. Public names: 3 functions (no `__al
 * BMR-Review: `tests/test_terminal_set_contract.py` imports the module to assert that `opportunities` stays deleted (and calls `accumulate`). Its shim `eidr_dedup_score/nonlinear.py` still imports `opportunities` and raises ImportError if anything imports it; nothing does today.
 * No other consumer imports it. python-sdk does not vendor it.
 
-**Specs.** `specs/compare-spec.md` ("Scoring model") and compare-spec.json `values`: `NL_MODIFIER` (0.75) and `FIELD_BONUS_CAP` (1.0) at 2.17.0.
+**Specs.** `specs/compare-spec.md` ("Scoring model") and compare-spec.json `values`: `NL_MODIFIER` (0.75) and `FIELD_BONUS_CAP` (1.0) at 2.18.0.
 
 ### `accumulate`
 
@@ -1895,7 +1913,7 @@ Source `src/eidr_core/compare/spec.py`. Public names: 2 functions (no `__all__`:
 * De-Dupe UI reads compare-spec.json as raw JSON in `tools/audit_spec_claims.py` and `tools/check_engine_sync.py` (auditing and syncing the JavaScript copy), not through this loader; `check_engine_sync.py` also hashes this source file, so any edit reports drift there.
 * No other consumer imports it. python-sdk does not vendor it.
 
-**Specs.** `specs/compare-spec.md` (structure and tuning workflow) and `src/eidr_core/specs/compare-spec.json` (sections `$spec`, `types`, `weights`, `values`, `states`, `rationale_schema`; version 2.17.0 today). `rationale_schema` is not returned by `load_spec`.
+**Specs.** `specs/compare-spec.md` (structure and tuning workflow) and `src/eidr_core/specs/compare-spec.json` (sections `$spec`, `types`, `weights`, `values`, `states`, `rationale_schema`; version 2.18.0 on 2026-10-02). `rationale_schema` is not returned by `load_spec`.
 
 ### `load_spec`
 
@@ -1955,7 +1973,7 @@ Source `src/eidr_core/compare/states.py`. Public names: 4 functions (no `__all__
 * De-Dupe UI imports nothing from it, but `tools/check_engine_sync.py` hashes this source file, so any edit reports drift for its JavaScript port.
 * No other consumer imports it. python-sdk does not vendor it.
 
-**Specs.** `specs/dedupe-worklist.md` section 4 (payload shape, UI-manifest keys, states never recomputed by the UI); compare-spec.json `states` (defaults 0.985 / 0.75, empty `per_field`, `discriminative_fields` alt_id, release_date, length, edit_class, manifestation_class at 2.17.0); `specs/unified-scoring.md` (states are bands over q).
+**Specs.** `specs/dedupe-worklist.md` section 4 (payload shape, UI-manifest keys, states never recomputed by the UI); compare-spec.json `states` (defaults 0.985 / 0.75, empty `per_field`, `discriminative_fields` alt_id, release_date, length, edit_class, manifestation_class at 2.18.0); `specs/unified-scoring.md` (states are bands over q).
 
 ### `band`
 
@@ -4334,8 +4352,8 @@ no version yet.
 |---|---|---|---|---|
 | `specs/normalized-record.md` | The field model of an EIDR record and its canonical ordering (titles, Alt IDs, credits) | SPEC v1, ratified 2026-07-29 | none | `eidr_core.ordering`; consumers XML_to_JSON, BMR-Review, eidr-wikidata, De-Dupe UI |
 | `specs/unified-scoring.md` | The design of the one match-candidate scoring engine: layers, banded states, per-creation-type weights | approved 2026-07-27 | its runtime config is the compare-spec | BMR-Review's engine (reference), De-Dupe UI (JavaScript) |
-| `specs/compare-spec.md` | The engine's tuning surface: weights, values, states, rationale, and the porting requirements | version in the JSON: 2.17.0 today. The `.md` header still reads "2.0.0"; the JSON is authoritative | `src/eidr_core/specs/compare-spec.json`, loaded by `eidr_core.compare.spec.load_spec` (override with `EIDR_COMPARE_SPEC`) | Authored in BMR-Review `eidr_dedup_score/config.py` and regenerated, never hand-edited; conforming: BMR-Review, De-Dupe UI |
-| `specs/golden-pairs.md` | The conformance corpus formats (`pair`, `case`, `recovery_pool`), invariants, and the optional `ancestry` block | landed; 34 fixtures at compare-spec 2.17.0 | `src/eidr_core/specs/golden_pairs/*.json`; `golden_pairs_pending/` holds fixtures that wait on an engine version | Evaluator: BMR-Review `eidr_dedup_score/golden.py`; conforming: BMR-Review, De-Dupe UI |
+| `specs/compare-spec.md` | The engine's tuning surface: weights, values, states, rationale, and the porting requirements | the version is the JSON's `$spec.version`: 2.18.0 on 2026-10-02 | `src/eidr_core/specs/compare-spec.json`, loaded by `eidr_core.compare.spec.load_spec` (override with `EIDR_COMPARE_SPEC`) | Authored in BMR-Review `eidr_dedup_score/config.py` and regenerated, never hand-edited; conforming: BMR-Review, De-Dupe UI |
+| `specs/golden-pairs.md` | The conformance corpus formats (`pair`, `case`, `recovery_pool`), invariants, and the optional `ancestry` block | landed; 38 fixtures at compare-spec 2.18.0 | `src/eidr_core/specs/golden_pairs/*.json`; `golden_pairs_pending/` holds fixtures that wait on an engine version | Evaluator: BMR-Review `eidr_dedup_score/golden.py`; conforming: BMR-Review, De-Dupe UI |
 | `specs/dedupe-worklist.md` | The De-Dupe work-list, results and supplement JSONL formats, including the per-candidate scoring payload | SPEC v2 (2026-08-30) | none | Producer BMR-Review `run_worklist.py`; consumer De-Dupe UI |
 | `specs/altidtool-format.md` | The AltIDTool input line (3, 4 or 5 tab-separated columns) and the portfolio's Alt ID rules (relation, presence, rule 6) | SPEC v1.5 (2026-10-02) | `src/eidr_core/specs/multi_form_kinds.json`, read by `multi_form_domains()` | `eidr_core.altidtool_io`; producers eidr-wikidata and BMRtoAltID; vendored by python-tools |
 | `specs/altid-display-order.md`, `specs/title-display-order.md` | The display order of Alt IDs and titles that the API Shim must emit | handoffs to the API Shim team, 2026-07-29 and 2026-07-30 | none | the API Shim (outside this portfolio) |

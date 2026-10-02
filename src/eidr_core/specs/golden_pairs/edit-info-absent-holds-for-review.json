@@ -64,13 +64,14 @@
     ]
   },
   "expected": {
-    "spec_version": "2.17.0",
+    "spec_version": "2.18.0",
     "assessment": "Review",
     "proposed_id": "10.5240/FEED-0001-0002-0003-0005-K",
     "confidence": 100.0,
     "clears_without_review": false,
     "notes": [
       "editinfo: base object data accepts 10.5240/FEED-0001-0002-0003-0005-K but the candidate record asserts no EditInfo -- identity cannot be confirmed, held for review"
-    ]
+    ],
+    "reason": "Tamr auto-matched, but the match scores in the Review band — confirm or correct."
   }
 }

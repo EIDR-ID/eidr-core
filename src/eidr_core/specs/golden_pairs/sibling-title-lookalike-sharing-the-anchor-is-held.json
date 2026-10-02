@@ -77,11 +77,12 @@
     "clears_without_review": false
   },
   "expected": {
-    "spec_version": "2.17.0",
+    "spec_version": "2.18.0",
     "assessment": "Disagree: other match",
     "proposed_id": "10.5240/FEED-0001-0002-0003-0005-K",
     "confidence": 89.7,
     "clears_without_review": false,
-    "notes": []
+    "notes": [],
+    "reason": "Sole high-scoring candidate, but auto-match is gated: multiple siblings under the same parent share this title — reported for manual review."
   }
 }

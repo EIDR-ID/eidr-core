@@ -47,5 +47,35 @@
     "field_quality_max": {
       "title": 1.0
     }
+  },
+  "expected": {
+    "spec_version": "2.18.0",
+    "confidence": 79.0,
+    "verdict": "Review",
+    "field_qualities": {
+      "title": 0.957,
+      "release_date": 1.0,
+      "director": null,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": null,
+      "original_language": null,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "similar",
+      "release_date": "identical",
+      "director": "neutral",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "neutral",
+      "original_language": "neutral",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
   }
 }

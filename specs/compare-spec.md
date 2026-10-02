@@ -3,9 +3,11 @@
 **The runtime file is `src/eidr_core/specs/compare-spec.json`** (inside the
 package so `eidr_core.compare.spec.load_spec` finds it via importlib.resources
 in any install mode; override with the `EIDR_COMPARE_SPEC` env var for
-experiments). Current version: **2.0.0** — a 1:1 externalization of BMR-Review's
-`config.py` as of 2026-07-28 (that file's annotated original is preserved in
-BMR-Review git history, commit `17574c4` and earlier).
+experiments). **The version is the JSON's `$spec.version`;** this document no
+longer repeats it, because the copy here went stale (it read 2.0.0 until
+2.18.0). 2.0.0 was the 1:1 externalization of BMR-Review's `config.py` as of
+2026-07-28 (that file's annotated original is preserved in BMR-Review git
+history, commit `17574c4` and earlier).
 
 ## Tuning workflow (the whole point)
 
@@ -68,7 +70,38 @@ the reasoning, not just the number.
   date prefix the fuzzy title comparator cannot see, and the blocker had held
   20 rows a reviewer confirmed 20 of 20. A rule change with no value moved;
   pinned both ways by `sibling-title-lookalike-with-distinct-anchor-clears`
-  and `sibling-title-lookalike-sharing-the-anchor-is-held`.
+  and `sibling-title-lookalike-sharing-the-anchor-is-held`. **Precisely**
+  (stated at 2.18.0; the engine has done this since 2.17.0): (1) the sibling
+  is compared on the ONE anchor kind that picked the proposal -- full date,
+  distribution number, house sequence, sequence number or end date; (2) an
+  `alt-id` anchor keeps the gate as before, because identifiers copied
+  across a set are the known source of wrong 100s; (3) an anchor kind the
+  comparison does not recognise counts as SHARED, so the gate fires; (4) the
+  part-letter strip applies only in the sibling comparison. (2) and (3)
+  together are pinned by `sibling-title-lookalike-altid-anchor-is-held`
+  (2.18.0, De-Dupe UI S-33): an engine that drops the alt-id exception and
+  defaults an unknown kind to not-shared clears it.
+* **Internal titles count, discounted (2.18.0, LanguageTool's request,
+  BMR-Review T38; operator GO and "Accept both changes", 2026-10-02).**
+  `INTERNAL_TITLE_DISCOUNT` (0.8): an Internal-class title -- a machine
+  translation, mostly an English rendering of a non-English registered title
+  -- takes part in title comparison with its similarity multiplied by the
+  discount, on the normal path and on the Internal-only fallback alike
+  (normalized-record 4.1: diminished, never ignored). Only the best aligned
+  pair may be Internal-sourced: a further aligned Internal pair earns no
+  accumulation bonus, because once the real titles are aligned a translation
+  is left pairing with whatever title remains, and that is not a second
+  agreeing title (eidr-core 0.44.0). `INTERNAL_TITLE_ACCEPT_REQUIRES_ALT_ID`
+  (true): when the title agreement rests on an Internal title (the title
+  meta's `internal_title_used`: an Internal pair strictly beats every real
+  pair), an Accept-band score is capped at `REVIEW_TOP` unless an identity
+  Alt ID agrees with no conflict -- a translated generic title with year,
+  country and length is not identity evidence. Measured by BMR-Review over
+  every labelled corpus: five labelled false positives become Reviews, 13
+  correct cross-language bridges clear, 0 flips. Pinned by
+  `internal-title-bridges-languages`,
+  `internal-title-second-pair-earns-no-bonus` and
+  `internal-title-carried-match-needs-alt-id-to-accept`.
 
 **Porting requirements** (from BMR-Review's ENGINE_SYNC `BMR-20260926-1` for
 2.16.0, lifted verbatim at 2.17.0 as ruled 2026-09-26). These are the places a
@@ -88,6 +121,15 @@ BMR-Review.
 3. **The relationship exclusion runs BEFORE scoring**, so a targeted record
    can never become the proposal by elimination; the vendor's own candidate
    list is kept for the AUTO labels.
+4. **Internal titles (2.18.0, from BMR-Review's T38 execution steps).**
+   Internal titles are included at the discount; only the best aligned pair
+   may be Internal-sourced (further aligned Internal pairs add no bonus);
+   `internal_title_used` is true only when an Internal pair strictly beats
+   every real pair (a tie credits the real title); with it set, an
+   Accept-band score is capped at `REVIEW_TOP` unless an identity Alt ID
+   agrees with no conflict, and the note reads "title agreement rests on an
+   internal (machine-translated) title: review only (no auto-accept without
+   an Alt ID)".
 
 ## Date profiles: the ANCHOR is per creation type, the SHAPE is measured
 

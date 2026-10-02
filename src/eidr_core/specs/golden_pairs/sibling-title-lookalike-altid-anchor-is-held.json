@@ -83,5 +83,16 @@
       "Accept: sole match"
     ],
     "clears_without_review": false
+  },
+  "expected": {
+    "spec_version": "2.18.0",
+    "assessment": "Disagree: other match",
+    "proposed_id": "10.5240/FEED-0001-0002-0003-000B-8",
+    "confidence": 100.0,
+    "clears_without_review": false,
+    "notes": [
+      "alt-id match: +8.0"
+    ],
+    "reason": "Sole high-scoring candidate, but auto-match is gated: multiple siblings under the same parent share this title — reported for manual review."
   }
 }

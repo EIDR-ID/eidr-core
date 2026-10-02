@@ -74,13 +74,14 @@
     ]
   },
   "expected": {
-    "spec_version": "2.17.0",
+    "spec_version": "2.18.0",
     "assessment": "Disagree: all candidates rejected",
     "proposed_id": "NO MATCH",
     "confidence": 100.0,
     "clears_without_review": true,
     "notes": [
       "editinfo: base object data accepts 10.5240/FEED-0001-0002-0003-0005-K but EditInfo differs (3D) -- demonstrably different"
-    ]
+    ],
+    "reason": "Tamr offered candidates but every one scores Reject: no match, and Tamr's shortlist was wrong."
   }
 }

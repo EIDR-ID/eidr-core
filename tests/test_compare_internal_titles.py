@@ -79,12 +79,22 @@ def _restore_source():
     set_params(before)
 
 
+def _spec_without_knob():
+    # Since compare-spec 2.18.0 the packaged spec DEFINES the knob (0.8), so
+    # the knob-absent path is reached by stripping it. That path still
+    # matters: a parameter source registered without the knob (an older
+    # config, a test) must keep the pre-0.40.0 behaviour byte for byte.
+    spec = load_spec()
+    spec.pop("INTERNAL_TITLE_DISCOUNT", None)
+    return spec
+
+
 def _without_knob():
-    set_params(SimpleNamespace(**load_spec()))
+    set_params(SimpleNamespace(**_spec_without_knob()))
 
 
 def _with_knob(value=DISCOUNT):
-    set_params(SimpleNamespace(**load_spec(), INTERNAL_TITLE_DISCOUNT=value))
+    set_params(SimpleNamespace(**{**_spec_without_knob(), "INTERNAL_TITLE_DISCOUNT": value}))
 
 
 # --- (a) knob absent: exactly 0.39.0 ---------------------------------------

@@ -2,7 +2,7 @@
 
 **Status:** all three modes LANDED — `pair` 2026-07-29; `case` ratified 2026-09-10 (S-26),
 evaluator 2026-09-11; `recovery_pool` ratified 2026-09-10 (S-9), first captured instance and
-evaluator 2026-09-11 (BMR-Review T17). Corpus: 21 `pair`, 12 `case`, 1 `recovery_pool` (34) at compare-spec 2.17.0.
+evaluator 2026-09-11 (BMR-Review T17). Corpus: 24 `pair`, 13 `case`, 1 `recovery_pool` (38) at compare-spec 2.18.0.
 **Owner of the format:** eidr-core. **Owner of the evaluator:** BMR-Review
 (`eidr_dedup_score/golden.py`). **Conforming implementation:** De-Dupe UI,
 in JavaScript, with no database.
@@ -165,7 +165,7 @@ value must be re-approved at each one.**
   "tamr_kind": "AUTO",
   "submitted": { <record> },
   "candidates": [ { "eidr_id": "...", <record> }, ... ],
-  "expected": { "spec_version": "...", "assessment": "...", "proposed_id": "...", "notes": [...] },
+  "expected": { "spec_version": "...", "assessment": "...", "proposed_id": "...", "notes": [...], "reason": "..." },
   "invariants": {
     "assessment_not_in": ["Agree"],
     "proposed_id_not": "10.5240/FEED-...",
@@ -191,6 +191,14 @@ Rules, each of which comes from a defect that already happened:
   would need re-approval for a change that altered no behaviour.
 * **`assessment_not_in` beats `assessment_in`** for the same reason
   `verdict_not_in` does.
+* **`notes_match` / `notes_not_match` read everything a reviewer is SHOWN:
+  the assessment's `notes` AND its `reason`** (2.18.0). Blocker texts such as
+  "multiple siblings under the same parent share this title" live in the
+  reason, never in notes, so a notes-only check made a `notes_not_match` on a
+  blocker vacuous: `sibling-title-lookalike-with-distinct-anchor-clears`
+  carried one that could never fire (found by BMR-Review, 2026-10-02). An
+  evaluator joins the notes and the reason and matches against both;
+  `expected` snapshots the reason as `reason`.
 * **`notes_match` / `notes_not_match` take substrings (or patterns), never
   exact text.** Two reasons. Wording must stay free to improve without
   re-pinning every fixture. And exact text is *impossible* here anyway: the

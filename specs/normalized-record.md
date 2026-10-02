@@ -197,14 +197,19 @@ check, which deliberately does NOT track these region-level rules).
 The ratified title-scoring semantics differ from the CURRENT engine
 (`eidr_core.compare` `cmp_titles`/`select_titles`) in two ways:
 
-1. **Internal titles are currently EXCLUDED from evaluation** entirely;
-   ratified: include with diminished value.
-2. **The title field is currently dropped when EITHER side has only
-   system-generated titles**; ratified: diminished impact when one side is
-   SystemGenerated, dropped only when BOTH sides are.
+1. **CLOSED at compare-spec 2.18.0 (2026-10-02).** Internal titles were
+   excluded from evaluation; ratified: include with diminished value. They
+   are now included at `INTERNAL_TITLE_DISCOUNT` (0.8); only the best aligned
+   pair may be Internal-sourced, and an Accept carried by an Internal title
+   needs an identity Alt ID. See compare-spec.md, "Internal titles count,
+   discounted".
+2. **CLOSED differently, 2026-08-30 (eidr-core 0.19.0).** The title field was
+   dropped when EITHER side had only system-generated titles; the ratified
+   text asked for diminished impact when one side is system-generated. The
+   operator's 2026-08-30 ruling went further: a one-sided system-generated
+   title is compared at FULL weight, and the field is dropped only when BOTH
+   sides are system-generated. The knob this section once named,
+   `SYSTEM_TITLE_DISCOUNT`, was removed at compare-spec 2.12.0 as dead (T19)
+   and is not revived.
 
-These are engine-behavior changes with tuning implications (the diminished
-weights are compare-spec knobs — e.g. `SYSTEM_TITLE_DISCOUNT`, and a new
-Internal discount). They belong in the next engine-tuning cycle alongside the
-human-results review: implement → add golden pairs pinning both behaviors →
-bump the compare-spec version. Flagged in BMR-Review's CLAUDE.md.
+Both gaps are closed; this section is kept as the record of how.

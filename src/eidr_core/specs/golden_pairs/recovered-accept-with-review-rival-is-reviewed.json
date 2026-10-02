@@ -94,13 +94,14 @@
     "clears_without_review": false
   },
   "expected": {
-    "spec_version": "2.17.0",
+    "spec_version": "2.18.0",
     "assessment": "Disagree: Tamr missed",
     "proposed_id": "10.5240/FEED-0001-0002-0003-0005-K",
     "confidence": 100.0,
     "clears_without_review": false,
     "notes": [
       "alt-id match: +8.0"
-    ]
+    ],
+    "reason": "Tamr found no match, but a candidate scores Accept — Tamr may have missed it."
   }
 }

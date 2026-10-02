@@ -67,13 +67,14 @@
     ]
   },
   "expected": {
-    "spec_version": "2.17.0",
+    "spec_version": "2.18.0",
     "assessment": "Disagree: no match",
     "proposed_id": "NO MATCH",
     "confidence": 0.0,
     "clears_without_review": false,
     "notes": [
       "1 candidate(s) excluded: the submission targets them by an explicit relationship (10.5240/FEED-0001-0002-0003-0005-K Lightweight), so they are related, never duplicates"
-    ]
+    ],
+    "reason": "Tamr auto-matched a record this submission targets by an explicit relationship (a trailer's film, a compilation's entry): related, not the same work — confirm no match."
   }
 }

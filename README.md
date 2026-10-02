@@ -18,6 +18,13 @@ The organizing principle: **a piece of logic moves here when it has a
 second consumer.** Until then it stays in its home project. Anything here
 is, by construction, used by at least two programs.
 
+**Looking for something? Read [`DICTIONARY.md`](DICTIONARY.md) first.** It
+lists every public function, class and constant, with each parameter's type,
+default and purpose, the return value, what the name does, and per module
+when to use it and when not. Every project is asked to read it before it
+asks eidr-core a question or proposes a change. Its signatures are generated
+from the source, and the test suite keeps it current.
+
 ## Installing
 
 eidr-core is **not on PyPI** — it installs straight from this repo:

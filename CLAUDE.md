@@ -96,3 +96,25 @@ Two conventions worth keeping:
 
 Comments should explain **why**, not what. When behavior changes, update
 the comments, the docs, and the tests in the same change.
+
+## The dictionary
+
+`DICTIONARY.md` is what consumers read before they ask a question or
+propose a change (operator, 2026-10-02). It holds every public name, its
+parameters and return value, what it does, and per module when to use it
+and when not. Its signatures are generated from the source, and its prose
+is written by hand. So:
+
+- **A change a consumer could notice updates the dictionary in the same
+  commit.** That covers a new, changed or removed public name, a behaviour
+  change, a spec change, and every release. Run `python
+  tools/gen_dictionary.py --write`, fill in every `TODO` it leaves, and add
+  a `### <version>` entry under Changes that says what a consumer could
+  notice. `tests/test_dictionary.py` fails until that is done.
+- **Public means `__all__`.** A module without one documents every
+  top-level name without a leading underscore. Prefer an `__all__`: it
+  states the surface for consumers, not only for the tool.
+- **After the push, publish.** Run `python
+  D:\Software\eidr-core-ops\tools\publish_dictionary.py`. The copy it puts
+  in each project, with its Changes entry, is how consumers hear about the
+  change.

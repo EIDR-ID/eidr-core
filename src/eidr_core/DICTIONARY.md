@@ -5,7 +5,9 @@ copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
 `EIDR-CORE-DICTIONARY.md` in your project is a published copy that eidr-core
-refreshes. Never edit it.
+refreshes. Never edit it. Wherever eidr-core is installed,
+`python -m eidr_core.dictionary <name>` prints one entry from the copy that
+shipped with the installed code.
 
 ## Read this first
 
@@ -52,7 +54,9 @@ So no eidr-core release ships without its dictionary update.
 
 **How it reaches you.** eidr-core publishes a fresh copy to every project,
 as `EIDR-CORE-DICTIONARY.md` at its root, whenever eidr-core changes in a way
-a consumer could notice. That means a release, a new or changed public name,
+a consumer could notice. The copy is delivered the way `SESSION_BRIEF.md` is.
+It is gitignored, never committed in your project, and your session brief
+says when a new edition has arrived. That means a release, a new or changed public name,
 or a spec change. **Changes**, below, says what moved, newest first. When your
 copy changes, read the new Changes entries first.
 
@@ -93,6 +97,10 @@ Newest first. Each entry says what a consumer could notice.
     is in the new lists.
 * The **Used by.** line of each module is now generated from a scan of the
   consumer trees at each release. Vendored copies are listed with their pin.
+* Your project's `EIDR-CORE-DICTIONARY.md` is now **gitignored**. eidr-core
+  delivers it like `SESSION_BRIEF.md` and no longer commits it, so a new
+  edition costs your repository nothing. The session brief still lists it,
+  and says when it changed.
 
 ### 0.45.1 (2026-10-02)
 

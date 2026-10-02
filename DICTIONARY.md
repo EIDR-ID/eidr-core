@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.44.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.45.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -75,6 +75,22 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.45.0 (2026-10-02)
+
+Two silent-failure fixes that the dictionary audit found. Both were
+approved by the operator.
+
+* `normalize.alias_name` / `normalize.norm_name`: the name alias map (CT + T)
+  is resolved as one map, so a chain that crosses the two domains is
+  followed. Exactly one entry moves: `jacque` now gives `jacob`, as
+  `jacques` already did. `Jacque Brel` and `Jacques Brel` now normalise
+  alike. Title normalisation is unchanged.
+* `secrets_loader.load_local`: the trailing-comma repair no longer touches
+  string values. Before, a password containing `,}` or `,]` was silently
+  altered. A file with a UTF-8 byte-order mark now loads.
+  `secrets_loader.load_aws` raises `SecretsError` for a payload that is not
+  JSON.
 
 ### 0.44.0 (2026-10-02)
 
@@ -3377,7 +3393,7 @@ Defined in `src/eidr_core/normalize/__init__.py`.
 
 **Does.** Normalises a personal or organisation name for comparison. Text with exactly one comma is read as `Last, First` and inverted when the part after the comma is non-empty. Then `&` and `+` become `and`, other punctuation becomes a space, Roman numerals i to xii and number words one to twelve become digits, and each token passes through `alias_name` (ordinals, the CT list and the T nickname list, so `bill` -> `william`). A single letter beside an ampersand, or a one-letter name, is kept verbatim (`A&E` -> `a and e`), and no article is stripped.
 
-**Notes.** Generational suffixes fold too (`John Smith III` -> `john smith 3`). It inherits `alias_name`'s cross-domain gap: `Jacque Brel` and `Jacques Brel` normalise differently.
+**Notes.** Generational suffixes fold too (`John Smith III` -> `john smith 3`). Since 0.45.0 the alias map is idempotent across its two domains, so `Jacque Brel` and `Jacques Brel` normalise alike.
 
 ### `norm_title`
 
@@ -3515,7 +3531,7 @@ Defined in `src/eidr_core/normalize/aliases.py`.
 
 **Does.** Returns the canonical form of a personal or organisation name token. It checks the ordinals, then the CT and T lists combined (T wins on a clash), so `bill` -> `william` and `y` -> `and`. The CSV is read once and cached for the process; if the file is missing the CSV maps are silently empty and every token except a spelled ordinal comes back unchanged.
 
-**Notes.** Not idempotent across domains: CT and T are resolved separately and then merged, so a T entry whose target is itself a CT word stops one step short. `jacque` -> `jacques` but `jacques` -> `jacob`, so `norm_name('Jacque Brel')` is `jacques brel` while `norm_name('Jacques Brel')` is `jacob brel`.
+**Notes.** Since 0.45.0 the name map is CT + T resolved as one map, so it is idempotent across domains (`jacque` and `jacques` both give `jacob`). Before, a T entry whose target was itself a CT word stopped one step short. `tests/test_normalize_aliases.py` pins both maps.
 
 ### `alias_title`
 
@@ -3986,7 +4002,7 @@ Defined in `src/eidr_core/secrets_loader/__init__.py`.
 **Returns** `dict` -- The secret parsed as JSON, from `SecretString`, else `SecretBinary` decoded as UTF-8. Not checked to be a dict.
 <!-- /dict -->
 
-**Does.** Fetches one secret from AWS Secrets Manager and parses it as JSON. Raises `SecretsError` when boto3 is not installed, on any botocore error (credentials, profile, access, missing secret), or when the payload is empty. A payload that is not valid JSON raises `json.JSONDecodeError`, not `SecretsError`.
+**Does.** Fetches one secret from AWS Secrets Manager and parses it as JSON. Raises `SecretsError` when boto3 is not installed, on any botocore error (credentials, profile, access, missing secret), when the payload is empty, or (since 0.45.0) when it is not valid JSON.
 
 ### `load_local`
 
@@ -4004,7 +4020,7 @@ Defined in `src/eidr_core/secrets_loader/__init__.py`.
 **Returns** `dict` -- The parsed JSON (normally a dict; not checked).
 <!-- /dict -->
 
-**Does.** Reads a local secrets JSON file, tolerating trailing commas before `}` or `]`. Raises `SecretsError` if the file does not exist, or is still not valid JSON after the trailing commas are removed; an unreadable file raises the underlying `OSError`. The file is read as UTF-8: a byte-order mark makes it fail as invalid JSON (`SecretsError`), and bytes that are not UTF-8 raise `UnicodeDecodeError`. The comma repair runs only when the first parse fails, and then it also applies inside string values (a password containing `,}` would be altered).
+**Does.** Reads a local secrets JSON file, tolerating trailing commas before `}` or `]`. Raises `SecretsError` if the file does not exist, or is still not valid JSON after the trailing commas are removed; an unreadable file raises the underlying `OSError`. The file is read as UTF-8 with an optional byte-order mark (since 0.45.0), and bytes that are not UTF-8 raise `UnicodeDecodeError`. The comma repair runs only when the first parse fails, and it never touches string values (since 0.45.0; before, a password containing `,}` was altered).
 
 ### `load_secrets`
 

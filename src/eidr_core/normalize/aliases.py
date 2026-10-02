@@ -5,7 +5,9 @@ The list maps a submitted word to a canonical form applied token-by-token before
 string-distance comparison. Two domains: CT (titles / company terms / symbols /
 international name variants) and T (personal-name nicknames). Maps are made
 idempotent: cycles in the source (e.g. & -> and -> &) are collapsed to a single
-representative so repeated application is stable.
+representative so repeated application is stable. The name map is CT + T
+resolved together, so a chain that crosses the two domains is idempotent too
+(tests/test_normalize_aliases.py pins both maps).
 
 Symbols ('&', '+') are handled in normalize.py (-> "and") before tokenising, so
 they are dropped from the token maps here.
@@ -54,9 +56,14 @@ def _load():
     except FileNotFoundError:
         pass
     ct = _resolve(ct_raw)
-    t = _resolve(t_raw)
-    t_combined = dict(ct); t_combined.update(t)       # names get CT + T
-    return ct, t_combined
+    # Names get CT + T, resolved as ONE map (2026-10-02). Resolving each domain
+    # alone and then merging left a chain that crosses domains unresolved:
+    # T 'jacque' -> 'jacques' and CT 'jacques' -> 'jacob' gave
+    # norm_name('Jacque Brel') = 'jacques brel' but norm_name('Jacques Brel') =
+    # 'jacob brel', a silent mismatch between two spellings of one name. T wins
+    # where a word is in both domains, as before; only the chain is followed.
+    names_raw = dict(ct_raw); names_raw.update(t_raw)
+    return ct, _resolve(names_raw)
 
 
 def alias_title(tok):

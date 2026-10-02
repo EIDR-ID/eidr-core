@@ -9,7 +9,10 @@ Extraction unified the BEST behavior from each variant:
   masked, but must also not be fatal when a valid local file exists);
 * trailing-comma tolerance in the local file (from eidr-wikidata's
   2026-07-14 fix: the file is hand-edited and a trailing comma broke every
-  pipeline command — the regex strips only `,}` / `,]`, never valid JSON);
+  pipeline command). The repair runs only after a first parse fails, and
+  since 2026-10-02 it skips string values: the original regex also rewrote
+  `,}` / `,]` INSIDE strings, so a password containing them was silently
+  altered. A UTF-8 byte-order mark (Windows Notepad) is tolerated too;
 * broad truthiness for the local-mode flag (1/true/yes/on).
 
 What deliberately stays OUT (per-program decisions, LOCAL tier):
@@ -32,7 +35,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -62,17 +64,55 @@ def _first_env(names: Sequence[str], default: str | None = None) -> str | None:
     return default
 
 
+def _strip_trailing_commas(text: str) -> str:
+    """Drop a comma that is followed (past whitespace) by ``}`` or ``]``.
+
+    A tiny scanner rather than a regex so that string values are never
+    touched: ``{"pw": "a,}"}`` keeps its password. Escapes inside strings are
+    honoured, so ``"\\"`` and ``"\""`` do not end a string early.
+    """
+    out: list[str] = []
+    in_str = escaped = False
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if in_str:
+            out.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+            out.append(ch)
+        elif ch == ",":
+            j = i + 1
+            while j < n and text[j] in " \t\r\n":
+                j += 1
+            if j >= n or text[j] not in "}]":
+                out.append(ch)
+        else:
+            out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def load_local(path: str | os.PathLike) -> dict:
-    """Load a local secrets JSON file, tolerating trailing commas."""
+    """Load a local secrets JSON file, tolerating trailing commas and a BOM."""
     p = Path(path)
     if not p.exists():
         raise SecretsError(f"Secrets file not found: {p.resolve()}")
-    raw = p.read_text(encoding="utf-8")
+    # utf-8-sig: a file saved with a byte-order mark (Windows Notepad) is
+    # otherwise rejected as "Unexpected UTF-8 BOM"; eidr-imdb and LanguageCode
+    # kept local copies of this loader for that one reason.
+    raw = p.read_text(encoding="utf-8-sig")
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
         try:
-            return json.loads(re.sub(r",(\s*[}\]])", r"\1", raw))
+            return json.loads(_strip_trailing_commas(raw))
         except json.JSONDecodeError as exc:
             raise SecretsError(
                 f"Secrets file is not valid JSON: {p}: {exc}") from exc
@@ -101,6 +141,10 @@ def load_aws(secret_name: str, region: str,
         return json.loads(raw)
     except (BotoCoreError, ClientError) as exc:
         raise SecretsError(f"AWS Secrets Manager error: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        # A payload that is not JSON is a secrets failure like any other;
+        # direct callers expect SecretsError, not a parser exception.
+        raise SecretsError(f"AWS secret {secret_name!r} is not valid JSON: {exc}") from exc
 
 
 def load_secrets(

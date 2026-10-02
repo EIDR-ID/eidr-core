@@ -4,6 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
+# 0.45.0 (2026-10-02): two silent-failure fixes from the dictionary audit
+# (operator-approved). normalize.aliases resolves the name map (CT + T) as one
+# map, so 'Jacque' and 'Jacques' normalise alike (the only entry that moves:
+# jacque -> jacob). secrets_loader.load_local: the trailing-comma repair skips
+# string values (a password containing ',}' was silently altered) and a BOM is
+# tolerated; load_aws raises SecretsError for a non-JSON payload.
 # 0.44.0 (2026-10-02): compare-spec 2.18.0 (T38, operator GO and "Accept both
 # changes"). cmp_titles with INTERNAL_TITLE_DISCOUNT registered: an Internal
 # pair earns first-match credit only, never the accumulation bonus (a weak
@@ -81,7 +87,7 @@ name = "eidr-core"
 # moved, but T6 makes this repo's CI gate the precondition for consumers
 # pinning @main, so WHICH checker verified the py.typed annotations is part
 # of what that version identifies.
-version = "0.44.0"
+version = "0.45.0"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers

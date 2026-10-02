@@ -1,0 +1,87 @@
+{
+  "mode": "case",
+  "creation_type": "Episode",
+  "tamr_kind": "CANDIDATES",
+  "added": "2026-10-02",
+  "id": "sibling-title-lookalike-altid-anchor-is-held",
+  "why": "Blocker (7), sibling-title ambiguity, the alt-id direction (De-Dupe UI S-33, 2026-10-02): mutation-testing 2.17.0, De-Dupe UI found that removing the alt-id exception survives all 34 fixtures. Since 2.17.0 a look-alike sibling stops the gate only when it does NOT carry the submission's anchor -- but that test is defined for a full date or a number, never for a shared identity Alt ID. A proposal anchored ONLY by a shared Alt ID is still held whenever a sibling under the same parent shares its title, whether or not the sibling carries the Alt ID: an Alt ID points at a work, a merged or misassigned record keeps its external ids, and an Alt-ID-anchored sole Accept beside a look-alike is the known source of wrong 100s. Here the submission and the first candidate share an IMDb id; their dates are year-only and neither carries a number, so the Alt ID is the only anchor; the second candidate is a same-titled sibling with no Alt ID. Expected: held -- the sibling scores as a weak rival (well below the line where a rival alone would hold the row), so only blocker (7) can hold it. The gate's text ('multiple siblings under the same parent share this title') is carried in the assessment's REASON, not its notes, so it cannot be pinned with notes_match; the assessment and clears_without_review pin the consequence. An implementation that extends the 2.17.0 refinement to the Alt-ID anchor -- treating a sibling without the Alt ID as 'a different episode' -- clears the row as 'Accept: sole match' and fails this fixture. In BMR-Review's code that mutant is the exception removed AND `_shares_anchor` answering False for an anchor it does not define (its default is True, which is why removing the exception alone changes nothing there; a port with the opposite default is exactly the implementation this pins). Pending only because a corpus addition rides the next corpus-touching version (eidr-core, 2026-10-02); it passes on 2.17.0. Pair with sibling-title-lookalike-with-distinct-anchor-clears and sibling-title-lookalike-sharing-the-anchor-is-held.",
+  "submitted": {
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0001-0002-0003-000A-A",
+    "titles": [
+      {
+        "text": "O Reencontro",
+        "lang": "pt",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2025",
+    "length_minutes": 44,
+    "directors": [
+      "Ana Lima"
+    ],
+    "countries": [
+      "BR"
+    ],
+    "alt_ids": [
+      {
+        "value": "tt31234567",
+        "id_type": "IMDB"
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "creation_type": "Episode",
+      "parent_id": "10.5240/FEED-0001-0002-0003-000A-A",
+      "titles": [
+        {
+          "text": "O Reencontro",
+          "lang": "pt",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2025",
+      "length_minutes": 44,
+      "directors": [
+        "Ana Lima"
+      ],
+      "countries": [
+        "BR"
+      ],
+      "alt_ids": [
+        {
+          "value": "tt31234567",
+          "id_type": "IMDB"
+        }
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-000B-8"
+    },
+    {
+      "creation_type": "Episode",
+      "parent_id": "10.5240/FEED-0001-0002-0003-000A-A",
+      "titles": [
+        {
+          "text": "O Reencontro",
+          "lang": "pt",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2012",
+      "length_minutes": 22,
+      "directors": [
+        "Paulo Reis"
+      ],
+      "countries": [
+        "PT"
+      ],
+      "eidr_id": "10.5240/FEED-0001-0002-0003-000C-6"
+    }
+  ],
+  "invariants": {
+    "assessment_not_in": [
+      "Accept: sole match"
+    ],
+    "clears_without_review": false
+  }
+}

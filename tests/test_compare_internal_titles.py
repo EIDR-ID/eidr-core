@@ -211,6 +211,41 @@ def test_meta_flag_false_and_plain_rationale_when_a_real_title_wins():
     assert "internal" not in r.detail
 
 
+# --- (e2) an Internal pair earns first-match credit only (2026-10-02) ------
+
+# The measured case (a labelled no-match): the real titles agree at ~0.96, and
+# once they are aligned the Internal translation is left pairing with the
+# French subtitle at a fraction of its discount.
+WEISS_SUB = _Rec([_real("Weisss Blut"),
+                  _real("1948 : Du sang blanc pour l'Afrique du Sud")])
+WEISS_CAND = _Rec([_real("Weisses Blut", "de"), _internal("White blood")])
+
+
+def test_a_second_aligned_internal_pair_adds_no_bonus():
+    _without_knob()
+    plain = cmp_titles(WEISS_SUB, WEISS_CAND)
+    _with_knob()
+    r = cmp_titles(WEISS_SUB, WEISS_CAND)
+    assert r.quality == plain.quality          # the real pair, nothing added
+    assert r.meta["internal_title_used"] is False
+    assert r.detail.startswith(f"best={plain.quality:.2f} matches=1")
+
+
+def test_an_internal_best_pair_still_counts():
+    _with_knob()
+    r = cmp_titles(FRENCH, ENGLISH)
+    assert r.quality == pytest.approx(DISCOUNT)
+
+
+def test_further_real_pairs_keep_their_bonus_beside_an_internal_best():
+    # Two real titles agreeing still accumulate even when an Internal title
+    # is present on the record.
+    _with_knob()
+    a = _Rec([_real("Alpha"), _real("Beta Gamma"), _internal("Delta")])
+    b = _Rec([_real("Alpha"), _real("Beta Gamma")])
+    assert cmp_titles(a, b).quality > 1.0
+
+
 # --- (f) the system-generated both-sides drop is unchanged ----------------
 
 @pytest.mark.parametrize("knob", [False, True])

@@ -81,6 +81,20 @@ def _greedy_align(a_norm, b_norm, simf=None):
     return qs
 
 
+def _greedy_align_pairs(n_a, n_b, simf):
+    """`_greedy_align` over indices, keeping WHICH pair each quality came from:
+    [(q, i, j)], best first. The Internal-title path needs the pairing to
+    tell an Internal pair from a real one."""
+    pairs = sorted(((simf(i, j), i, j) for i in range(n_a) for j in range(n_b)),
+                   reverse=True)
+    used_a, used_b, out = set(), set(), []
+    for q, i, j in pairs:
+        if i in used_a or j in used_b:
+            continue
+        used_a.add(i); used_b.add(j); out.append((q, i, j))
+    return out
+
+
 # -------- titles (episode-aware: part/segment rules, system-gen filtering) --------
 def _title_base_ratio(a, b):
     """Similarity of two already-normalised part BASE titles (0..1)."""
@@ -185,15 +199,28 @@ def cmp_titles(a, b):
         # greedy alignment takes the global best pair first, so a real-title
         # match is never reduced by Internal titles beside it: the Internal
         # pair only wins when its DISCOUNTED similarity beats every real pair.
-        # A further aligned Internal pair may add the usual diminishing bonus
-        # (nonlinear.accumulate) -- included at diminished value, per 4.1.
+        #
+        # An Internal pair earns FIRST-MATCH credit only, never the
+        # accumulation bonus (operator, 2026-10-02, on BMR-Review's
+        # measurement). `nonlinear.accumulate` adds every positive aligned
+        # pair, and once real titles are aligned an Internal translation is
+        # left pairing with whatever submitted title remains -- typically a
+        # foreign-language subtitle at a fraction of its discount. That is not
+        # a second agreeing title. Measured: a labelled no-match (real title
+        # 0.96, then the Internal "White blood" against a French subtitle at
+        # 0.26) rose 0.957 -> 1.153 and auto-matched; Internal titles are
+        # common on candidate records, so the path fires constantly. So
+        # the best aligned pair counts whatever its kind; further aligned
+        # pairs count only when both titles are real.
         a_int = [is_internal(t) for t in a_use if t.text]
         b_int = [is_internal(t) for t in b_use if t.text]
         sims = [[simf(x, y) * (discount if (a_int[i] or b_int[j]) else 1.0)
                  for j, y in enumerate(b_raw)]
                 for i, x in enumerate(a_raw)]
-        qs = _greedy_align(range(len(a_raw)), range(len(b_raw)),
-                           simf=lambda i, j: sims[i][j])
+        aligned = _greedy_align_pairs(len(a_raw), len(b_raw),
+                                      lambda i, j: sims[i][j])
+        qs = [q for k, (q, i, j) in enumerate(aligned)
+              if k == 0 or not (a_int[i] or b_int[j])]
         pairs = [(sims[i][j], a_int[i] or b_int[j])
                  for i in range(len(a_raw)) for j in range(len(b_raw))]
         best_real = max((q for q, via in pairs if not via), default=0.0)

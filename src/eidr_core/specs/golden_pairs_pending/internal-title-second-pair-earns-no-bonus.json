@@ -1,0 +1,51 @@
+{
+  "id": "internal-title-second-pair-earns-no-bonus",
+  "added": "2026-10-02",
+  "why": "An Internal-class title earns first-match credit only, never the accumulation bonus (operator, 2026-10-02, accepting BMR-Review's measurement in HANDOFF-FROM-BMR-REVIEW-2026-10-02-internal-title-measured-one-mechanism-change). Shaped on a human-labelled NO MATCH: the real titles agree at about 0.96 ('Weisss Blut' / 'Weisses Blut'), and once they are aligned the candidate's Internal translation 'White blood' is left pairing with the submission's French subtitle at a fraction of its discount. As 0.40.0 shipped, nonlinear.accumulate added that weak pair as a bonus and the title rose from 0.957 to 1.153, which auto-matched the labelled no-match. With the bonus restricted to real pairs the title stays at the real pair's value. Pending because it pins the knob-PRESENT path: with INTERNAL_TITLE_DISCOUNT absent the Internal title is not compared at all and the fixture passes for the wrong reason, so it lands with the compare-spec version that adds the knob. Invariants are value-independent: the title is carried by the real pair (at least 0.9) and gains nothing from the translation (at most 1.0). SCOPE: Basic, one Internal title on the candidate side, a second real submitted title that the translation can only weakly align with; it does not pin the discount's value.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Weisss Blut",
+        "lang": "de",
+        "is_resource": true
+      },
+      {
+        "text": "1948 : Du sang blanc pour l'Afrique du Sud",
+        "lang": "fr"
+      }
+    ],
+    "release_date": "1959",
+    "countries": [
+      "DE"
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/4A7C-21E0-9B3F-58D6-E1A2-K",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Weisses Blut",
+        "lang": "de",
+        "is_resource": true
+      },
+      {
+        "text": "White blood",
+        "lang": "en",
+        "title_class": "Internal"
+      }
+    ],
+    "release_date": "1959",
+    "countries": [
+      "DE"
+    ]
+  },
+  "invariants": {
+    "field_quality_min": {
+      "title": 0.9
+    },
+    "field_quality_max": {
+      "title": 1.0
+    }
+  }
+}

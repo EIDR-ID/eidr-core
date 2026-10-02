@@ -1,0 +1,49 @@
+{
+  "id": "internal-title-carried-match-needs-alt-id-to-accept",
+  "added": "2026-10-02",
+  "why": "When the title agreement rests on an Internal title -- a machine translation -- rather than on any real title, the pair may reach Review but not auto-accept unless an identity Alt ID agrees with no conflict (operator, 2026-10-02, accepting BMR-Review's proposal; scorer rule INTERNAL_TITLE_ACCEPT_REQUIRES_ALT_ID). A translated generic title matches unrelated works, and year, country and length corroborate weakly across a national cinema: with the discount at 0.8 and no such rule, this pair scored 80.2 Accept in BMR-Review's probe (length counts as a corroborator). Pending because with INTERNAL_TITLE_DISCOUNT absent the translation is not compared (title 0.33) and the field_quality_min below fails; it lands with the compare-spec version that adds the knob and the rule. Invariants are value-independent: the translation does carry the title (at least 0.5, so the pair is not passing merely because the title was ignored), and the verdict is not Accept. SCOPE: Basic, cross-language, Internal title on the submitted side, no Alt IDs; the Alt-ID release is pinned by BMR-Review's tests/test_internal_title_discount.py, not here.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "El Viaje",
+        "lang": "es",
+        "is_resource": true
+      },
+      {
+        "text": "The Journey",
+        "lang": "en",
+        "title_class": "Internal"
+      }
+    ],
+    "release_date": "2005",
+    "countries": [
+      "ES"
+    ],
+    "length_minutes": 90
+  },
+  "candidate": {
+    "eidr_id": "10.5240/D35B-9E07-C418-2FA6-B9C0-A",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "The Journey",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2005",
+    "countries": [
+      "ES"
+    ],
+    "length_minutes": 92
+  },
+  "invariants": {
+    "verdict_not_in": [
+      "Accept"
+    ],
+    "field_quality_min": {
+      "title": 0.5
+    }
+  }
+}

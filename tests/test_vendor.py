@@ -247,3 +247,40 @@ def test_cli_exit_codes(tmp_path, source, capsys):
     assert "extra file" in capsys.readouterr().err
     bad = _manifest(tmp_path, source, ["reaches_out"])
     assert main(["sync", "--config", str(bad.path), "--from", str(source)]) == 2
+
+
+# -- the REAL vendored modules stay vendorable (2026-10-02) ------------------
+# altidtool_io named its own package in a string from 0.39.0 to 0.45.0, so
+# sync refused it and python-tools' pin froze at 0.34.1 with nobody noticing:
+# the refusal only appears when someone tries to move the pin. This runs the
+# real module through sync, so the next such edit fails HERE.
+
+REAL_ALTIDTOOL = Path(__file__).resolve().parent.parent / "src" / "eidr_core" / "altidtool_io" / "__init__.py"
+
+
+def test_real_altidtool_io_vendors_and_works_without_eidr_core(tmp_path, source):
+    pkg = source / "src" / "eidr_core"
+    (pkg / "altidtool_io").mkdir()
+    (pkg / "altidtool_io" / "__init__.py").write_bytes(REAL_ALTIDTOOL.read_bytes())
+    _git("-c", "user.email=t@t", "-c", "user.name=t", "add", "-A", cwd=source)
+    _git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "altidtool", cwd=source)
+    m = _manifest(tmp_path, source, ["altidtool_io"])
+    sync(m, source_path=source)
+    code = (
+        "import sys\n"
+        "sys.modules['eidr_core'] = None\n"
+        f"sys.path.insert(0, {str(tmp_path / 'consumer' / 'src')!r})\n"
+        "from eidr._core.altidtool_io import format_line, parse_line, multi_form_domains\n"
+        "line = format_line('10.5240/7791-8534-2C23-9030-8610-5', 'IMDB', 'tt0000001')\n"
+        "assert parse_line(line).value == 'tt0000001'\n"
+        "try:\n"
+        "    multi_form_domains()\n"
+        "except RuntimeError as e:\n"
+        "    assert 'vendored copy' in str(e)\n"
+        "else:\n"
+        "    raise AssertionError('a vendored copy has no package data')\n"
+        "print('ok')\n")
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == "ok"
+

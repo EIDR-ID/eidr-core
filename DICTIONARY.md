@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.45.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.45.1<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -75,6 +75,15 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.45.1 (2026-10-02)
+
+* `altidtool_io` can be vendored again. `multi_form_domains()` no longer
+  names its own package in a string, which had made `eidr_core.vendor`
+  refuse the module since 0.39.0. Where eidr-core is installed, nothing
+  changes. In a vendored copy, `multi_form_domains()` raises `RuntimeError`,
+  because no package data is carried; the line functions work as before.
+  `tests/test_vendor.py` now runs the real module through `sync`.
 
 ### 0.45.0 (2026-10-02)
 

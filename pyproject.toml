@@ -4,6 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
+# 0.45.1 (2026-10-02): altidtool_io is vendorable again. multi_form_domains()
+# finds its data through the module's parent package instead of naming it, so
+# the vendoring tool no longer refuses the module (python-tools' pin had been
+# frozen at 0.34.1 since 0.39.0). No behaviour change where eidr-core is
+# installed; a vendored copy raises a clear RuntimeError from that one function.
 # 0.45.0 (2026-10-02): two silent-failure fixes from the dictionary audit
 # (operator-approved). normalize.aliases resolves the name map (CT + T) as one
 # map, so 'Jacque' and 'Jacques' normalise alike (the only entry that moves:
@@ -87,7 +92,7 @@ name = "eidr-core"
 # moved, but T6 makes this repo's CI gate the precondition for consumers
 # pinning @main, so WHICH checker verified the py.typed annotations is part
 # of what that version identifies.
-version = "0.45.0"
+version = "0.45.1"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers

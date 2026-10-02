@@ -152,6 +152,17 @@ def multi_form_domains() -> frozenset[str]:
     import json
     from importlib.resources import files
 
-    raw = json.loads((files("eidr_core") / "specs" / "multi_form_kinds.json")
-                     .read_text(encoding="utf-8"))
+    # The data is found through this module's PARENT package, never by its
+    # literal name: a literal name made the vendoring tool refuse the whole
+    # module (its residual-reference rule), which froze python-tools' vendored
+    # copy at 0.34.1 from 0.39.0 on (dictionary audit, 2026-10-02). A vendored
+    # copy carries no package data, so there this function says so plainly;
+    # format_line / parse_line / write_lines work in a vendored copy as before.
+    data = files(__name__.rpartition(".")[0]) / "specs" / "multi_form_kinds.json"
+    if not data.is_file():
+        raise RuntimeError(
+            "multi_form_domains() reads the declared list from eidr-core's package "
+            "data (specs/multi_form_kinds.json); a vendored copy does not carry it, "
+            "so call it where eidr-core itself is installed")
+    raw = json.loads(data.read_text(encoding="utf-8"))
     return frozenset(str(e["domain"]).strip().lower() for e in raw["domains"])

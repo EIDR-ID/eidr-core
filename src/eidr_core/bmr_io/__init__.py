@@ -56,7 +56,9 @@ READER HALF (added 2026-08-06, register R3 tail):
   rule is a parameter — ``stop=None`` (read all, skip blank rows; combine),
   ``stop="blank_first_col"`` (halt when column A is empty; BMRtoAltID and
   the real BMR tool's behavior), ``stop="blank_row"`` (halt at the first
-  fully-blank row; XML_to_JSON's BMR codec).
+  fully-blank row; XML_to_JSON's BMR codec), and ``stop="skip_blank_first_col"``
+  (0.47.0, BMR-Review's loader: NOT a stop -- a row whose column A is empty is
+  skipped and reading continues).
 * ``family_layout(header_names, members)`` — SPARSE, index-preserving map
   ``{group_index: {member: actual_header}}`` for a repeating column family.
   Sparse-by-design: XML_to_JSON's ``_collect_numbered`` densifies groups
@@ -416,7 +418,7 @@ def open_sheet(path: str, sheet_name: str, *,
     validated BEFORE the workbook is opened, so a typo fails without
     leaving a handle behind.
     """
-    if stop not in (None, "blank_row", "blank_first_col"):
+    if stop not in (None, "blank_row", "blank_first_col", "skip_blank_first_col"):
         raise ValueError(f"unknown stop rule: {stop!r}")
     # Lazy import keeps eidr_core.bmr_io importable without openpyxl for
     # consumers that only use the zip-surgery / layout / plan helpers.
@@ -446,11 +448,13 @@ def open_sheet(path: str, sheet_name: str, *,
             for offset, row_vals in enumerate(
                     ws.iter_rows(min_row=data_start, values_only=True)):
                 row_no = data_start + offset
-                if stop == "blank_first_col":
+                if stop in ("blank_first_col", "skip_blank_first_col"):
                     first = row_vals[0] if row_vals else None
                     if first is None or (isinstance(first, str)
                                          and not first.strip()):
-                        break
+                        if stop == "blank_first_col":
+                            break
+                        continue    # skip_blank_first_col: skip it, keep reading
                 row_dict: dict[str, object] = {}
                 for i, val in enumerate(row_vals[:n_cols]):
                     if val is None or val == "":

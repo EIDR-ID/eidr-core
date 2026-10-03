@@ -61,8 +61,13 @@ def title_sort_key(text, title_class=None, is_resource: bool = False) -> tuple:
 
 def is_shortdoi(id_type, domain) -> bool:
     """ShortDOI test (display suppression + evaluation exclusion; the
-    canonical/export form RETAINS ShortDOI — do not use this in exporters)."""
-    return ck(id_type) == "shortdoi" or ck(domain) == "shortdoi"
+    canonical/export form RETAINS ShortDOI — do not use this in exporters).
+
+    Whitespace around either half is ignored (0.47.0, BMR-Review's proposal):
+    a padded ``"ShortDOI "`` was never a real third-party identifier, and the
+    private copy inside ``compare.cmp_alt_ids`` already stripped -- the two
+    disagreed on exactly that input, and it now calls this one."""
+    return ck(id_type).strip() == "shortdoi" or ck(domain).strip() == "shortdoi"
 
 
 def altid_kind(id_type, domain) -> tuple:

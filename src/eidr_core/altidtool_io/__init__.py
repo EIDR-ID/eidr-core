@@ -26,12 +26,14 @@ and its own columns) and is deliberately NOT unified here.
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Iterable
 from typing import NamedTuple
 
 __all__ = ["AltIdRow", "AltIdRemoval", "format_line", "write_lines", "parse_line",
            "multi_form_domains",
-           "parse_edit_line"]
+           "parse_edit_line",
+           "is_identity_relation", "identity_relation_sql"]
 
 
 class AltIdRow(NamedTuple):
@@ -166,3 +168,41 @@ def multi_form_domains() -> frozenset[str]:
             "so call it where eidr-core itself is installed")
     raw = json.loads(data.read_text(encoding="utf-8"))
     return frozenset(str(e["domain"]).strip().lower() for e in raw["domains"])
+
+
+# -- the identity relation (0.47.0, BMR-Review's proposal) -------------------
+# Rule 1 of altidtool-format: a blank relation MEANS IsSameAs, so "is this Alt
+# ID an identity link?" admits a missing relation, an empty one and IsSameAs.
+# The portfolio wrote that test out in about twenty places, and the copies are
+# where it went wrong: on 2026-09-23 the mirror stored every absent relation
+# as '' while the identity predicates admitted only NULL, and 69.6% of IMDb
+# identity links were invisible to them. One definition, in both forms.
+
+_IDENTITY_RELATIONS = frozenset({"", "issameas"})
+_SQL_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?")
+
+
+def is_identity_relation(relation: object) -> bool:
+    """True when an Alt ID with this relation is an identity link.
+
+    ``None``, an empty or whitespace-only string, and ``IsSameAs`` in any case
+    are identity; any other relation (``IsDerivedFrom``, ``Deprecated``,
+    ``IsEntirelyContainedBy``, ...) is not.
+    """
+    return relation is None or str(relation).strip().casefold() in _IDENTITY_RELATIONS
+
+
+def identity_relation_sql(column: str = "relation") -> str:
+    """The same test as a SQL condition for mirror queries.
+
+    Returns ``(<column> IS NULL OR <column> = '' OR <column> = 'IsSameAs')``.
+    ``column`` must be a plain identifier, optionally table-qualified
+    (``a.relation``); anything else raises ``ValueError``, because this builds
+    SQL text and must never carry a caller's data into it. The SQL compares
+    ``IsSameAs`` exactly, as the mirror stores it; the Python test also folds
+    case and whitespace.
+    """
+    if not _SQL_IDENTIFIER.fullmatch(column or ""):
+        raise ValueError(f"not a SQL column identifier: {column!r}")
+    return f"({column} IS NULL OR {column} = '' OR {column} = 'IsSameAs')"
+

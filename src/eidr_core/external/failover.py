@@ -113,8 +113,10 @@ from __future__ import annotations
 import email.utils
 import logging
 import random
+import threading
 import time
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any
 
@@ -136,6 +138,10 @@ __all__ = [
     "http_status",
     "retry_after_seconds",
     "cooldown_remaining",
+    "RequestPacer",
+    "WIKIMEDIA_MIN_INTERVAL",
+    "WIKIMEDIA_SLOW_REQUEST",
+    "WIKIMEDIA_SLOW_PAUSE",
 ]
 
 log = logging.getLogger(__name__)
@@ -224,12 +230,23 @@ def is_bad_query_error(exc: Exception) -> bool:
     return "bad request" in s and "sparql" in s
 
 
-def classify_sparql_error(exc: Exception) -> str:
+# Message fragments of a socket or read timeout (2026-05-11: WinError 10060
+# from a slow-but-working QLever at ~21 s). Matched case-insensitively.
+_TIMEOUT_MARKERS = ("timed out", "timeout", "winerror 10060", "did not properly respond")
+
+
+def classify_sparql_error(exc: Exception, *, retry_timeouts: bool = False) -> str:
     """The seed's classification, in the seed's order.
 
     Order matters: an outage message can contain "429", so outage must win
     over transient; a bad-query echo can contain anything, so it is checked
     before the substring code scan.
+
+    ``retry_timeouts`` (0.47.0, eidr-wikidata): a timeout is ``RETRY`` instead
+    of ``NEXT_ENDPOINT``. For a one-endpoint chain, or one large query that a
+    slow but working endpoint answers late, moving on means giving up. Pass it
+    through ``functools.partial`` or a lambda when handing ``classify`` to
+    ``call_with_failover``. Outage and bad-query verdicts are unchanged.
     """
     if is_outage_error(exc):
         return OUTAGE
@@ -237,6 +254,9 @@ def classify_sparql_error(exc: Exception) -> str:
         return NEXT_ENDPOINT
     s = str(exc)
     if any(code in s for code in TRANSIENT_HTTP_MARKERS):
+        return RETRY
+    if retry_timeouts and (isinstance(exc, TimeoutError)
+                           or any(m in s.lower() for m in _TIMEOUT_MARKERS)):
         return RETRY
     # The seed's default for errors it could not name: break to the next
     # endpoint rather than burn the retry budget on an unknown failure.
@@ -545,3 +565,91 @@ def call_with_failover(
                 return result, endpoint, None
 
     return None, None, last_exc
+
+
+# ---------------------------------------------------------------------------
+# Request pacing (0.47.0; eidr-wikidata's Action API gap, BMR-Review's verifier).
+# ---------------------------------------------------------------------------
+# Wikimedia's rules for an unauthenticated client, relayed by
+# eidr-metadata-sources on 2026-09-30: one request at a time, at most 200 a
+# minute, and a 5-second pause after any request that took more than a second
+# to serve. eidr-wikidata (wikidata/api.py) and BMR-Review (verify.py) each
+# implemented the same pacer; this is the one implementation.
+
+WIKIMEDIA_MIN_INTERVAL = 0.3    # 200 requests a minute
+WIKIMEDIA_SLOW_REQUEST = 1.0    # "if your request takes more than 1 second to serve..."
+WIKIMEDIA_SLOW_PAUSE = 5.0      # "...please wait 5 seconds"
+
+
+class RequestPacer:
+    """Paces requests: at most ``max_concurrent`` at a time, at least
+    ``min_interval`` seconds apart, and ``slow_pause`` seconds after any
+    request that took longer than ``slow_threshold``.
+
+    The defaults are Wikimedia's rules. The pacer holds its own state, and
+    the CALLER decides its scope: one instance per client, or one shared by
+    every client in the process when the rule is process-wide (Wikimedia's
+    concurrency rule is). No instance is created at import (lesson 23: a
+    library holds no hidden process-wide state). Thread-safe.
+
+    Use it around the request itself, for example inside the ``attempt`` you
+    hand to ``call_with_failover``::
+
+        pacer = RequestPacer()
+        def attempt(url):
+            with pacer.request():
+                return fetch(url)
+
+    and call ``back_off(seconds)`` for a server's Retry-After or ``maxlag``
+    answer, so the next request also waits.
+    """
+
+    def __init__(self, min_interval: float = WIKIMEDIA_MIN_INTERVAL, *,
+                 slow_threshold: float = WIKIMEDIA_SLOW_REQUEST,
+                 slow_pause: float = WIKIMEDIA_SLOW_PAUSE,
+                 max_concurrent: int = 1,
+                 clock: Callable[[], float] = time.monotonic,
+                 sleep: Callable[[float], None] = time.sleep) -> None:
+        if max_concurrent < 1:
+            raise ValueError("max_concurrent must be at least 1")
+        self.min_interval = max(0.0, float(min_interval))
+        self.slow_threshold = float(slow_threshold)
+        self.slow_pause = max(0.0, float(slow_pause))
+        self._slot = threading.BoundedSemaphore(max_concurrent)
+        self._lock = threading.Lock()
+        self._next = 0.0
+        self._clock = clock
+        self._sleep = sleep
+
+    def wait(self) -> None:
+        """Block until the next request may start, and claim that start."""
+        with self._lock:
+            delay = self._next - self._clock()
+            if delay > 0:
+                self._sleep(delay)
+            self._next = self._clock() + self.min_interval
+
+    def done(self, duration: float) -> None:
+        """Record how long the request took: a slow one pauses the next."""
+        if duration > self.slow_threshold:
+            self.back_off(self.slow_pause)
+
+    def back_off(self, seconds: float) -> None:
+        """Make the next request wait at least ``seconds`` from now (a
+        Retry-After, a ``maxlag`` answer). Never shortens a wait."""
+        with self._lock:
+            self._next = max(self._next, self._clock() + max(0.0, float(seconds)))
+
+    @contextmanager
+    def request(self) -> Iterator[None]:
+        """Hold a concurrency slot, wait for the pace, run the body, and
+        record its duration -- also when the body raises, since a slow
+        failure loaded the server as much as a slow success."""
+        with self._slot:
+            self.wait()
+            started = self._clock()
+            try:
+                yield
+            finally:
+                self.done(self._clock() - started)
+

@@ -61,7 +61,8 @@ from __future__ import annotations
 
 import re
 
-__all__ = ["ALPHABET", "EIDR_CONTENT_ID_RE", "CONTENT_ID_SEARCH_RE", "check_character",
+__all__ = ["ALPHABET", "CONTENT_ID_SUFFIX", "EIDR_CONTENT_ID_RE", "CONTENT_ID_SEARCH_RE",
+           "check_character",
            "is_valid_eidr_id", "fault", "find_content_ids",
            "PARTY_ID_RE", "SERVICE_ID_RE", "USER_ID_RE",
            "PARTY_ID_SUFFIX", "SERVICE_ID_SUFFIX", "USER_ID_SUFFIX",
@@ -75,9 +76,14 @@ ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 # The check character is NOT hex — it ranges over 0-9A-Z — so it gets its
 # own class; writing [0-9A-F] there would reject roughly half of all valid
 # IDs while looking symmetric and correct.
-EIDR_CONTENT_ID_RE = re.compile(
-    r"^10\.5240/[0-9A-F]{4}(?:-[0-9A-F]{4}){4}-[0-9A-Z]$", re.I
-)
+# The part after "10.5240/", on its own (0.47.0, python-sdk): a validator of
+# the bare suffix composes from it, as it already can for the other three
+# families, instead of rebuilding a full ID only to strip the prefix again.
+# Case-explicit, so it works without a flag; both Content patterns are built
+# from it and cannot drift apart.
+CONTENT_ID_SUFFIX = r"[0-9A-Fa-f]{4}(?:-[0-9A-Fa-f]{4}){4}-[0-9A-Za-z]"
+
+EIDR_CONTENT_ID_RE = re.compile(r"^10\.5240/" + CONTENT_ID_SUFFIX + r"$", re.I)
 
 # The same shape, UNANCHORED, for pulling IDs out of free text (a notes
 # column, a log line, an error message). Added 2026-09-11: BMR-Review carried
@@ -86,7 +92,7 @@ EIDR_CONTENT_ID_RE = re.compile(
 # engine mirrors the notes-parsing rule in JavaScript, so the pattern is a
 # cross-language fact. Word-boundaried so `10.5240/...-Kx` is not a match.
 CONTENT_ID_SEARCH_RE = re.compile(
-    r"(?<![0-9A-Z/])10\.5240/[0-9A-F]{4}(?:-[0-9A-F]{4}){4}-[0-9A-Z](?![0-9A-Z-])", re.I
+    r"(?<![0-9A-Z/])10\.5240/" + CONTENT_ID_SUFFIX + r"(?![0-9A-Z-])", re.I
 )
 
 

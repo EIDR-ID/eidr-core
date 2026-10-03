@@ -79,6 +79,7 @@ from .failover import (
     NEXT_ENDPOINT,
     OUTAGE,
     RETRY,
+    RequestPacer,
     call_with_failover,
     classify_sparql_error,
     endpoint_chain,
@@ -89,6 +90,7 @@ __all__ = [
     # failover chassis (canonical home: eidr_core.external.failover)
     "RETRY", "NEXT_ENDPOINT", "OUTAGE", "FATAL",
     "call_with_failover", "classify_sparql_error", "endpoint_chain",
+    "RequestPacer",
 ]
 
 Key = tuple[str, str]          # (source, external_id)

@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.46.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.47.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,31 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.47.0 (2026-10-02)
+
+These widenings were asked for in the projects' replies to the dictionary.
+Each one is additive.
+
+* `altidtool_io.is_identity_relation(relation)` and
+  `altidtool_io.identity_relation_sql(column)` are the identity-relation
+  test (missing, empty or `IsSameAs`), in Python and in SQL (BMR-Review).
+* `ordering.is_shortdoi` ignores whitespace around its two halves
+  (BMR-Review). `compare.cmp_alt_ids` now uses both shared tests; its
+  results are unchanged.
+* `bmr_io.open_sheet` / `read_sheet`: `stop="skip_blank_first_col"`
+  skips a row whose column A is blank and keeps reading (BMR-Review).
+* `compare.fuzzy(a, b)`, the composed similarity, is public (De-Dupe UI
+  S-35). The private names remain as aliases.
+* `classify_sparql_error(exc, retry_timeouts=False)` can retry a timeout on
+  the same endpoint (eidr-wikidata).
+* `external.RequestPacer` applies Wikimedia's pacing rules, with the scope
+  chosen by the caller (eidr-wikidata and BMR-Review each carried one).
+* `ids.CONTENT_ID_SUFFIX`: both Content ID patterns are built from it
+  (python-sdk).
+* Prose: `find_content_ids` explains the percent-encoded redirect URL.
+  `is_valid_party_id` explains why the registry accepts `SUPERPARTY`.
+  The conventions gain a bullet on aliased IDs (MCP, python-sdk).
 
 ### 0.46.0 (2026-10-02)
 
@@ -215,6 +240,8 @@ edition's Changes entry.
 | Name | Kind | Does |
 |---|---|---|
 | [`eidr_core.altidtool_io.format_line`](#format_line) | function | Composes one AltIDTool input line from its fields under the canonical variable-width rules. |
+| [`eidr_core.altidtool_io.identity_relation_sql`](#identity_relation_sql) | function | Returns the identity-relation test as a SQL condition for mirror queries. |
+| [`eidr_core.altidtool_io.is_identity_relation`](#is_identity_relation) | function | Tests whether an Alt ID with this relation is an identity link (altidtool-format rule 1: a blank relation means `IsSameAs`). |
 | [`eidr_core.altidtool_io.multi_form_domains`](#multi_form_domains) | function | Returns the Proprietary domains exempt from altidtool-format rule 6, read from the packaged `multi_form_kinds.json`. |
 | [`eidr_core.altidtool_io.parse_edit_line`](#parse_edit_line) | function | Parses one AltIDTool edit-file line into an addition, a removal, or None for a blank or comment line. |
 | [`eidr_core.altidtool_io.parse_line`](#parse_line) | function | Parses one 3-, 4- or 5-column AltIDTool addition line back into an AltIdRow. |
@@ -280,6 +307,7 @@ edition's Changes entry.
 | [`eidr_core.compare.cmp_titles`](#cmp_titles) | function | Compares two records' title lists with part and segment rules, greedy one-to-one alignment, and diminishing credit for extra matches. |
 | [`eidr_core.compare.cmp_version_language`](#cmp_version_language) | function | Compares version-language codes as exact matches on the primary subtag after `norm_lang`, so `fr-CA` equals `fr`. |
 | [`eidr_core.compare.date_profile`](#date_profile) | function | Returns the date-comparison profile for a pair: the shared creation type's `DATE_PROFILES` entry, else the `Basic` entry. |
+| [`eidr_core.compare.fuzzy`](#fuzzy) | function | Returns the composed similarity of two normalised strings, the raw value the person, organisation and title comparators build on. |
 | [`eidr_core.compare.set_params`](#set_params) | function | Registers the process-wide object from which every comparator reads its tuning constants (`NL_MODIFIER`, `NAME_MATCH_MIN`, `DATE_*`, `DUR_*`, ...). |
 | [`eidr_core.compare.validate_date_profile`](#validate_date_profile) | function | Checks a date profile for authoring defects and returns them as messages rather than raising them. |
 | [`eidr_core.compare.FieldResult`](#fieldresult-class) | class | Holds one comparator's result for one field: quality, readable detail, Alt-ID conflict count and optional metadata. |
@@ -318,6 +346,7 @@ edition's Changes entry.
 | [`eidr_core.external.FactCache`](#factcache-class) | class | Defines the two-method cache interface that source clients and crosswalks take instead of a database connection. |
 | [`eidr_core.external.JsonFactCache`](#jsonfactcache-class) | class | Persists fact entries in one JSON file, with an optional single expiry time and atomic whole-file writes. |
 | [`eidr_core.external.NullFactCache`](#nullfactcache-class) | class | Implements `FactCache` by storing nothing and returning nothing, so every lookup becomes a fetch. |
+| [`eidr_core.external.RequestPacer`](#requestpacer-class) | class | Paces requests: one at a time by default, 0.3 s apart, and 5 s after any request slower than 1 s (Wikimedia's rules for an unauthenticated client). |
 | [`eidr_core.external.Entry`](#entry-constant) | constant | Type alias (plain `dict` at runtime) for one cached fact dict in the fact-dict contract: key "status" is "found", "not_found" or "error"; key "facts" may hold "runtime_minutes" (list of float), "episode_runtime_minutes" (list of float), "release_date" ("YYYY-MM-DD", earliest known), "release_date_precision" ("day", "month" or "year") and "label" (str); key "error" (str) is present when status is "error". |
 | [`eidr_core.external.FATAL`](#fatal-constant) | constant | Verdict string a `classify` returns when no endpoint can help (authentication failure, malformed input): the walk stops at once and `call_with_failover` returns `(None, None, exc)`. |
 | [`eidr_core.external.Key`](#key-constant) | constant | Type alias for a cache key: `(source, external_id)`, both strings, for example `("wikidata", "Q42")` as eidr-dq writes them. |
@@ -334,6 +363,9 @@ edition's Changes entry.
 | [`eidr_core.external.failover.OUTAGE_SIGNATURES`](#outage_signatures-constant) | constant | Message fragments, matched case-insensitively by `is_outage_error`, meaning a WDQS endpoint is rate-limiting the whole workload (observed verbatim in the 2026-05-09/10 WDQS outages). |
 | [`eidr_core.external.failover.RATE_LIMIT_STATUSES`](#rate_limit_statuses-constant) | constant | HTTP statuses (429 Too Many Requests, 503 Service Unavailable) for which `call_with_failover` waits `rate_limit_floor` and records a cooldown when the exception carries no Retry-After value. |
 | [`eidr_core.external.failover.TRANSIENT_HTTP_MARKERS`](#transient_http_markers-constant) | constant | Status-code substrings that make `classify_sparql_error` return `RETRY` when found anywhere in an exception's text (tested after the outage and bad-query checks). |
+| [`eidr_core.external.failover.WIKIMEDIA_MIN_INTERVAL`](#wikimedia_min_interval-constant) | constant | Seconds between request starts under Wikimedia's 200-requests-a-minute limit; `RequestPacer`'s default `min_interval`. |
+| [`eidr_core.external.failover.WIKIMEDIA_SLOW_PAUSE`](#wikimedia_slow_pause-constant) | constant | Seconds to wait after a request that took longer than `WIKIMEDIA_SLOW_REQUEST` (Wikimedia: "please wait 5 seconds"); `RequestPacer`'s default `slow_pause`. |
+| [`eidr_core.external.failover.WIKIMEDIA_SLOW_REQUEST`](#wikimedia_slow_request-constant) | constant | A request slower than this many seconds counts as slow and triggers the pause; `RequestPacer`'s default `slow_threshold`. |
 | [`eidr_core.ids.category`](#category) | function | Classifies a DOI into its EIDR ID family by prefix alone. |
 | [`eidr_core.ids.check_character`](#check_character) | function | Computes the ISO 7064 Mod 37,36 check character for an EIDR suffix payload. |
 | [`eidr_core.ids.fault`](#fault) | function | Returns the reason a Content ID is unsound, or `None` when it is sound. |
@@ -344,6 +376,7 @@ edition's Changes entry.
 | [`eidr_core.ids.is_valid_user_id`](#is_valid_user_id) | function | Tests whether a value matches the user DOI pattern `USER_ID_RE`. |
 | [`eidr_core.ids.ALPHABET`](#alphabet-constant) | constant | The ISO 7064 Mod 37,36 base-36 alphabet, digits then upper-case letters. |
 | [`eidr_core.ids.CONTENT_ID_SEARCH_RE`](#content_id_search_re-constant) | constant | Compiled, case-insensitive, UNANCHORED Content ID shape for searching free text. |
+| [`eidr_core.ids.CONTENT_ID_SUFFIX`](#content_id_suffix-constant) | constant | Regex source string (not compiled, case-explicit) for the part after `10.5240/`: five 4-hex groups and the check character. |
 | [`eidr_core.ids.EIDR_CONTENT_ID_RE`](#eidr_content_id_re-constant) | constant | Compiled, case-insensitive, ANCHORED Content ID shape: `10.5240/`, five 4-hex groups, one check character. |
 | [`eidr_core.ids.PARTY_ID_RE`](#party_id_re-constant) | constant | Compiled, anchored party DOI pattern: `10.5237/` plus `PARTY_ID_SUFFIX`. |
 | [`eidr_core.ids.PARTY_ID_SUFFIX`](#party_id_suffix-constant) | constant | Regex source string (not compiled) for the part after `10.5237/`: `XXXX-XXXX` hex in either case, or the literal lower-case `superparty`. |
@@ -387,7 +420,7 @@ edition's Changes entry.
 | [`eidr_core.ordering.ck`](#ck) | function | Returns the casefolded sort key for a value, treating None as an empty string. |
 | [`eidr_core.ordering.is_internal_class`](#is_internal_class) | function | Tests whether a Title Class is `Internal` (casefolded, exact match). |
 | [`eidr_core.ordering.is_resource_class`](#is_resource_class) | function | Tests whether a Title Class marks the primary title, meaning it casefolds to `release` or `resource`. |
-| [`eidr_core.ordering.is_shortdoi`](#is_shortdoi) | function | Tests whether an Alt ID is a ShortDOI, by its Type or its Domain (casefolded, exact match). |
+| [`eidr_core.ordering.is_shortdoi`](#is_shortdoi) | function | Tests whether an Alt ID is a ShortDOI, by its Type or its Domain (stripped and casefolded since 0.47.0, exact match). |
 | [`eidr_core.ordering.title_bucket`](#title_bucket) | function | Returns the three-bucket rank of a title: ResourceName, then non-Internal alternates, then Internal alternates. |
 | [`eidr_core.ordering.title_sort_key`](#title_sort_key) | function | Returns the full title sort key: the three-bucket rank, then the casefolded text. |
 | [`eidr_core.registry.build_registry_credentials`](#build_registry_credentials) | function | Builds SDK `Credentials` from a project secrets dict, falling back to the SDK's own credential discovery. |
@@ -421,7 +454,7 @@ edition's Changes entry.
 ## `eidr_core.altidtool_io`
 
 <!-- dict-module:eidr_core.altidtool_io -->
-Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 5 functions, 2 classes (declared by `__all__`).
+Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 7 functions, 2 classes (declared by `__all__`).
 <!-- /dict-module -->
 
 **Purpose.** The one implementation of the EIDR AltIDTool input-file line format: tab-separated `EIDR_ID, Type, Value[, Domain][, Relation]`, UTF-8, no header, 3 to 5 columns wide. It was extracted on 2026-08-04 from eidr-wikidata `bmr/altidtool.py` (the production feed generator) so that every producer composes lines the same way and every reader parses them the same way. Since spec v1.1 it also reads AltIDTool edit files (removal lines and `//` comments). Since v1.4 it also hosts the declared list of Proprietary domains exempt from rule 6 (`multi_form_domains`).
@@ -587,6 +620,42 @@ Defined in `src/eidr_core/altidtool_io/__init__.py`.
 
 **Does.** Holds one AltIDTool addition line as a NamedTuple in column order. The field order matches `format_line`, so `format_line(*row)` composes the line and `write_lines` accepts rows directly. `parse_line` and `parse_edit_line` return it.
 
+### `identity_relation_sql`
+
+<!-- dict:eidr_core.altidtool_io.identity_relation_sql -->
+```python
+def identity_relation_sql(column: str = "relation") -> str
+```
+
+Defined in `src/eidr_core/altidtool_io/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `column` | `str` | `"relation"` | The column to test: a plain identifier, optionally table-qualified (`a.relation`). Anything else raises `ValueError`, since this builds SQL text. |
+
+**Returns** `str` -- `(<column> IS NULL OR <column> = '' OR <column> = 'IsSameAs')`, parenthesised so it can be ANDed safely.
+<!-- /dict -->
+
+**Does.** Returns the identity-relation test as a SQL condition for mirror queries. It compares `IsSameAs` exactly, as the mirror stores it; the Python `is_identity_relation` also folds case and whitespace. Use it instead of writing the condition by hand: a NULL-only form hid 69.6% of IMDb identity links on 2026-09-23.
+
+### `is_identity_relation`
+
+<!-- dict:eidr_core.altidtool_io.is_identity_relation -->
+```python
+def is_identity_relation(relation: object) -> bool
+```
+
+Defined in `src/eidr_core/altidtool_io/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `relation` | `object` | required | An Alt ID's relation as read: `None`, a string, or any value (it is converted with `str()`). |
+
+**Returns** `bool` -- True for `None`, an empty or whitespace-only value, or `IsSameAs` in any case; False for every other relation.
+<!-- /dict -->
+
+**Does.** Tests whether an Alt ID with this relation is an identity link (altidtool-format rule 1: a blank relation means `IsSameAs`). It is the one Python definition; `compare.cmp_alt_ids` uses it since 0.47.0. Do not write `relation in ("", "IsSameAs")` again: the copies across the portfolio are where this went wrong.
+
 ## `eidr_core.bmr_io`
 
 <!-- dict-module:eidr_core.bmr_io -->
@@ -614,7 +683,7 @@ Source `src/eidr_core/bmr_io/__init__.py`. Public names: 21 functions, 9 classes
 <!-- dict-usedby:eidr_core.bmr_io -->
 Scan of 2026-10-02; regenerated at each release from the consumer trees.
 * **BMR-Review**: `families_for`, `header_map`, `index_rows`, `read_headers`, `resolve_parent`, `template_for_creation_type`, `write_sheet`
-* **BMRtoAltID**: `ASSIGNED_ID_COLUMN`, `check_sheet`, `DATA_START`, `family_layout`, `fill_column`, `HEADER_ROW`, `open_sheet`, `ROW_ID_COLUMN`, `SHEET_TO_TEMPLATE`, `subset_rows`, `TemplateMismatch`
+* **BMRtoAltID**: `ASSIGNED_ID_COLUMN`, `check_sheet`, `DATA_START`, `family_layout`, `fill_column`, `HEADER_ROW`, `open_sheet`, `ROW_ID_COLUMN`, `SHEET_TO_TEMPLATE`, `subset_rows`, `TemplateMismatch`, `TEMPLATES`
 * **eidr-dq**: `pad_groups`, `RepeatPlan`
 * **eidr-imdb**: `DATA_START`, `HEADER_ROW`, `TEMPLATES`, `write_sheet`
 * **eidr-wikidata**: `count_family`, `DATA_START`, `expand_family`, `families_for`, `family_layout`, `fix_shared_strings`, `HEADER_ROW`, `pad_groups`, `read_headers`, `read_sheet`, `RepeatPlan`, `rightmost_in`, `SCHEMA_MAX`, `transplant`, `write_sheet`
@@ -845,7 +914,7 @@ Defined in `src/eidr_core/bmr_io/__init__.py`.
 | `sheet_name` | `str` | required | Exact tab name. A missing tab raises `ValueError` listing the tabs found. |
 | `header_row` | `int` | `HEADER_ROW` (keyword-only) | 1-based row holding the headers. Pass the discovered row for a sheet whose headers moved off row 3. |
 | `data_start` | `int` | `DATA_START` (keyword-only) | 1-based first data row. |
-| `stop` | `str \| None` | `None` (keyword-only) | End-of-data rule. `None`: read to the end, skipping blank rows. `"blank_first_col"`: stop at the first row whose column A is empty or whitespace. `"blank_row"`: stop at the first row with no value under any header. Anything else raises `ValueError` before the file is opened. |
+| `stop` | `str \| None` | `None` (keyword-only) | End-of-data rule. `None`: read to the end, skipping blank rows. `"blank_first_col"`: stop at the first row whose column A is empty or whitespace. `"blank_row"`: stop at the first row with no value under any header. `"skip_blank_first_col"` (0.47.0): not a stop -- skip any row whose column A is empty or whitespace and keep reading. Anything else raises `ValueError` before the file is opened. |
 
 **Returns** `Iterator[tuple[dict[int, str], Iterator[tuple[int, dict[str, object]]]]]` -- a context manager yielding `(headers, rows)`. `headers` is `{1-based column: header}`; `rows` lazily yields `(absolute sheet row number, {header: value})` and works only inside the `with` block.
 <!-- /dict -->
@@ -934,7 +1003,7 @@ Defined in `src/eidr_core/bmr_io/__init__.py`.
 | `sheet_name` | `str` | required | Exact tab name; a missing tab raises `ValueError`. |
 | `header_row` | `int` | `HEADER_ROW` (keyword-only) | 1-based header row, as in `open_sheet`. |
 | `data_start` | `int` | `DATA_START` (keyword-only) | 1-based first data row. |
-| `stop` | `str \| None` | `None` (keyword-only) | End-of-data rule: `None`, `"blank_first_col"` or `"blank_row"`, exactly as in `open_sheet`. |
+| `stop` | `str \| None` | `None` (keyword-only) | End-of-data rule: `None`, `"blank_first_col"`, `"blank_row"` or `"skip_blank_first_col"`, exactly as in `open_sheet`. |
 
 **Returns** `tuple[dict[int, str], list[dict[str, object]]]` -- `(headers, rows)`: `headers` as in `open_sheet`; `rows` is a list of `{header: value}` dicts, one per data row, without row numbers.
 <!-- /dict -->
@@ -1427,7 +1496,7 @@ Defined in `src/eidr_core/codes/__init__.py`.
 ## `eidr_core.compare`
 
 <!-- dict-module:eidr_core.compare -->
-Source `src/eidr_core/compare/__init__.py`. Public names: 19 functions, 1 class, 2 constants (declared by `__all__`). Some are defined in, and also importable from: `src/eidr_core/compare/_params.py`.
+Source `src/eidr_core/compare/__init__.py`. Public names: 20 functions, 1 class, 2 constants (declared by `__all__`). Some are defined in, and also importable from: `src/eidr_core/compare/_params.py`, `src/eidr_core/compare/titles.py`.
 <!-- /dict-module -->
 
 **Purpose.** The portfolio's one field-comparator library (layer L2 of unified-scoring.md): each `cmp_*` function compares one field of two EIDR records and returns a `FieldResult` with a continuous quality and, for Alt IDs, a conflict count. It was extracted from BMR-Review `eidr_dedup_score/compare.py` on 2026-07-28, so BMR-Review's scorer, its golden-pair evaluator and De-Dupe UI's conformance-vector generator all score through the same code. The compare-spec tuning constants are not hardcoded: comparators read them lazily from the object a consumer registers with `set_params`. The title-rule thresholds and quality constants in `titles` are the exception: they are module constants.
@@ -1516,7 +1585,7 @@ Defined in `src/eidr_core/compare/__init__.py`.
 
 **Does.** Compares third-party identifiers per namespace: a shared value is identity evidence; disagreeing values in a shared namespace are a conflict. Entries are dropped first when they are ShortDOIs (an alias of the EIDR ID), opaque registry IDs (`alt_source` gives None), or carry a non-identity relation (anything but missing, empty or `IsSameAs`, tested per entry). Values compare stripped and casefolded; a namespace counts as matched when any value overlaps, so a shared IMDb ID is not cancelled by a second, unshared one. This is the only comparator that produces a negative signal.
 
-**Notes.** Not in `COMPARATORS`: call it separately and read `conflict` and `meta["matches"]` (BMR-Review's scorer does, for the conflict penalty and the corroboration count). Quality `None` with `conflict > 0` is a normal result. The namespace is `alt_source`'s key (domain, else type), which is looser than the "id_type AND the full domain" Kind in the docstring and in compare-spec.md. No registered parameters are needed unless a namespace matches (`accumulate`).
+**Notes.** Not in `COMPARATORS`: call it separately and read `conflict` and `meta["matches"]` (BMR-Review's scorer does, for the conflict penalty and the corroboration count). Quality `None` with `conflict > 0` is a normal result. The namespace is `alt_source`'s key (domain, else type), which is looser than the "id_type AND the full domain" Kind in the docstring and in compare-spec.md. No registered parameters are needed unless a namespace matches (`accumulate`). Since 0.47.0 its relation and ShortDOI tests are the shared `altidtool_io.is_identity_relation` and `ordering.is_shortdoi`.
 
 ### `cmp_assoc_orgs`
 
@@ -1871,6 +1940,27 @@ Defined in `src/eidr_core/compare/__init__.py`.
 
 **Value** `DATE_PROFILE_DEFAULT = "Basic"` -- The `DATE_PROFILES` key `date_profile` uses when the two creation types differ, a type is missing, or a type has no profile of its own.
 <!-- /dict -->
+
+### `fuzzy`
+
+<!-- dict:eidr_core.compare.fuzzy -->
+```python
+def fuzzy(a, b)
+```
+
+Defined in `src/eidr_core/compare/titles.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `a` | - | required | An already-normalised string (for example the output of `normalize.norm_title` or `norm_name`); empty or `None` scores 0.0. |
+| `b` | - | required | The other normalised string, the same way. |
+
+**Returns** not annotated -- `float` in [0, 1]: 1.0 when the strings are equal ignoring spaces, else `max(token_set_ratio, WRatio) / 100`.
+<!-- /dict -->
+
+**Does.** Returns the composed similarity of two normalised strings, the raw value the person, organisation and title comparators build on. It does not normalise its inputs and applies no part or segment rules (`titles.title_similarity` does). Public since 0.47.0 (De-Dupe UI S-35); the private names `compare._fuzzy`, `compare._title_base_ratio` and `titles._fuzzy` are aliases of it.
+
+**Notes.** Needs the `compare` extra (rapidfuzz). Normalise first: on raw text, case and punctuation count as differences.
 
 ## `eidr_core.compare.nonlinear`
 
@@ -2334,7 +2424,7 @@ Source `src/eidr_core/db_schemas/__init__.py`. Public names: 4 functions, 1 cons
 Scan of 2026-10-02; regenerated at each release from the consumer trees.
 * **BMR-Review**: `assert_tables`, `contract_version`, `DATABASES`, `load_manifest`, `table_columns`
 * **BMRtoAltID**: `assert_tables`
-* **eidr-dq**: `assert_tables`, `contract_version`, `load_manifest`
+* **eidr-dq**: `assert_tables`, `contract_version`, `load_manifest`, `table_columns`
 * **eidr-imdb**: `assert_tables`, `load_manifest`
 * **eidr-wikidata**: `assert_tables`, `contract_version`
 * **MCP**: `load_manifest`
@@ -2515,7 +2605,7 @@ No parameters.
 ## `eidr_core.external`
 
 <!-- dict-module:eidr_core.external -->
-Source `src/eidr_core/external/__init__.py`. Public names: 3 functions, 4 classes, 6 constants (declared by `__all__`). Some are defined in, and also importable from: `src/eidr_core/external/failover.py`.
+Source `src/eidr_core/external/__init__.py`. Public names: 3 functions, 5 classes, 6 constants (declared by `__all__`). Some are defined in, and also importable from: `src/eidr_core/external/failover.py`.
 <!-- /dict-module -->
 
 **Purpose.** The shared chassis for clients of outside data sources (Wikidata, TMDb, IMDb). It holds the fact-cache seam (the `FactCache` protocol plus three ready implementations), the fact-dict contract that providers return and `eidr_core.verify` consumes, and a re-export of the retry and endpoint-failover loop from `eidr_core.external.failover`. The cache half was extracted from eidr-dq `src/dq/external/cache.py` (register R13, 2026-08-06); the failover half came from eidr-wikidata. Stdlib only: nothing here imports a database driver or an HTTP library.
@@ -2537,7 +2627,7 @@ Source `src/eidr_core/external/__init__.py`. Public names: 3 functions, 4 classe
 Scan of 2026-10-02; regenerated at each release from the consumer trees.
 * **eidr-dq**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `Entry`, `FactCache`, `FATAL`, `Key`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RETRY`
 * **eidr-imdb**: `call_with_failover`, `endpoint_chain`, `FATAL`, `NEXT_ENDPOINT`, `OUTAGE`, `RETRY`
-* **eidr-wikidata**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `FactCache`, `NullFactCache`
+* **eidr-wikidata**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `FactCache`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RETRY`
 <!-- /dict-usedby -->
 
 ### `call_with_failover`
@@ -2576,7 +2666,7 @@ Defined in `src/eidr_core/external/failover.py`.
 
 <!-- dict:eidr_core.external.classify_sparql_error -->
 ```python
-def classify_sparql_error(exc: Exception) -> str
+def classify_sparql_error(exc: Exception, *, retry_timeouts: bool = False) -> str
 ```
 
 Defined in `src/eidr_core/external/failover.py`.
@@ -2584,6 +2674,7 @@ Defined in `src/eidr_core/external/failover.py`.
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `exc` | `Exception` | required | The exception a SPARQL `attempt` raised (typically from SPARQLWrapper). Only `str(exc)` is examined. |
+| `retry_timeouts` | `bool` | `False` (keyword-only) | `True` makes a timeout (`TimeoutError`, or a message saying "timed out", "timeout", "WinError 10060" or "did not properly respond") `RETRY` instead of `NEXT_ENDPOINT`. Use it for a one-endpoint chain or one large query. Pass it with `functools.partial` when handing `classify` to `call_with_failover`. |
 
 **Returns** `str` -- `OUTAGE` if `is_outage_error(exc)`; else `NEXT_ENDPOINT` if `is_bad_query_error(exc)`; else `RETRY` if the text contains 429, 500, 502, 503 or 504; else `NEXT_ENDPOINT`. Never `FATAL`.
 <!-- /dict -->
@@ -2730,10 +2821,32 @@ Defined in `src/eidr_core/external/failover.py`.
 **Value** `RETRY = "retry"` -- Verdict string for a transient failure (429 or 5xx class): retry the same endpoint after backoff (and any Retry-After wait), up to `max_retries` attempts in total.
 <!-- /dict -->
 
+### `RequestPacer` (class)
+
+<!-- dict:eidr_core.external.RequestPacer -->
+```python
+class RequestPacer
+```
+
+Defined in `src/eidr_core/external/failover.py`.
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `__init__` | `def __init__(min_interval: float = WIKIMEDIA_MIN_INTERVAL, *, slow_threshold: float = WIKIMEDIA_SLOW_REQUEST, slow_pause: float = WIKIMEDIA_SLOW_PAUSE, max_concurrent: int = 1, clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep) -> None` | `min_interval`: seconds between request starts (0.3, Wikimedia's 200 a minute); `slow_threshold` / `slow_pause`: after a request longer than 1.0 s, wait 5.0 s; `max_concurrent`: requests in flight at once (1); `clock` / `sleep`: injectable for tests. `max_concurrent` below 1 raises `ValueError`. |
+| `wait` | `def wait() -> None` | Blocks until the next request may start and claims that start; thread-safe. |
+| `done` | `def done(duration: float) -> None` | Records a finished request; `duration` in seconds. Over `slow_threshold`, the next request waits `slow_pause`. |
+| `back_off` | `def back_off(seconds: float) -> None` | Makes the next request wait at least `seconds` from now (a Retry-After, a `maxlag` answer); never shortens a wait. |
+| `request` | `def request() -> Iterator[None]` | Context manager around ONE request: holds a concurrency slot, waits for the pace, runs the body, and records its duration even when the body raises. |
+<!-- /dict -->
+
+**Does.** Paces requests: one at a time by default, 0.3 s apart, and 5 s after any request slower than 1 s (Wikimedia's rules for an unauthenticated client). It holds its own state, and the caller decides its scope: one per client, or one shared by every client in the process when the rule is process-wide. No instance exists at import. Added in 0.47.0 for eidr-wikidata's Action API client and BMR-Review's Wikidata verifier, which each carried the same pacer.
+
+**Notes.** Use it inside the `attempt` you pass to `call_with_failover`; on a 429 or `maxlag` answer also call `back_off(retry_after_seconds(exc))`, so the NEXT call waits as well as the retry.
+
 ## `eidr_core.external.failover`
 
 <!-- dict-module:eidr_core.external.failover -->
-Source `src/eidr_core/external/failover.py`. Public names: 5 functions, 5 constants (declared by `__all__`).
+Source `src/eidr_core/external/failover.py`. Public names: 5 functions, 8 constants (declared by `__all__`).
 <!-- /dict-module -->
 
 **Purpose.** The retry, backoff, Retry-After and endpoint-failover loop shared by every outside-service client in the portfolio, plus the SPARQL error classifiers. It was extracted from eidr-wikidata's `_query_endpoints` (register R13, 2026-08-09) to replace three diverging retry loops. The chassis owns the loop; the caller owns the transport (`attempt`) and the meaning of errors (`classify`). Stdlib only; its verdicts, `call_with_failover`, `classify_sparql_error` and `endpoint_chain` are also re-exported from `eidr_core.external`.
@@ -2753,8 +2866,8 @@ Source `src/eidr_core/external/failover.py`. Public names: 5 functions, 5 consta
 <!-- dict-usedby:eidr_core.external.failover -->
 Scan of 2026-10-02; regenerated at each release from the consumer trees.
 * **BMR-Review**: `retry_after_seconds`
-* **eidr-imdb**: `DEFAULT_RATE_LIMIT_FLOOR`
-* **eidr-wikidata**: `is_bad_query_error`, `is_outage_error`, `retry_after_seconds`
+* **eidr-imdb**: `DEFAULT_RATE_LIMIT_FLOOR`, `http_status`
+* **eidr-wikidata**: `http_status`, `is_bad_query_error`, `is_outage_error`, `retry_after_seconds`
 <!-- /dict-usedby -->
 
 ### `cooldown_remaining`
@@ -2889,10 +3002,34 @@ Defined in `src/eidr_core/external/failover.py`.
 **Value** `TRANSIENT_HTTP_MARKERS = ("429", "500", "502", "503", "504")` -- Status-code substrings that make `classify_sparql_error` return `RETRY` when found anywhere in an exception's text (tested after the outage and bad-query checks).
 <!-- /dict -->
 
+### `WIKIMEDIA_MIN_INTERVAL` (constant)
+
+<!-- dict:eidr_core.external.failover.WIKIMEDIA_MIN_INTERVAL -->
+Defined in `src/eidr_core/external/failover.py`.
+
+**Value** `WIKIMEDIA_MIN_INTERVAL = 0.3` -- Seconds between request starts under Wikimedia's 200-requests-a-minute limit; `RequestPacer`'s default `min_interval`.
+<!-- /dict -->
+
+### `WIKIMEDIA_SLOW_PAUSE` (constant)
+
+<!-- dict:eidr_core.external.failover.WIKIMEDIA_SLOW_PAUSE -->
+Defined in `src/eidr_core/external/failover.py`.
+
+**Value** `WIKIMEDIA_SLOW_PAUSE = 5.0` -- Seconds to wait after a request that took longer than `WIKIMEDIA_SLOW_REQUEST` (Wikimedia: "please wait 5 seconds"); `RequestPacer`'s default `slow_pause`.
+<!-- /dict -->
+
+### `WIKIMEDIA_SLOW_REQUEST` (constant)
+
+<!-- dict:eidr_core.external.failover.WIKIMEDIA_SLOW_REQUEST -->
+Defined in `src/eidr_core/external/failover.py`.
+
+**Value** `WIKIMEDIA_SLOW_REQUEST = 1.0` -- A request slower than this many seconds counts as slow and triggers the pause; `RequestPacer`'s default `slow_threshold`.
+<!-- /dict -->
+
 ## `eidr_core.ids`
 
 <!-- dict-module:eidr_core.ids -->
-Source `src/eidr_core/ids/__init__.py`. Public names: 8 functions, 9 constants (declared by `__all__`).
+Source `src/eidr_core/ids/__init__.py`. Public names: 8 functions, 10 constants (declared by `__all__`).
 <!-- /dict-module -->
 
 **Purpose.** The one implementation of EIDR identifier syntax. It validates Content IDs (`10.5240/`) including the ISO 7064 Mod 37,36 check character, pattern-checks party (`10.5237/`), user (`10.5238/`) and service (`10.5239/`) DOIs (which carry no check character), classifies a DOI by prefix, and pulls Content IDs out of free text. It was accepted on 2026-08-26 from BMR-Review's proposal, seeded from its `validate_returned_ids.py`, and shared without waiting for a second consumer because the ID shape and the checksum are published standards: a local copy is a second chance to get them wrong silently (BMR-Review's first copy reported all 2,996 valid production IDs it checked as broken). It imports only `re`, so it is closed under imports and a package that cannot depend on eidr-core (python-sdk) can vendor it whole.
@@ -2917,7 +3054,7 @@ Scan of 2026-10-02; regenerated at each release from the consumer trees.
 * **BMR-Review**: `category`, `fault`, `find_content_ids`, `is_valid_eidr_id`
 * **BMRtoAltID**: `fault`
 * **De-Dupe UI**: `ALPHABET`, `check_character`, `is_valid_eidr_id`
-* **eidr-wikidata**: `fault`, `is_valid_eidr_id`
+* **eidr-wikidata**: `EIDR_CONTENT_ID_RE`, `fault`, `is_valid_eidr_id`
 * **python-sdk**: (vendors the module, pin `46cd70a`)
 * **XML_to_JSON**: `is_valid_eidr_id`
 <!-- /dict-usedby -->
@@ -2999,7 +3136,7 @@ Defined in `src/eidr_core/ids/__init__.py`.
 
 **Does.** Extracts every EIDR Content ID mentioned in free text, upper-cased and de-duplicated in order of appearance. Matching uses `CONTENT_ID_SEARCH_RE`, which refuses a match glued to a preceding letter, digit or `/`, or to a following letter, digit or hyphen. Party, service and user IDs are ignored.
 
-**Notes.** An ID inside a URL path is NOT found: `https://doi.org/10.5240/...` returns `[]` because the ID follows a `/`. Strip URL prefixes first if your text carries them. `doi:10.5240/...`, `id=10.5240/...` and `(10.5240/...)` are found.
+**Notes.** An ID inside a URL path is NOT found: `https://doi.org/10.5240/...` returns `[]` because the ID follows a `/`. Strip URL prefixes first if your text carries them. A resolver's REDIRECT URL also percent-encodes the slash after the prefix (`https://resolve.eidr.org/EIDR/object/10.5240%2F...`, measured by MCP 2026-10-02), so decode it (`urllib.parse.unquote`) as well. `doi:10.5240/...`, `id=10.5240/...` and `(10.5240/...)` are found.
 
 ### `is_valid_eidr_id`
 
@@ -3035,7 +3172,7 @@ Defined in `src/eidr_core/ids/__init__.py`.
 **Returns** `bool` -- `True` for `10.5237/XXXX-XXXX` (hex, either case) or the literal `10.5237/superparty`; `False` otherwise.
 <!-- /dict -->
 
-**Does.** Tests whether a value matches the party DOI pattern `PARTY_ID_RE`. Pattern check only: party IDs carry no check character, so a typo in the hex cannot be detected. The hex is case-insensitive but `superparty` must be lower-case, so `10.5237/SUPERPARTY` returns `False`.
+**Does.** Tests whether a value matches the party DOI pattern `PARTY_ID_RE`. Pattern check only: party IDs carry no check character, so a typo in the hex cannot be detected. The hex is case-insensitive but `superparty` must be lower-case, so `10.5237/SUPERPARTY` returns `False`: this tests schema validity as written (the XSD pattern is case-sensitive). The registry itself resolves any case of `superparty` to the lower-case ID (python-sdk, measured 2026-10-02), so it does not say which party a string names.
 
 ### `is_valid_service_id`
 
@@ -3086,7 +3223,7 @@ Defined in `src/eidr_core/ids/__init__.py`.
 <!-- dict:eidr_core.ids.CONTENT_ID_SEARCH_RE -->
 Defined in `src/eidr_core/ids/__init__.py`.
 
-**Value** `CONTENT_ID_SEARCH_RE = re.compile( r"(?<![0-9A-Z/])10\.5240/[0-9A-F]{4}(?:-[0-9A-F]{4}){4}-[0-9A-Z](?![0-9A-Z-...` -- Compiled, case-insensitive, UNANCHORED Content ID shape for searching free text. It will not match when glued to a preceding letter, digit or `/` (so not inside a DOI URL), or to a following letter, digit or hyphen. Shape only, no checksum: `find_content_ids` adds the check and is what most callers want. De-Dupe UI's engine mirrors this rule in JavaScript, so treat the pattern as a cross-language fact.
+**Value** `CONTENT_ID_SEARCH_RE = re.compile( r"(?<![0-9A-Z/])10\.5240/" + CONTENT_ID_SUFFIX + r"(?![0-9A-Z-])", re.I )` -- Compiled, case-insensitive, UNANCHORED Content ID shape for searching free text. It will not match when glued to a preceding letter, digit or `/` (so not inside a DOI URL), or to a following letter, digit or hyphen. Shape only, no checksum: `find_content_ids` adds the check and is what most callers want. De-Dupe UI's engine mirrors this rule in JavaScript, so treat the pattern as a cross-language fact.
 <!-- /dict -->
 
 ### `EIDR_CONTENT_ID_RE` (constant)
@@ -3094,7 +3231,7 @@ Defined in `src/eidr_core/ids/__init__.py`.
 <!-- dict:eidr_core.ids.EIDR_CONTENT_ID_RE -->
 Defined in `src/eidr_core/ids/__init__.py`.
 
-**Value** `EIDR_CONTENT_ID_RE = re.compile( r"^10\.5240/[0-9A-F]{4}(?:-[0-9A-F]{4}){4}-[0-9A-Z]$", re.I )` -- Compiled, case-insensitive, ANCHORED Content ID shape: `10.5240/`, five 4-hex groups, one check character. The check character ranges over 0-9A-Z, not only hex. Shape only; it does not verify the check character, so validate with `is_valid_eidr_id`. Match it against stripped text.
+**Value** `EIDR_CONTENT_ID_RE = re.compile(r"^10\.5240/" + CONTENT_ID_SUFFIX + r"$", re.I)` -- Compiled, case-insensitive, ANCHORED Content ID shape: `10.5240/`, five 4-hex groups, one check character. The check character ranges over 0-9A-Z, not only hex. Shape only; it does not verify the check character, so validate with `is_valid_eidr_id`. Match it against stripped text.
 <!-- /dict -->
 
 ### `PARTY_ID_RE` (constant)
@@ -3145,6 +3282,14 @@ Defined in `src/eidr_core/ids/__init__.py`.
 **Value** `USER_ID_SUFFIX = r"[0-9a-zA-Z_#.\-()]{3,32}"` -- Regex source string for the username after `10.5238/`: 3 to 32 characters from `0-9 a-z A-Z _ # . - ( )`, transcribed from schema 2.7.0 `userDOIType`. python-sdk builds its user-ID check from this string.
 <!-- /dict -->
 
+### `CONTENT_ID_SUFFIX` (constant)
+
+<!-- dict:eidr_core.ids.CONTENT_ID_SUFFIX -->
+Defined in `src/eidr_core/ids/__init__.py`.
+
+**Value** `CONTENT_ID_SUFFIX = r"[0-9A-Fa-f]{4}(?:-[0-9A-Fa-f]{4}){4}-[0-9A-Za-z]"` -- Regex source string (not compiled, case-explicit) for the part after `10.5240/`: five 4-hex groups and the check character. `EIDR_CONTENT_ID_RE` and `CONTENT_ID_SEARCH_RE` are built from it (0.47.0, python-sdk), so a validator of a bare suffix composes from it as it can for party, service and user. Shape only: use `check_character` or `is_valid_eidr_id` for the checksum.
+<!-- /dict -->
+
 ## `eidr_core.inheritance`
 
 <!-- dict-module:eidr_core.inheritance -->
@@ -3170,7 +3315,7 @@ Source `src/eidr_core/inheritance/__init__.py`. Public names: 6 functions, 1 cla
 <!-- dict-usedby:eidr_core.inheritance -->
 Scan of 2026-10-02; regenerated at each release from the consumer trees.
 * **BMR-Review**: `build_full_record`, `provenance`, `RECORD_ATTRS`, `TitleConstructionError`, (the module)
-* **XML_to_JSON**: `build_full_base`, `INHERITABLE_FIELDS`, `TitleConstructionError`
+* **XML_to_JSON**: `build_full_base`, `INHERITABLE_FIELDS`, `is_absent`, `TitleConstructionError`
 <!-- /dict-usedby -->
 
 **Specs.** `specs/merge-rules.md` section 4.2 fixes that an inherited value counts as present for rule 15 (ApproximateLength) and rules 4 to 6 (release date), so the merge engine needs the full record this module builds. `specs/golden-pairs.md` fixes that a fixture record may carry a `provenance` block, which a loader must set on the attribute `provenance()` reads, and that a record without one is self-asserted.
@@ -3888,10 +4033,10 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 | `id_type` | - | required | Alt ID Type. None allowed. |
 | `domain` | - | required | Alt ID Domain. None allowed. |
 
-**Returns** `bool` -- True when the Type or the Domain casefolds to exactly `shortdoi`.
+**Returns** `bool` -- True when the Type or the Domain, stripped and casefolded, is exactly `shortdoi`.
 <!-- /dict -->
 
-**Does.** Tests whether an Alt ID is a ShortDOI, by its Type or its Domain (casefolded, exact match). Use it to hide ShortDOI from display and to leave it out of evaluation. Never use it to filter an export: canonical and export forms keep ShortDOI.
+**Does.** Tests whether an Alt ID is a ShortDOI, by its Type or its Domain (stripped and casefolded since 0.47.0, exact match). Use it to hide ShortDOI from display and to leave it out of evaluation. Never use it to filter an export: canonical and export forms keep ShortDOI.
 
 ### `title_bucket`
 
@@ -3959,7 +4104,6 @@ Scan of 2026-10-02; regenerated at each release from the consumer trees.
 * **eidr-dq**: `build_registry_credentials`, `get_registry_client`
 * **eidr-wikidata**: `build_registry_credentials`, `CODE_SUCCESS`, `DEFAULT_REGISTRY`, `get_registry_client`, `OperationStatus`, `parse_operation_status`, `parse_operation_statuses`, `token_operation_status`
 * **LanguageTool**: `get_registry_client`, `parse_operation_status`, `token_operation_status`
-* **python-tools**: `build_registry_credentials`, `get_registry_client`
 <!-- /dict-usedby -->
 
 ### `build_registry_credentials`
@@ -4138,10 +4282,9 @@ Scan of 2026-10-02; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_local`
 * **BMRtoAltID**: `load_secrets`, `SecretsError`
 * **eidr-dq**: `load_secrets`, `SecretsError`
-* **eidr-imdb**: `load_secrets`, `SecretsError`
+* **eidr-imdb**: `load_local`, `load_secrets`, `SecretsError`
 * **eidr-wikidata**: `load_local`, `load_secrets`, `SecretsError`
 * **LanguageTool**: `load_local`
-* **python-tools**: `load_local`
 * **XML_to_JSON**: `load_secrets`, `SecretsError`
 <!-- /dict-usedby -->
 
@@ -4570,6 +4713,13 @@ no version yet.
   ask why before you call the difference justified. The usual cause is a
   signature gap, and widening the signature is cheaper than keeping two
   implementations.
+* **An aliased Content ID resolves to its TARGET.** Resolving an ID that
+  has been aliased (merged into another record) returns the target's
+  metadata. The `<ID>` in the response differs from the ID you asked for,
+  and from the ID in a resolver URL. Code that compares "the ID I asked
+  for" with "the ID in the response" must decide which one it means. MCP
+  measured this on 2026-10-02, on a ShortDOI that points at an aliased
+  predecessor.
 * **Vendor only through the mechanism.** A package that cannot depend on
   eidr-core uses `python -m eidr_core.vendor` under `specs/vendoring.md`.
   Never copy files by hand.

@@ -337,7 +337,7 @@ def test_open_sheet_and_read_sheet_agree_on_every_stop_rule(tmp_path):
     # The whole safety argument for refactoring read_sheet onto open_sheet
     # is that they cannot diverge. Prove it rather than assert it.
     path = _write_sheet(tmp_path, STOP_HEADERS, STOP_ROWS)
-    for stop in (None, "blank_row", "blank_first_col"):
+    for stop in (None, "blank_row", "blank_first_col", "skip_blank_first_col"):
         eager_headers, eager_rows = read_sheet(path, SHEET, stop=stop)
         with open_sheet(path, SHEET, stop=stop) as (headers, rows):
             streamed = list(rows)
@@ -414,3 +414,14 @@ def test_header_map_is_the_public_name_for_the_one_policy():
     from eidr_core.bmr_io import header_map
     got = header_map(["Unique Row ID", None, "  ", " Title ", ""])
     assert got == {1: "Unique Row ID", 4: "Title"}
+
+
+def test_skip_blank_first_col_skips_and_keeps_reading(tmp_path):
+    # 0.47.0, BMR-Review's loader: a row whose column A is blank is skipped
+    # (the orphan AND the fully blank row) and reading continues to the end,
+    # unlike blank_first_col, which halts at the orphan.
+    path = _write_sheet(tmp_path, STOP_HEADERS, STOP_ROWS)
+    with open_sheet(path, SHEET, stop="skip_blank_first_col") as (_h, rows):
+        got = [(n, r.get("Title")) for n, r in rows]
+    assert got == [(4, "First"), (6, "Third"), (8, "After the gap")]
+

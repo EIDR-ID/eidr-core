@@ -21,8 +21,6 @@ imports and the engine-tuning workflow are unchanged.
 from dataclasses import dataclass
 from functools import partial
 
-from rapidfuzz import fuzz
-
 from eidr_core.normalize import (
     days_between,
     norm_code,  # noqa: F401 — re-exported; BMR-Review's compare.py shim star-imports it
@@ -38,6 +36,7 @@ from . import _params as config
 from . import nonlinear
 from ._params import set_source as set_params  # the public registration API, re-exported
 from .titles import (
+    fuzzy,
     is_internal,
     parts_ambiguous,
     parts_conflict,
@@ -71,6 +70,7 @@ __all__ = [
     "cmp_version_language",
     "date_profile",
     "FieldResult",
+    "fuzzy",
     "set_params",
     "validate_date_profile",
 ]
@@ -85,15 +85,10 @@ class FieldResult:
     meta: dict | None = None
 
 
-def _fuzzy(a, b):
-    if not a or not b:
-        return 0.0
-    # inputs are already ASCII-folded/lower-cased/punct-stripped; ignoring spaces
-    # too means diacritics, ligatures, punctuation, case and spacing never count
-    # as a difference for an otherwise-identical string.
-    if a.replace(" ", "") == b.replace(" ", ""):
-        return 1.0
-    return max(fuzz.token_set_ratio(a, b), fuzz.WRatio(a, b)) / 100.0
+# The composed similarity had three identical bodies here and in titles
+# (_fuzzy twice, _title_base_ratio); one public function now, the private
+# names kept as aliases so nothing that imported them moves (0.47.0, S-35).
+_fuzzy = fuzzy
 
 
 def _greedy_align(a_norm, b_norm, simf=None):
@@ -126,14 +121,8 @@ def _greedy_align_pairs(n_a, n_b, simf):
 
 
 # -------- titles (episode-aware: part/segment rules, system-gen filtering) --------
-def _title_base_ratio(a, b):
-    """Similarity of two already-normalised part BASE titles (0..1)."""
-    from rapidfuzz import fuzz as _f
-    if not a or not b:
-        return 0.0
-    if a.replace(" ", "") == b.replace(" ", ""):
-        return 1.0
-    return max(_f.token_set_ratio(a, b), _f.WRatio(a, b)) / 100.0
+# Similarity of two already-normalised part BASE titles: the same body.
+_title_base_ratio = fuzzy
 
 def _internal_title_discount():
     """The Internal-title discount from the registered parameters, or ``None``.
@@ -806,12 +795,13 @@ def cmp_alt_ids(a, b):
     ShortDOIs are skipped: a ShortDOI is an alias of the EIDR ID itself, not
     a third-party identifier, so matching on one is circular.
     """
-    def rel_ok(r):
-        return r is None or str(r).strip().lower() in ("", "issameas")
+    # The shared predicates (0.47.0), not private copies: these two tests
+    # were written out across the portfolio and had already diverged once.
+    from eidr_core.altidtool_io import is_identity_relation as rel_ok
+    from eidr_core.ordering import is_shortdoi as _is_shortdoi
 
     def is_shortdoi(x):
-        return (str(getattr(x, "id_type", "") or "").strip().lower() == "shortdoi"
-                or str(getattr(x, "domain", "") or "").strip().lower() == "shortdoi")
+        return _is_shortdoi(getattr(x, "id_type", None), getattr(x, "domain", None))
     from collections import defaultdict
     av = defaultdict(set); bv = defaultdict(set)
 

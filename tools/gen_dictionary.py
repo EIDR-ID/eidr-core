@@ -71,7 +71,10 @@ USEDBY_RE = re.compile(
 # Directories a consumer scan never enters: environments, builds, and the
 # vendored copies (their use is reported from vendor.toml instead).
 SCAN_SKIP = {".venv", "venv", "node_modules", "build", "dist", "site-packages", ".git",
-             "_core", "__pycache__", ".tox", ".mypy_cache", ".pytest_cache"}
+             "_core", "__pycache__", ".tox", ".mypy_cache", ".pytest_cache",
+             # one-off research scripts, not shipped code (python-tools, 2026-10-02):
+             # a probe that imports eidr-core is not a consumer to plan a change around
+             "probes"}
 
 # Re-exports that a module without __all__ makes public on purpose. Keep
 # this short. The better fix is an __all__ in the module, which makes the

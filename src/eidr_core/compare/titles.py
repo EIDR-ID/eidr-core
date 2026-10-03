@@ -40,6 +40,7 @@ from eidr_core.normalize import norm_title
 # Star-imports (BMR-Review's shims use them) now take only these names,
 # not the stdlib and third-party modules this file imports.
 __all__ = [
+    "fuzzy",
     "COMBINATION_DIFFERS_QUALITY",
     "PART_AMBIGUOUS_QUALITY",
     "is_internal",
@@ -151,7 +152,15 @@ def segments(raw):
     return parts if len(parts) > 1 else None
 
 
-def _fuzzy(a, b):
+def fuzzy(a, b):
+    """Composed similarity of two already-normalised strings, in [0, 1].
+
+    1.0 when the strings are equal ignoring spaces; otherwise the larger of
+    rapidfuzz's ``token_set_ratio`` and ``WRatio``, over 100. 0.0 when either
+    is empty. Public since 0.47.0 (De-Dupe UI S-35): it is the raw value the
+    person, organisation and title comparators build on, and a consumer that
+    needs it had to import a private name or copy the body.
+    """
     if not a or not b:
         return 0.0
     # inputs are already ASCII-folded/lower-cased/punct-stripped; ignoring spaces
@@ -160,6 +169,10 @@ def _fuzzy(a, b):
     if a.replace(" ", "") == b.replace(" ", ""):
         return 1.0
     return max(fuzz.token_set_ratio(a, b), fuzz.WRatio(a, b)) / 100.0
+
+
+# The private name stays, so nothing that imported it moves.
+_fuzzy = fuzzy
 
 
 def title_similarity(a_raw, b_raw, *, episodic=False):

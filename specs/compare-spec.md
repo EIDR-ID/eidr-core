@@ -102,6 +102,27 @@ the reasoning, not just the number.
   `internal-title-bridges-languages`,
   `internal-title-second-pair-earns-no-bonus` and
   `internal-title-carried-match-needs-alt-id-to-accept`.
+* **Releases a source records as a movie (2.19.0, the operator's statement on
+  the Medium review, BMR-Review T42, 2026-10-03).** Three more cross-type
+  CANDIDATE rules, each scored on the Basic profile and capped into Review like
+  every cross-type pair, never auto-matched. (1) Episode with Basic: a
+  user-titled Episode of `GATE_EPISODE_TVMOVIE_MIN_MINUTES` (61) or more,
+  whatever its class or its series' class -- "dramatic TV series episodes
+  released as independent TV movies ... longer than 1 hour so that (with
+  commercials) they fill a 90-minute or 2-hour time slot". (2) Series with
+  Basic: a Series with at most `GATE_SHORT_SERIES_MAX_EPISODES` (3) live
+  episodes, counted directly or through its Seasons, whatever its class --
+  "short mini-series (2 or 3 episodes) ... listed as movies". (3) Series with
+  Basic: a theatrical serial, released by `GATE_SERIAL_MAX_YEAR` (1956) with the
+  Series record's own (chapter) length at most `GATE_SERIAL_MAX_EPISODE_MINUTES`
+  (30), whatever its class (chapter plays are often classed Anthology or not at
+  all). Measured on the Medium review: the reviewed true record reaches the
+  reviewer 183 -> 187 of 187, wrong auto-clears 0 -> 0; on the Mediafilm
+  corpus never-seen false negatives 4 -> 0 for +195 review rows; 0 flips
+  anywhere. Pinned by `crosstype-feature-length-episode-meets-tv-movie-at-review`
+  and `crosstype-theatrical-serial-meets-movie-at-review`, each failing on 2.18.0
+  and under its own mutant only; the short-series rule needs a registry episode
+  count, which a pair fixture cannot carry, so BMR-Review's tests pin it.
 
 **Porting requirements** (from BMR-Review's ENGINE_SYNC `BMR-20260926-1` for
 2.16.0, lifted verbatim at 2.17.0 as ruled 2026-09-26). These are the places a
@@ -130,6 +151,13 @@ BMR-Review.
    agrees with no conflict, and the note reads "title agreement rests on an
    internal (machine-translated) title: review only (no auto-accept without
    an Alt ID)".
+5. **The 2.19.0 movie-release rules (from BMR-Review's T42 request).** The
+   short-series rule needs an episode count from a registry source (live
+   Episodes under the Series, directly or through its Seasons, not aliased);
+   with no source it does not apply -- never infer the count from the records
+   at hand. The serial rule reads the Series record's OWN release year and
+   length. The feature-length rule needs a user-supplied title, so a
+   system-generated "Season 1: Episode 3" never qualifies.
 
 ## Date profiles: the ANCHOR is per creation type, the SHAPE is measured
 

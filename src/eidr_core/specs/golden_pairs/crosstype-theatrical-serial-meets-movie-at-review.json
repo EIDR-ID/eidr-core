@@ -1,0 +1,87 @@
+{
+  "id": "crosstype-theatrical-serial-meets-movie-at-review",
+  "added": "2026-10-03",
+  "why": "Operator, 2026-10-03, on the Medium review: sources often list a theatrical serial (chapter play) as one movie -- its chapters strung together -- even though it was never presented that way. A Series from the serial era (released by 1956) whose chapters are short (the Series record carries their length, at most 30 minutes) is a candidate for a Basic record: scored on the Basic profile, capped into Review, never auto-matched. Its class cannot be relied on: shaped on Medium row 34955 (Spy Smasher, 1942, a 12-chapter Republic serial registered as a Series classed ANTHOLOGY), where the reviewer picked the Series over an 81.3 Basic carried to the top by the source's wrong IMDb and Wikidata ids. Pins both halves: eligible (at or above the Review floor) and capped (never Accept). The short-series half of the same rule (a Series of at most 3 episodes) needs an episode count from the registry and is pinned by BMR-Review's tests/test_medium_rules_2026_10_03.py, not here.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Spy Smasher",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1942",
+    "length_minutes": "215",
+    "directors": [
+      "William Witney"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": []
+  },
+  "candidate": {
+    "eidr_id": "10.5240/FEED-0000-0000-000B-0000-0",
+    "creation_type": "Series",
+    "titles": [
+      {
+        "text": "Spy Smasher",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1942",
+    "length_minutes": "20",
+    "directors": [
+      "William Witney"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": [],
+    "series_class": "Anthology"
+  },
+  "invariants": {
+    "verdict_in": [
+      "Review"
+    ],
+    "score_min": 30.0
+  },
+  "expected": {
+    "spec_version": "2.19.0",
+    "confidence": 79.0,
+    "verdict": "Review",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 1.0,
+      "director": 1.0,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": 0.093,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "identical",
+      "director": "identical",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "mismatch",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

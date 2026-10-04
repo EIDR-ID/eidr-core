@@ -2,7 +2,7 @@
 
 **Status:** all three modes LANDED — `pair` 2026-07-29; `case` ratified 2026-09-10 (S-26),
 evaluator 2026-09-11; `recovery_pool` ratified 2026-09-10 (S-9), first captured instance and
-evaluator 2026-09-11 (BMR-Review T17). Corpus: 24 `pair`, 13 `case`, 1 `recovery_pool` (38) at compare-spec 2.18.0.
+evaluator 2026-09-11 (BMR-Review T17). Corpus: 26 `pair`, 13 `case`, 1 `recovery_pool` (40) at compare-spec 2.19.0.
 **Owner of the format:** eidr-core. **Owner of the evaluator:** BMR-Review
 (`eidr_dedup_score/golden.py`). **Conforming implementation:** De-Dupe UI,
 in JavaScript, with no database.

@@ -67,7 +67,7 @@
     ]
   },
   "expected": {
-    "spec_version": "2.18.0",
+    "spec_version": "2.19.0",
     "assessment": "Disagree: no match",
     "proposed_id": "NO MATCH",
     "confidence": 0.0,

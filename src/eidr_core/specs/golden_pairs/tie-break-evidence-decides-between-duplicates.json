@@ -92,7 +92,7 @@
     ]
   },
   "expected": {
-    "spec_version": "2.18.0",
+    "spec_version": "2.19.0",
     "assessment": "Disagree: Tamr missed",
     "proposed_id": "10.5240/FEED-0001-0002-0003-0007-B",
     "confidence": 100.0,

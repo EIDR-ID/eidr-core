@@ -420,7 +420,7 @@ def open_sheet(path: str, sheet_name: str, *,
     """
     if stop not in (None, "blank_row", "blank_first_col", "skip_blank_first_col"):
         raise ValueError(f"unknown stop rule: {stop!r}")
-    # Lazy import keeps eidr_core.bmr_io importable without openpyxl for
+    # Lazy import keeps bmr_io importable without openpyxl for
     # consumers that only use the zip-surgery / layout / plan helpers.
     import openpyxl
 
@@ -715,7 +715,7 @@ def resolve_parent(row: Mapping[str, Any],
 
     An EIDR ID is used as-is. Anything else is treated as a Row ID and looked
     up in *index* (build it with :func:`index_rows`). The discrimination is
-    :func:`eidr_core.ids.is_valid_eidr_id`, not a prefix test, so a mistyped
+    :func:`ids.is_valid_eidr_id`, not a prefix test, so a mistyped
     ID with a bad check character is reported as an unresolved reference
     rather than silently passed downstream as a parent that cannot exist.
     """
@@ -785,7 +785,7 @@ def parent_chain(row: Mapping[str, Any],
 
 # The writer composes the primitives defined above, so it imports from this
 # module; importing it here, after they exist, is what lets a consumer write
-# ``from eidr_core.bmr_io import write_sheet`` without a second import path
+# ``bmr_io.write_sheet`` from the package itself, without a second import path
 # to remember. Bottom-of-file by necessity, not by accident (E402).
 from eidr_core.bmr_io.subset import (  # noqa: E402
     FillReport,

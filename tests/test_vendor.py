@@ -285,3 +285,43 @@ def test_real_altidtool_io_vendors_and_works_without_eidr_core(tmp_path, source)
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() == "ok"
 
+
+
+# -- bmr_map vendors with its closure (B5, 2026-10-13) -----------------------
+# python-tools adopts bmr_map by vendoring (its blocker B3: the tools run with
+# only the SDK installed). bmr_map imports bmr_io (family_layout) and
+# inheritance (is_absent), and bmr_io imports ids relatively, so the closure is
+# four modules. Until 2026-10-13 bmr_io and inheritance named their own
+# package in comments, which sync refuses; this test runs the REAL closure
+# through sync and uses the copy with eidr_core blocked, so such text returning
+# fails HERE rather than when python-tools next moves its pin.
+
+_SRC = Path(__file__).resolve().parent.parent / "src" / "eidr_core"
+
+
+def test_real_bmr_map_closure_vendors_and_works_without_eidr_core(tmp_path, source):
+    import shutil
+    pkg = source / "src" / "eidr_core"
+    for mod in ("bmr_map", "bmr_io", "inheritance"):
+        shutil.copytree(_SRC / mod, pkg / mod, ignore=shutil.ignore_patterns("__pycache__"))
+    _git("-c", "user.email=t@t", "-c", "user.name=t", "add", "-A", cwd=source)
+    _git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "bmr_map", cwd=source)
+    m = _manifest(tmp_path, source, ["bmr_map", "bmr_io", "inheritance", "ids"])
+    sync(m, source_path=source)
+    code = (
+        "import sys\n"
+        "sys.modules['eidr_core'] = None\n"
+        f"sys.path.insert(0, {str(tmp_path / 'consumer' / 'src')!r})\n"
+        "from eidr._core.bmr_map import row_from_blocks, record_from_row\n"
+        "base = {'ResourceName': [{'Title': 'T'}],\n"
+        "        'AlternateID': [{'AltID': 'tt1', 'Type': 'IMDB'}]}\n"
+        "row = row_from_blocks(base, {}, 'non_episodic')\n"
+        "assert row['Title'] == 'T' and row['IMDb'] == 'tt1'\n"
+        "cells = {'Title': 'T', 'Alt ID 2': 'x', 'Domain 2': 'example.org'}\n"
+        "rec = record_from_row(cells, 'non_episodic')\n"
+        "assert rec['SelfDefinedMetadata']['BaseObjectData']['AlternateID'] == "
+        "[{'AltID': 'x', 'Domain': 'example.org'}]\n"
+        "print('ok')\n")
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == "ok"

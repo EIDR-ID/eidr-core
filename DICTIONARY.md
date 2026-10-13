@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.48.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.49.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,23 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.49.0 (2026-10-13)
+
+* **New module `eidr_core.bmr_map` (B5): standard record <-> Template-22
+  row.** `row_from_record` / `row_from_blocks` map a record to a row, and
+  `record_from_row` maps a row back to the self-defined record. Extracted
+  from XML_to_JSON's frozen mapper and inverse (content-sha1
+  `4cda07af7ba7`) on the six conditions of 2026-09-23; the output is the
+  reference's, checked against it on real sheets and 20,000 synthetic
+  records. `PRODUCED_BASES` and `NEVER_PRODUCED` let a guardrail compare a
+  template with the module instead of a transcribed list. Additive; nothing
+  existing changed behaviour. XML_to_JSON and python-tools adopt it in their
+  own cycles.
+* **`bmr_io` and `inheritance` are now vendorable.** Seven comments and
+  docstrings named their own package, which `vendor sync` refuses; reworded,
+  no code changed. The vendoring closure for `bmr_map` is
+  `["bmr_map", "bmr_io", "inheritance", "ids"]`, tested by a real sync.
 
 ### 0.48.0 (2026-10-03)
 
@@ -306,6 +323,16 @@ edition's Changes entry.
 | [`eidr_core.bmr_io.SHEET_TO_TEMPLATE`](#sheet_to_template-constant) | constant | Data tab name to `TEMPLATES` key: `"Episodics"` to `episodic`, `"Stand-Alone Works"` to `non_episodic`, `"Edits"` to `edit`, `"Clips"` to `clip`, `"Manifestations"` to `manifestation`, `"Compilations"` to `compilation`. |
 | [`eidr_core.bmr_io.TEMPLATES`](#templates-constant) | constant | The six Template-22 content templates as `Template` values, keyed `episodic`, `non_episodic`, `edit`, `clip`, `manifestation` and `compilation`. |
 | [`eidr_core.bmr_io.subset.required_headers`](#required_headers) | function | Returns the shipped headers whose absence makes a sheet not that template's data sheet: sheet mechanics plus required, never-inherited columns. |
+| [`eidr_core.bmr_map.administrators_of`](#administrators_of) | function | Finds Registrant and Metadata Authority where this record carries them. |
+| [`eidr_core.bmr_map.creation_type_from_row`](#creation_type_from_row) | function | Decides the creation type a row describes. |
+| [`eidr_core.bmr_map.header_base`](#header_base) | function | Strips the group number from a family column header, so template columns compare with `PRODUCED_BASES`. |
+| [`eidr_core.bmr_map.record_from_row`](#record_from_row) | function | Builds the self-defined record a row describes. |
+| [`eidr_core.bmr_map.row_from_blocks`](#row_from_blocks) | function | Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title; Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line. |
+| [`eidr_core.bmr_map.row_from_record`](#row_from_record) | function | Maps a whole record with the documented defaults: exactly what XML_to_JSON's `--sheet-out` did per record, minus the `Unique Row ID` column and the echo of an unconvertible row, which stay with the caller. |
+| [`eidr_core.bmr_map.select_blocks`](#select_blocks) | function | Picks the blocks a sheet is built from. |
+| [`eidr_core.bmr_map.NEVER_PRODUCED`](#never_produced-constant) | constant | the template columns this module never writes, each for a stated reason: `Unique Row ID` (the caller's), `Assigned EIDR ID` and `Registration Errors & Notes` (the registry's and the reviewer's), `Metadata Authority` (the display name; only the Party ID column is written), `Operator's Notes` (written on Manifestation only). |
+| [`eidr_core.bmr_map.PRODUCED_BASES`](#produced_bases-constant) | constant | per supported template, every header base the mapper can write (derived from a record that takes every branch and pinned by a test, together with the rule that every stock template column is here or in `NEVER_PRODUCED`). |
+| [`eidr_core.bmr_map.SUPPORTED_TEMPLATES`](#supported_templates-constant) | constant | the template keys `row_from_blocks` writes; Compilation has a sheet but is refused. |
 | [`eidr_core.codes.normalize_country_code`](#normalize_country_code) | function | Returns the EIDR form of one country code, rewriting a dissolved or renamed country's alpha-2 code to alpha-4. |
 | [`eidr_core.codes.OBSOLETE_ALPHA2_TO_ALPHA4`](#obsolete_alpha2_to_alpha4-constant) | constant | The crosswalk from former ISO 3166-1 alpha-2 codes of dissolved or renamed countries to their ISO 3166-3 alpha-4 codes: SU to SUHH, YU to YUCS, CS to CSHH (Czechoslovakia, not Serbia and Montenegro's CSXX), DD to DDDE, BU to BUMM. |
 | [`eidr_core.compare.alt_source`](#alt_source) | function | Returns the namespace key under which an Alt ID's value is compared: its casefolded domain, else its casefolded type. |
@@ -711,7 +738,7 @@ Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **XML_to_JSON**: `DATA_START`, `family_layout`, `HEADER_ROW`, `index_rows`, `read_headers`, `read_sheet`, `resolve_parent`, `SHEET_TO_TEMPLATE`, `template_for_creation_type`, `TEMPLATES`, `write_sheet`
 <!-- /dict-usedby -->
 
-**Specs.** No versioned spec governs this module. `specs/merge-rules.md` (DRAFT) makes `SCHEMA_MAX` (as `write_sheet` uses it) the per-family caps of the planned merge engine, never the .NET tool's hardcoded caps, and requires the planned B5 mapper to read families sparsely, as `family_layout` does. `specs/vendoring.md` 1.0.0 section 6 notes that a vendored `bmr_io.read_sheet` still needs openpyxl. `specs/merge-rules.md` also plans for python-tools' `MergeTool` to vendor `bmr_io` (S4), but the module is not vendorable as it stands: comments and docstrings in `__init__.py` and `subset.py` contain the text `eidr_core`, which `vendor sync` refuses, and `resolve_parent` needs `ids` vendored with it.
+**Specs.** No versioned spec governs this module. `specs/merge-rules.md` (DRAFT) makes `SCHEMA_MAX` (as `write_sheet` uses it) the per-family caps of the planned merge engine, never the .NET tool's hardcoded caps, and requires the planned B5 mapper to read families sparsely, as `family_layout` does. `specs/vendoring.md` 1.0.0 section 6 notes that a vendored `bmr_io.read_sheet` still needs openpyxl. `specs/merge-rules.md` also plans for python-tools' `MergeTool` to vendor `bmr_io` (S4), and since 0.49.0 it is vendorable: the comments that named its own package are reworded, and `resolve_parent` needs `ids` vendored with it (list both).
 
 ### `check_sheet`
 
@@ -4689,6 +4716,192 @@ Defined in `src/eidr_core/verify/__init__.py`.
 **Does.** Collects every comparable runtime in a fact set as floats in minutes, including series episode runtimes. Raises ValueError or TypeError when an item cannot be converted to float.
 
 **Notes.** A scalar in place of a list is not caught cleanly. A number raises TypeError, and a string such as `"90"` is read character by character, giving `[9.0, 0.0]`.
+
+## `eidr_core.bmr_map`
+
+<!-- dict-module:eidr_core.bmr_map -->
+Source `src/eidr_core/bmr_map/__init__.py`. Public names: 7 functions, 3 constants (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** The one implementation of mapping a standard record (the registry-shaped JSON XML_to_JSON emits) to a Template-22 BMR row, and a row back to the self-defined record it describes. Extracted 2026-10-13 (register B5) from XML_to_JSON's `_bmr_rows_from_standard_records` and `build_standard_record_from_bmr_row`, on the six conditions XML_to_JSON set and eidr-core accepted on 2026-09-24. Second consumer: python-tools (`FlattenTool -f bmr`, `-bmrin`). It is cell <-> field mechanism for one record and one row; routing, family expansion, row IDs, parent resolution and Full-record construction stay where they already live.
+
+**Use it when.** 
+* You turn a standard record into a BMR row: `row_from_record` (select the block, take Administrators from where the record carries them), or `row_from_blocks` if you hold the blocks. Route first with `bmr_io.template_for_creation_type`, write with `bmr_io.write_sheet`.
+* You read a BMR row back into a record (for a Modify, or a `--sheet` pass): `record_from_row`, then resolve the parent with `bmr_io.resolve_parent` and build Full with `inheritance.build_full_base` if you need them.
+* Your guardrail checks that every column of a template is accounted for: compare the template's header bases (`header_base`) with `PRODUCED_BASES[template] | NEVER_PRODUCED`.
+
+**Do not use it when.** 
+* You need the Compilation template: it is refused (`SUPPORTED_TEMPLATES`), because this mapper cannot populate its Header/Entry structure.
+* You want `Unique Row ID`, the verbatim echo of an unconvertible row, `Assigned EIDR ID` or `Registration Errors & Notes`: those are the caller's and the writer's.
+* You want a per-family cap or a report of values with no column: `bmr_io.write_sheet` does both (`SCHEMA_MAX`, `WriteReport.dropped`); there is deliberately no second cap here.
+* You want `DisplayName` on a built record: it is a display convention of your output, not a registry field, and `record_from_row` leaves it out.
+* You want ShortDOI rows dropped from a registration: that is your policy; `record_from_row` keeps every Alt ID the row carries.
+* Vendoring: list `["bmr_map", "bmr_io", "inheritance", "ids"]`; that closure is tested by a real sync.
+
+**Used by.**
+<!-- dict-usedby:eidr_core.bmr_map -->
+No consumer imports it directly (scan of 2026-10-13).
+<!-- /dict-usedby -->
+
+### `administrators_of`
+
+<!-- dict:eidr_core.bmr_map.administrators_of -->
+```python
+def administrators_of(record: Mapping[str, Any], base: Mapping[str, Any]) -> dict
+```
+
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `record` | `Mapping[str, Any]` | required | A standard record. |
+| `base` | `Mapping[str, Any]` | required | The block selected for the row (from `select_blocks`); its `Administrators` is the fallback. |
+
+**Returns** `dict` -- a copy of `ProvenanceMetadata.Administrators` when the record has it, else of `base["Administrators"]`, else `{}`.
+<!-- /dict -->
+
+**Does.** Finds Registrant and Metadata Authority where this record carries them. A mirror-exported record has ProvenanceMetadata (the full Metadata Authority list whatever block is selected); a record built from a BMR row has them only in its block. Until 2026-10-02 the reference read Provenance only, so every sheet-built row lost both (24 of 24 real rows).
+
+### `creation_type_from_row`
+
+<!-- dict:eidr_core.bmr_map.creation_type_from_row -->
+```python
+def creation_type_from_row(template: str, row: Mapping[str, Any]) -> str
+```
+
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `template` | `str` | required | A Template-22 key (`bmr_io.TEMPLATES`), including `compilation`. |
+| `row` | `Mapping[str, Any]` | required | The row; only `Referent Type` is read, for episodic rows. |
+
+**Returns** `str` -- `Basic`, `Series`, `Season`, `Episode`, `Edit`, `Clip`, `Manifestation` or `Compilation`.
+<!-- /dict -->
+
+**Does.** Decides the creation type a row describes. Episodic rows split on `Referent Type` (Series, Season, else Episode). An unknown key raises `ValueError`; the old fallback to `Basic` turned every Episode into a Basic record on 2026-09-11.
+
+### `header_base`
+
+<!-- dict:eidr_core.bmr_map.header_base -->
+```python
+def header_base(header: str) -> str
+```
+
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `header` | `str` | required | A column header, for example `Alt ID 3`. |
+
+**Returns** `str` -- the header without a trailing group number (`Alt ID`); a header with no number is returned unchanged.
+<!-- /dict -->
+
+**Does.** Strips the group number from a family column header, so template columns compare with `PRODUCED_BASES`.
+
+### `record_from_row`
+
+<!-- dict:eidr_core.bmr_map.record_from_row -->
+```python
+def record_from_row(row: Mapping[str, Any], template: str) -> dict
+```
+
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `row` | `Mapping[str, Any]` | required | One row as `{column header: cell value}`; blank cells may be `None` or absent. |
+| `template` | `str` | required | The row's Template-22 key; any key `creation_type_from_row` accepts. |
+
+**Returns** `dict` -- `{"CreationType": ..., "SelfDefinedMetadata": {...}}` with absent values pruned (`inheritance.is_absent`).
+<!-- /dict -->
+
+**Does.** Builds the self-defined record a row describes. Every family is read on `bmr_io.family_layout` (a bare header is group 1; companion columns pair by the sheet's own group index). Metadata Authority comes from the Party ID column only. `IMDb`, `ISAN` and `V-ISAN` come back as Alt IDs with Domain `IMDB` / `ISAN`. Languages and countries are de-duplicated and sorted case-insensitively (the BMR-input canonical order). Parent references are left as written.
+
+### `row_from_blocks`
+
+<!-- dict:eidr_core.bmr_map.row_from_blocks -->
+```python
+def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template: str, *, administrators: Mapping[str, Any] | None = None) -> dict[str, str | None]
+```
+
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `base` | `Mapping[str, Any]` | required | The selected `BaseObjectData`. |
+| `extra` | `Mapping[str, Any]` | required | The selected `ExtraObjectMetadata`. |
+| `template` | `str` | required | One of `SUPPORTED_TEMPLATES`; anything else raises `ValueError`. |
+| `administrators` | `Mapping[str, Any] \| None` | `None` (keyword-only) | Registrant and Metadata Authority. Omitted: `base["Administrators"]`, so a sheet-built record never silently loses them. |
+
+**Returns** `dict[str, str | None]` -- one row, `{column header: text or None}`, numbered families as `"<base> N"`; never `Unique Row ID`.
+<!-- /dict -->
+
+**Does.** Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title; Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line. Behaviour is the reference's, row for row (checked against it on real sheets and 20,000 synthetic records, 2026-10-13).
+
+### `row_from_record`
+
+<!-- dict:eidr_core.bmr_map.row_from_record -->
+```python
+def row_from_record(record: Mapping[str, Any], template: str, *, source: str = "self", administrators: Mapping[str, Any] | None = None) -> dict[str, str | None]
+```
+
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `record` | `Mapping[str, Any]` | required | A standard record. |
+| `template` | `str` | required | One of `SUPPORTED_TEMPLATES`. |
+| `source` | `str` | `"self"` (keyword-only) | `"self"` (SelfDefinedMetadata only) or `"full"` (FullMetadata, falling back to Self). |
+| `administrators` | `Mapping[str, Any] \| None` | `None` (keyword-only) | Overrides where Registrant and Metadata Authority come from; omitted, `administrators_of` decides. |
+
+**Returns** `dict[str, str | None]` -- the row, as `row_from_blocks` returns it.
+<!-- /dict -->
+
+**Does.** Maps a whole record with the documented defaults: exactly what XML_to_JSON's `--sheet-out` did per record, minus the `Unique Row ID` column and the echo of an unconvertible row, which stay with the caller.
+
+### `select_blocks`
+
+<!-- dict:eidr_core.bmr_map.select_blocks -->
+```python
+def select_blocks(record: Mapping[str, Any], source: str = "self") -> tuple[dict, dict]
+```
+
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `record` | `Mapping[str, Any]` | required | A standard record. |
+| `source` | `str` | `"self"` | `"self"` or `"full"`; anything else raises `ValueError`. |
+
+**Returns** `tuple[dict, dict]` -- `(BaseObjectData, ExtraObjectMetadata)`, each `{}` when absent.
+<!-- /dict -->
+
+**Does.** Picks the blocks a sheet is built from. `self` leaves values the record does not define itself empty on the sheet; `full` uses FullMetadata and falls back to Self when there is none, so a Self-only record never maps to an empty row.
+
+### `NEVER_PRODUCED` (constant)
+
+<!-- dict:eidr_core.bmr_map.NEVER_PRODUCED -->
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+
+**Value** `NEVER_PRODUCED: frozenset[str] = frozenset({ "Unique Row ID", "Assigned EIDR ID", "Registration Errors & Notes", "Metada...` -- the template columns this module never writes, each for a stated reason: `Unique Row ID` (the caller's), `Assigned EIDR ID` and `Registration Errors & Notes` (the registry's and the reviewer's), `Metadata Authority` (the display name; only the Party ID column is written), `Operator's Notes` (written on Manifestation only).
+<!-- /dict -->
+
+### `PRODUCED_BASES` (constant)
+
+<!-- dict:eidr_core.bmr_map.PRODUCED_BASES -->
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+
+**Value** `PRODUCED_BASES: dict[str, frozenset[str]] = { "non_episodic": _COMMON \| _ISAN, "episodic": _COMMON \| _ISAN \| _EPISODIC, "edit": _CO...` -- per supported template, every header base the mapper can write (derived from a record that takes every branch and pinned by a test, together with the rule that every stock template column is here or in `NEVER_PRODUCED`). A produced base need not be a column of that template: Clip carries no Alternate Title, and `write_sheet` reports such a value as dropped.
+<!-- /dict -->
+
+### `SUPPORTED_TEMPLATES` (constant)
+
+<!-- dict:eidr_core.bmr_map.SUPPORTED_TEMPLATES -->
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+
+**Value** `SUPPORTED_TEMPLATES: tuple[str, ...] = ( "non_episodic", "episodic", "edit", "manifestation", "clip")` -- the template keys `row_from_blocks` writes; Compilation has a sheet but is refused.
+<!-- /dict -->
 
 ## Specs and data files
 

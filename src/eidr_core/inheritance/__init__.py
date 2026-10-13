@@ -107,7 +107,7 @@ wholesale, so the policy lives once and two thin adapters sit over it:
 * :func:`build_full_base` — registry JSON (``BaseObjectData`` dicts).
 * :func:`build_full_record` — record objects addressed by attribute.
 
-``eidr_core`` deliberately imports NEITHER consumer's model. The object
+This package deliberately imports NEITHER consumer's model. The object
 adapter works through :data:`RECORD_ATTRS`, a documented canonical-name →
 attribute-name convention the caller may override.
 
@@ -500,7 +500,7 @@ def _best_title(base: dict | None) -> str:
 # ---------------------------------------------------------------------------
 
 # Canonical EIDR field name -> attribute name on a portfolio record object.
-# A convention, not an import: eidr_core must not depend on any consumer's
+# A convention, not an import: eidr-core must not depend on any consumer's
 # model. Pass `attrs=` to override. Fields absent from a given model are
 # skipped silently, which is why `Status` (which CanonicalRecord does not
 # carry) needs no special handling.

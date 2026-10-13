@@ -53,7 +53,7 @@ being an error** — Title Class and Alt ID Relation included. So:
   provide rather than inherit; ``Component Mode`` / ``Start Time`` /
   ``Content Duration`` for a Clip; ``Manif Class 1`` for a Manifestation;
   nothing but the parent for Episodics, since a Season or Episode inherits
-  every base field (``eidr_core.inheritance.INHERITABLE_FIELDS``). Missing
+  every base field (``inheritance.INHERITABLE_FIELDS``). Missing
   one of these is a ``TemplateMismatch``: the emit is refused and no output
   file is left behind.
 * **Optional**: everything else the template ships — alternate titles,
@@ -120,7 +120,7 @@ _MECHANICS = ("Unique Row ID", "Operator's Notes", "Assigned EIDR ID",
 # for a creation: StructuralType, Mode, ReferentType, ResourceName + lang,
 # OriginalLanguage, ReleaseDate, CountryOfOrigin, Status, ApproximateLength
 # all carry no minOccurs="0"). Every one of these is INHERITABLE by a child
-# (eidr_core.inheritance.INHERITABLE_FIELDS), so they are required only on
+# (inheritance.INHERITABLE_FIELDS), so they are required only on
 # the two sheets that hold roots alone.
 _ROOT_BASE = ("Structural Type", "Mode", "Referent Type", "Title", "Title Language",
               "Original Language 1", "Release Date", "Country of Origin 1",

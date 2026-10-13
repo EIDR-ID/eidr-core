@@ -493,8 +493,8 @@ Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 7 functions, 2 cl
 
 **Used by.**
 <!-- dict-usedby:eidr_core.altidtool_io -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
-* **BMRtoAltID**: `format_line`, `multi_form_domains`
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
+* **BMRtoAltID**: `format_line`, `is_identity_relation`, `multi_form_domains`
 * **eidr-dq**: `identity_relation_sql`
 * **eidr-imdb**: `AltIdRow`, `format_line`, `parse_line`, `write_lines`
 * **eidr-wikidata**: `format_line`, `multi_form_domains`, `parse_line`
@@ -657,6 +657,8 @@ Defined in `src/eidr_core/altidtool_io/__init__.py`.
 
 **Does.** Returns the identity-relation test as a SQL condition for mirror queries. It compares `IsSameAs` exactly, as the mirror stores it; the Python `is_identity_relation` also folds case and whitespace. Use it instead of writing the condition by hand: a NULL-only form hid 69.6% of IMDb identity links on 2026-09-23.
 
+**When not to use.** A query that must ride one of the mirror's partial identity indexes (for example `idx_cais_type_domain_relnorm_altid`, whose predicate is `relation IS NULL OR relation = 'IsSameAs'`) must repeat that predicate verbatim: the extra `= ''` term falls outside the index, and the planner then gives it up. The term matches nothing today (0 empty relations since MCP's 2026-09-23 repair), so dropping it there loses nothing. Queries keyed on `content_id` (a plain index) are safe with this helper, which is what BMR-Review's and eidr-dq's are. Found by BMRtoAltID, 2026-10-13, which keeps its own predicate in `mirror.lookup_alt_ids` for this reason.
+
 ### `is_identity_relation`
 
 <!-- dict:eidr_core.altidtool_io.is_identity_relation -->
@@ -700,7 +702,7 @@ Source `src/eidr_core/bmr_io/__init__.py`. Public names: 21 functions, 9 classes
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `families_for`, `header_map`, `index_rows`, `read_headers`, `resolve_parent`, `template_for_creation_type`, `write_sheet`
 * **BMRtoAltID**: `ASSIGNED_ID_COLUMN`, `check_sheet`, `DATA_START`, `family_layout`, `fill_column`, `HEADER_ROW`, `open_sheet`, `ROW_ID_COLUMN`, `SHEET_TO_TEMPLATE`, `subset_rows`, `TemplateMismatch`, `TEMPLATES`
 * **eidr-dq**: `pad_groups`, `RepeatPlan`
@@ -1434,7 +1436,7 @@ Source `src/eidr_core/bmr_io/subset.py`. Public names: 1 function (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io.subset -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `required_headers`
 <!-- /dict-usedby -->
 
@@ -1480,7 +1482,7 @@ Source `src/eidr_core/codes/__init__.py`. Public names: 1 function, 1 constant (
 
 **Used by.**
 <!-- dict-usedby:eidr_core.codes -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **eidr-wikidata**: `normalize_country_code`
 <!-- /dict-usedby -->
 
@@ -1533,7 +1535,7 @@ Source `src/eidr_core/compare/__init__.py`. Public names: 20 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `cmp_alt_ids`, `COMPARATORS`, `FieldResult`, `set_params`
 * **De-Dupe UI**: `cmp_alt_ids`, `cmp_length`, `cmp_release_date`, `cmp_titles`, `fuzzy`
 <!-- /dict-usedby -->
@@ -2000,7 +2002,7 @@ Source `src/eidr_core/compare/nonlinear.py`. Public names: 3 functions (declared
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.nonlinear -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `accumulate`, `aggregate`, `corroborate`, (the module)
 * **De-Dupe UI**: `accumulate`
 <!-- /dict-usedby -->
@@ -2088,7 +2090,7 @@ Source `src/eidr_core/compare/spec.py`. Public names: 2 functions (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.spec -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_spec`, `spec_path`, (the module)
 <!-- /dict-usedby -->
 
@@ -2149,7 +2151,7 @@ Source `src/eidr_core/compare/states.py`. Public names: 4 functions (declared by
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.states -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `band`, `field_not_counted`, `field_states`, `ui_field_key`, (the module)
 <!-- /dict-usedby -->
 
@@ -2256,7 +2258,7 @@ Source `src/eidr_core/compare/titles.py`. Public names: 7 functions, 2 constants
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.titles -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `parse_part`, `parts_conflict`, `segments`, `select_titles`, `title_similarity`
 * **De-Dupe UI**: `COMBINATION_DIFFERS_QUALITY`, `parse_part`, `PART_AMBIGUOUS_QUALITY`, `parts_conflict`, `segments`, `title_similarity`
 * **LanguageTool**: `title_similarity`
@@ -2440,7 +2442,7 @@ Source `src/eidr_core/db_schemas/__init__.py`. Public names: 4 functions, 1 cons
 
 **Used by.**
 <!-- dict-usedby:eidr_core.db_schemas -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `assert_tables`, `contract_version`, `DATABASES`, `load_manifest`, `table_columns`
 * **BMRtoAltID**: `assert_tables`
 * **eidr-dq**: `assert_tables`, `contract_version`, `load_manifest`, `table_columns`
@@ -2566,7 +2568,7 @@ needs no extra.
 
 **Used by.**
 <!-- dict-usedby:eidr_core.dictionary -->
-No consumer imports it directly (scan of 2026-10-03).
+No consumer imports it directly (scan of 2026-10-13).
 <!-- /dict-usedby -->
 
 ### `changes`
@@ -2643,8 +2645,8 @@ Source `src/eidr_core/external/__init__.py`. Public names: 3 functions, 5 classe
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
-* **eidr-dq**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `Entry`, `FactCache`, `FATAL`, `Key`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RETRY`
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
+* **eidr-dq**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `Entry`, `FactCache`, `FATAL`, `Key`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
 * **eidr-imdb**: `call_with_failover`, `endpoint_chain`, `FATAL`, `NEXT_ENDPOINT`, `OUTAGE`, `RETRY`
 * **eidr-wikidata**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `FactCache`, `FATAL`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
 <!-- /dict-usedby -->
@@ -2883,7 +2885,7 @@ Source `src/eidr_core/external/failover.py`. Public names: 5 functions, 8 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external.failover -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `retry_after_seconds`
 * **eidr-imdb**: `DEFAULT_RATE_LIMIT_FLOOR`, `http_status`
 * **eidr-wikidata**: `http_status`, `is_bad_query_error`, `is_outage_error`, `retry_after_seconds`
@@ -3069,10 +3071,11 @@ Source `src/eidr_core/ids/__init__.py`. Public names: 8 functions, 10 constants 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ids -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `category`, `fault`, `find_content_ids`, `is_valid_eidr_id`
 * **BMRtoAltID**: `fault`
 * **De-Dupe UI**: `ALPHABET`, `check_character`, `is_valid_eidr_id`
+* **eidr-dq**: `find_content_ids`
 * **eidr-wikidata**: `EIDR_CONTENT_ID_RE`, `fault`, `is_valid_eidr_id`
 * **python-sdk**: (vendors the module, pin `d65267a`)
 * **XML_to_JSON**: `is_valid_eidr_id`
@@ -3332,7 +3335,7 @@ Source `src/eidr_core/inheritance/__init__.py`. Public names: 6 functions, 1 cla
 
 **Used by.**
 <!-- dict-usedby:eidr_core.inheritance -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `build_full_record`, `provenance`, `RECORD_ATTRS`, `TitleConstructionError`, (the module)
 * **XML_to_JSON**: `build_full_base`, `INHERITABLE_FIELDS`, `is_absent`, `TitleConstructionError`
 <!-- /dict-usedby -->
@@ -3550,7 +3553,7 @@ Source `src/eidr_core/normalize/__init__.py`. Public names: 13 functions (declar
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `ascii_fold`, `cmp_key`, `days_between`, `nfkc`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **De-Dupe UI**: `ascii_fold`, `cmp_key`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **eidr-wikidata**: `norm_title`, `sanitize_field`
@@ -3822,7 +3825,7 @@ Source `src/eidr_core/normalize/aliases.py`. Public names: 2 functions, 1 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize.aliases -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `alias_name`, `alias_title`, `ORDINALS`
 <!-- /dict-usedby -->
 
@@ -3895,7 +3898,7 @@ Source `src/eidr_core/ordering/__init__.py`. Public names: 10 functions (declare
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ordering -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `altid_canonical_key`, `altid_collapsed_canonical_key`, `altid_display_key`, `altid_kind`, `is_shortdoi`, `title_bucket`, `title_sort_key`
 * **XML_to_JSON**: `altid_collapsed_canonical_key`, `title_sort_key`
 <!-- /dict-usedby -->
@@ -4118,11 +4121,12 @@ Source `src/eidr_core/registry/__init__.py`. Public names: 5 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.registry -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `get_registry_client`
 * **eidr-dq**: `build_registry_credentials`, `get_registry_client`
 * **eidr-wikidata**: `build_registry_credentials`, `CODE_SUCCESS`, `DEFAULT_REGISTRY`, `get_registry_client`, `OperationStatus`, `parse_operation_status`, `parse_operation_statuses`, `token_operation_status`
 * **LanguageTool**: `get_registry_client`, `parse_operation_status`, `token_operation_status`
+* **ShortDOI**: `get_registry_client`, `token_operation_status`
 <!-- /dict-usedby -->
 
 ### `build_registry_credentials`
@@ -4297,13 +4301,14 @@ Source `src/eidr_core/secrets_loader/__init__.py`. Public names: 3 functions, 1 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.secrets_loader -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_local`
 * **BMRtoAltID**: `load_secrets`, `SecretsError`
 * **eidr-dq**: `load_secrets`, `SecretsError`
 * **eidr-imdb**: `load_local`, `load_secrets`, `SecretsError`
 * **eidr-wikidata**: `load_local`, `load_secrets`, `SecretsError`
 * **LanguageTool**: `load_local`
+* **ShortDOI**: `load_local`
 * **XML_to_JSON**: `load_secrets`, `SecretsError`
 <!-- /dict-usedby -->
 
@@ -4410,7 +4415,7 @@ Source `src/eidr_core/vendor/__init__.py`. Public names: 3 functions, 3 classes,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.vendor -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **python-tools**: `check`, `load_manifest`, (the module)
 <!-- /dict-usedby -->
 
@@ -4573,7 +4578,7 @@ Source `src/eidr_core/verify/__init__.py`. Public names: 5 functions (declared b
 
 **Used by.**
 <!-- dict-usedby:eidr_core.verify -->
-Scan of 2026-10-03; regenerated at each release from the consumer trees.
+Scan of 2026-10-13; regenerated at each release from the consumer trees.
 * **eidr-dq**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 * **eidr-wikidata**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 <!-- /dict-usedby -->
@@ -4738,7 +4743,14 @@ no version yet.
   and from the ID in a resolver URL. Code that compares "the ID I asked
   for" with "the ID in the response" must decide which one it means. MCP
   measured this on 2026-10-02, on a ShortDOI that points at an aliased
-  predecessor.
+  predecessor. For a ShortDOI, doi.org answers in two hops: the first is
+  `301` to the DOI URL itself (`https://doi.org/10.5240/...`, slash NOT
+  percent-encoded), and only the second goes to `resolve.eidr.org` (where
+  the slash is encoded as `%2F`). An unknown ShortDOI returns `404` with no
+  Location; HEAD and GET answer alike. So one `HEAD` without following
+  redirects names the ID the ShortDOI was minted for (eidr-dq measured,
+  2026-10-13). `ids.find_content_ids` does not find an ID inside a URL
+  path: strip the path first.
 * **Vendor only through the mechanism.** A package that cannot depend on
   eidr-core uses `python -m eidr_core.vendor` under `specs/vendoring.md`.
   Never copy files by hand.

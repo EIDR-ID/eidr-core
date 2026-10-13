@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.49.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.49.1<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,16 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.49.1 (2026-10-13)
+
+* **`inheritance.build_full_base` returns its keys in a stable order.** It
+  appended inherited fields in a frozenset's iteration order, which follows
+  string hashing, so the same input gave a Full `BaseObjectData` with
+  differently ordered keys in every process (`PYTHONHASHSEED`). Values were
+  always equal. The order is now the parent's key order, then any remaining
+  inheritable field sorted. A consumer that writes Full JSON now writes the
+  same bytes on every run. Found comparing two XML_to_JSON runs byte for byte.
 
 ### 0.49.0 (2026-10-13)
 

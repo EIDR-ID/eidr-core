@@ -439,7 +439,15 @@ def build_full_base(
                 "heaviest-weighted comparison field."
             )
 
-    for field in INHERITABLE_FIELDS:
+    # The PARENT's key order, then the rest sorted: never the frozenset's own
+    # iteration order, which follows string hashing and so changed from one
+    # process to the next (PYTHONHASHSEED). Inherited fields are appended to
+    # `full` in this order, so until 0.49.1 the same input gave Full JSON
+    # with differently ordered keys on every run (found 2026-10-13 comparing
+    # two XML_to_JSON runs byte for byte; values were always equal).
+    ordered = [f for f in parent_base if f in INHERITABLE_FIELDS]
+    ordered += sorted(INHERITABLE_FIELDS.difference(ordered))
+    for field in ordered:
         if field in NEVER_INHERITED:
             continue                                    # belt and braces
         if field == "ResourceName":

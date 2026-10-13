@@ -800,3 +800,37 @@ def test_a_genuinely_self_defined_value_still_reads_self_on_re_entry():
     built = build_full_record(child, _credit_parent(), "Edit")
     assert provenance(built)["Credits"] == "self"
     assert provenance(build_full_record(built, _credit_parent(), "Edit"))["Credits"] == "self"
+
+
+def test_full_base_key_order_does_not_depend_on_string_hashing():
+    """build_full_base appended inherited fields in a frozenset's iteration
+    order, which follows string hashing, so the same input produced Full JSON
+    with differently ordered keys in every process (found 2026-10-13 comparing
+    two XML_to_JSON runs byte for byte). Two interpreters with different
+    PYTHONHASHSEEDs must now agree, and the order follows the parent's."""
+    import json
+    import os
+    import subprocess
+    import sys
+    code = (
+        "import json\n"
+        "from eidr_core.inheritance import build_full_base\n"
+        "parent = {'StructuralType': 'Abstraction', 'Mode': 'AudioVisual',\n"
+        "          'ReferentType': 'TV', 'OriginalLanguage': ['en'],\n"
+        "          'CountryOfOrigin': ['US'], 'ReleaseDate': '2001', 'Status': 'valid',\n"
+        "          'AssociatedOrg': [{'DisplayName': 'Org'}], 'ApproximateLength': 'PT1H'}\n"
+        "child = {'ResourceName': [{'Title': 'Pilot', 'SystemGenerated': 'false'}]}\n"
+        "out, _src = build_full_base(child, parent, 'Episode', {'SequenceNumber': '1'})\n"
+        "print(json.dumps(list(out)))\n")
+    orders = []
+    for seed in ("1", "2", "3"):
+        env = dict(os.environ, PYTHONHASHSEED=seed)
+        r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env)
+        assert r.returncode == 0, r.stderr
+        orders.append(json.loads(r.stdout))
+    assert orders[0] == orders[1] == orders[2]
+    inherited = [k for k in orders[0] if k != "ResourceName"]
+    parent_order = ["StructuralType", "Mode", "ReferentType", "OriginalLanguage",
+                    "CountryOfOrigin", "ReleaseDate", "Status", "AssociatedOrg",
+                    "ApproximateLength"]
+    assert inherited == [k for k in parent_order if k in inherited]

@@ -79,7 +79,7 @@ _COMMON = frozenset({
     "Structural Type", "Mode", "Referent Type",
     "Title", "Title Class", "Title Language",
     "Alternate Title", "Alt Title Class", "Alt Title Language",
-    "Original Language", "Version Language", "Language Mode",
+    "Original Language", "Version Language",
     "Associated Org", "Associated Org Role", "Associated Org Party ID",
     "Release Date", "Country of Origin", "Publication Status", "Approx Length",
     "Alt ID", "Domain", "Relation", "IMDb", "IMDb Relation",
@@ -98,13 +98,14 @@ _EPISODIC = frozenset({
     "Distribution No.", "Dist. No. Domain", "House No.", "House No. Domain",
     "Alternate No.", "Alt. No. Domain",
 })
+_MODE = frozenset({"Language Mode"})
 PRODUCED_BASES: dict[str, frozenset[str]] = {
-    "non_episodic": _COMMON | _ISAN,
-    "episodic": _COMMON | _ISAN | _EPISODIC,
-    "edit": _COMMON | _ISAN | frozenset({
+    "non_episodic": _COMMON | _ISAN | _MODE,
+    "episodic": _COMMON | _ISAN | _EPISODIC | _MODE,
+    "edit": _COMMON | _ISAN | _MODE | frozenset({
         "Parent EIDR/Row ID", "Edit Use", "Edit Class", "Made for Region",
         "Color Type", "In 3D", "Edit Details", "Edit Details Domain"}),
-    "manifestation": _COMMON | _ISAN | frozenset({
+    "manifestation": _COMMON | _ISAN | _MODE | frozenset({
         "Parent EIDR/Row ID", "Made for Region", "Manif Class",
         "Operator's Notes", "Manif Details", "Manif Details Domain"}),
     "clip": _COMMON | frozenset({
@@ -126,6 +127,20 @@ PRODUCED_BASES: dict[str, frozenset[str]] = {
 NEVER_PRODUCED: frozenset[str] = frozenset({
     "Unique Row ID", "Assigned EIDR ID", "Registration Errors & Notes",
     "Metadata Authority", "Operator's Notes"})
+
+# Every Template-22 tab has ONE "Language Mode" family, and it belongs to the
+# one language family that tab carries (XML_to_JSON, 2026-10-14): Original
+# Language on the Abstraction templates, Version Language on Edit and
+# Manifestation; Clip carries no language column. Until 0.51.0 both language
+# loops wrote "Language Mode N", so on an Edit or Manifestation sheet built
+# from `full` the parent's inherited Original Language mode landed beside the
+# Edit's Version Language (398 of 400 rows in one delivered sheet), and the
+# row -> record direction never read the column at all.
+_LANGUAGE_FAMILY: dict[str, str] = {
+    "non_episodic": "Original Language", "episodic": "Original Language",
+    "compilation": "Original Language",
+    "edit": "Version Language", "manifestation": "Version Language",
+}
 
 _GROUP_SUFFIX = re.compile(r"\s+\d+$")
 
@@ -262,6 +277,9 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
       ``* Required`` flags first found Episode -> Season -> Series.
     * Manifestation ``Digital`` XML goes to ``Operator's Notes`` as single-line
       XML, the only template that writes that column.
+    * ``Language Mode N`` comes only from the template's own language family
+      (Original Language on the Abstraction templates, Version Language on
+      Edit and Manifestation, none on Clip); since 0.51.0, not from the reference.
 
     Values are text (``None`` for absent); keys a template does not carry are
     never produced (``PRODUCED_BASES``).
@@ -342,13 +360,15 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
         if tl is not None:
             row[f"Alt Title Language {i}"] = tl
 
-    # Both language families write "Language Mode N", as the reference does.
+    # "Language Mode N" is written only from the template's OWN language
+    # family (_LANGUAGE_FAMILY); the other family's modes have no column.
+    own = _LANGUAGE_FAMILY.get(template)
     for family, key in (("Original Language", "OriginalLanguage"),
                         ("Version Language", "VersionLanguage")):
         for i, v in enumerate(_as_list(base.get(key), (str, int, float)), start=1):
             if isinstance(v, dict):
                 row[f"{family} {i}"] = _text(v.get("Language")) or _text(v.get("value"))
-                if _text(v.get("_mode")):
+                if family == own and _text(v.get("_mode")):
                     row[f"Language Mode {i}"] = _text(v.get("_mode"))
             else:
                 row[f"{family} {i}"] = _text(v)
@@ -662,6 +682,25 @@ def _casefold_set(values: Iterable[str]) -> list[str]:
     return sorted(set(values), key=str.casefold)
 
 
+def _languages(row: Mapping[str, Any], family: str, template: str) -> list[Any]:
+    """A language family read back, with its mode when the template pairs one.
+
+    For the template's own language family, ``Language Mode N`` is read with
+    ``<family> N`` and the entry is ``{"value": lang, "_mode": mode}`` (the
+    mirror export's shape); a language without a mode stays a plain string.
+    Same canonical order as before: de-duplicated, case-insensitive by
+    language, then by mode.
+    """
+    if family != _LANGUAGE_FAMILY.get(template):
+        return _casefold_set(_values(row, family))
+    pairs: set[tuple[str, str | None]] = {
+        (lang, g.get("Language Mode"))
+        for g in _groups(row, [family, "Language Mode"])
+        if (lang := g.get(family)) is not None}
+    return [{"value": lang, "_mode": mode} if mode else lang
+            for lang, mode in sorted(pairs, key=lambda p: (p[0].casefold(), p[1] or ""))]
+
+
 def record_from_row(row: Mapping[str, Any], template: str) -> dict:
     """The SELF-defined standard record one Template-22 row describes.
 
@@ -669,7 +708,10 @@ def record_from_row(row: Mapping[str, Any], template: str) -> dict:
     absent values pruned. Every family is read on ``bmr_io.family_layout``
     (a bare header is group 1; companion columns pair by the sheet's own
     group index). Metadata Authority comes from the ``Metadata Authority
-    Party ID`` column only: the display-name column is never an ID. The
+    Party ID`` column only: the display-name column is never an ID.
+    ``Language Mode N`` is read into the template's own language family as
+    ``{"value": lang, "_mode": mode}`` (0.51.0). Every ``Edit Details`` /
+    ``Manif Details`` group is read; the reference read group 1 only. The
     ``IMDb``, ``ISAN`` and ``V-ISAN`` columns come back as Alt IDs with
     Domain ``IMDB`` / ``ISAN``. ShortDOI rows are NOT filtered: whether a
     ShortDOI belongs in a registration is the caller's policy.
@@ -713,8 +755,8 @@ def record_from_row(row: Mapping[str, Any], template: str) -> dict:
         "Mode": _text(row.get("Mode")),
         "ReferentType": _text(row.get("Referent Type")),
         "ResourceName": titles,
-        "OriginalLanguage": _casefold_set(_values(row, "Original Language")),
-        "VersionLanguage": _casefold_set(_values(row, "Version Language")),
+        "OriginalLanguage": _languages(row, "Original Language", template),
+        "VersionLanguage": _languages(row, "Version Language", template),
         "AssociatedOrg": orgs,
         "ReleaseDate": _text(row.get("Release Date")),
         "CountryOfOrigin": _casefold_set(_values(row, "Country of Origin")),

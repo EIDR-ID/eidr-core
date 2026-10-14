@@ -253,3 +253,40 @@ def test_a_sheet_row_survives_row_to_record_to_row(template, referent):
     if template == "episodic" and referent == "Series":
         row.pop("Parent EIDR/Row ID")  # a Series has no parent field
     assert {k: v for k, v in back.items() if v is not None} == row
+
+
+# ── Language Mode belongs to the template's own language family (0.51.0) ────
+# Every tab has ONE Language Mode family: Original Language's on the
+# Abstraction templates, Version Language's on Edit and Manifestation.
+# XML_to_JSON measured both directions wrong in the reference: 398 of 400
+# Edit rows written from `full` carried the parent's inherited Original mode
+# beside the Edit's Version Language, and the row -> record direction dropped
+# the column on about 254,000 real rows.
+
+def test_an_edits_inherited_original_mode_is_not_written_beside_its_version_language():
+    base = {"OriginalLanguage": [{"value": "en", "_mode": "Audio"}], "VersionLanguage": ["fr"]}
+    row = M.row_from_blocks(base, {}, "edit")
+    assert row["Version Language 1"] == "fr" and "Language Mode 1" not in row
+
+
+def test_the_templates_own_family_writes_its_mode():
+    base = {"OriginalLanguage": [{"value": "en", "_mode": "Audio"}],
+            "VersionLanguage": [{"value": "fr", "_mode": "Visual"}]}
+    assert M.row_from_blocks(base, {}, "non_episodic")["Language Mode 1"] == "Audio"
+    assert M.row_from_blocks(base, {}, "manifestation")["Language Mode 1"] == "Visual"
+    assert "Language Mode 1" not in M.row_from_blocks(base, {}, "clip")
+
+
+@pytest.mark.parametrize("template,family,key", [
+    ("non_episodic", "Original Language", "OriginalLanguage"),
+    ("episodic", "Original Language", "OriginalLanguage"),
+    ("edit", "Version Language", "VersionLanguage"),
+    ("manifestation", "Version Language", "VersionLanguage")])
+def test_language_mode_is_read_back_into_its_family(template, family, key):
+    row = {"Referent Type": "Movie", f"{family} 1": "fr", "Language Mode 1": "Visual",
+           f"{family} 2": "en", "Language Mode 2": "Audio", f"{family} 3": "de"}
+    langs = M.record_from_row(row, template)["SelfDefinedMetadata"]["BaseObjectData"][key]
+    assert langs == ["de", {"value": "en", "_mode": "Audio"}, {"value": "fr", "_mode": "Visual"}]
+    back = M.row_from_record(M.record_from_row(row, template), template)
+    pairs = {(back[f"{family} {i}"], back.get(f"Language Mode {i}")) for i in (1, 2, 3)}
+    assert pairs == {("de", None), ("en", "Audio"), ("fr", "Visual")}

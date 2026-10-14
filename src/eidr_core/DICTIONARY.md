@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.50.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.51.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,33 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.51.0 (2026-10-14)
+
+* **`bmr_map`: `Language Mode` belongs to the template's own language
+  family, in both directions.** Every Template-22 tab has one `Language
+  Mode` family: Original Language's on Non-Episodic, Episodic and
+  Compilation, Version Language's on Edit and Manifestation; Clip has none.
+  `row_from_blocks` used to write it from both families, so an Edit or
+  Manifestation built from `full` carried the parent's inherited Original
+  Language mode beside its own Version Language (XML_to_JSON: 398 of 400 rows
+  of a delivered Edit sheet; 10,357 of 10,358 Manifestation rows). It now
+  writes it only from the template's family. `record_from_row` used to drop
+  the column (about 254,000 real rows carry one); it now returns those
+  languages as `{"value": lang, "_mode": mode}`, the mirror export's shape,
+  and plain strings where there is no mode. `PRODUCED_BASES["clip"]` no
+  longer lists `Language Mode`. Requested by XML_to_JSON; a behaviour change,
+  hence the minor bump.
+* **Correction to the 0.49.0 entry:** "the output is the reference's" holds
+  except for Details. The reference's row -> record read only `Edit Details
+  1` / `Manif Details 1`; `record_from_row` reads every group (9 real rows
+  differ, each now keeping data the reference dropped).
+* **`bmr_io.fix_shared_strings` keeps C1 characters.** It decoded each inline
+  string with `html.unescape`, which maps numeric references 128-159 to
+  Windows-1252, so a U+0096 in a cell came out of `write_sheet` as an en
+  dash, unreported (python-tools: three production Service names). It now
+  decodes with XML's rules. Any `write_sheet` caller could have been
+  affected; values without U+0080-U+009F are unchanged.
 
 ### 0.50.0 (2026-10-13)
 
@@ -350,7 +377,7 @@ edition's Changes entry.
 | [`eidr_core.bmr_map.creation_type_from_row`](#creation_type_from_row) | function | Decides the creation type a row describes. |
 | [`eidr_core.bmr_map.header_base`](#header_base) | function | Strips the group number from a family column header, so template columns compare with `PRODUCED_BASES`. |
 | [`eidr_core.bmr_map.record_from_row`](#record_from_row) | function | Builds the self-defined record a row describes. |
-| [`eidr_core.bmr_map.row_from_blocks`](#row_from_blocks) | function | Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title; Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line. |
+| [`eidr_core.bmr_map.row_from_blocks`](#row_from_blocks) | function | Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title; Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line; `Language Mode N` only from the template's own language family (Original Language on Abstraction templates, Version Language on Edit and Manifestation, none on Clip; 0.51.0). |
 | [`eidr_core.bmr_map.row_from_record`](#row_from_record) | function | Maps a whole record with the documented defaults: exactly what XML_to_JSON's `--sheet-out` did per record, minus the `Unique Row ID` column and the echo of an unconvertible row, which stay with the caller. |
 | [`eidr_core.bmr_map.select_blocks`](#select_blocks) | function | Picks the blocks a sheet is built from. |
 | [`eidr_core.bmr_map.NEVER_PRODUCED`](#never_produced-constant) | constant | the template columns this module never writes, each for a stated reason: `Unique Row ID` (the caller's), `Assigned EIDR ID` and `Registration Errors & Notes` (the registry's and the reviewer's), `Metadata Authority` (the display name; only the Party ID column is written), `Operator's Notes` (written on Manifestation only). |
@@ -543,7 +570,7 @@ Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 7 functions, 2 cl
 
 **Used by.**
 <!-- dict-usedby:eidr_core.altidtool_io -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `format_line`, `is_identity_relation`, `multi_form_domains`
 * **eidr-dq**: `identity_relation_sql`
 * **eidr-imdb**: `AltIdRow`, `format_line`, `parse_line`, `write_lines`
@@ -752,13 +779,13 @@ Source `src/eidr_core/bmr_io/__init__.py`. Public names: 21 functions, 9 classes
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `families_for`, `header_map`, `index_rows`, `read_headers`, `resolve_parent`, `template_for_creation_type`, `write_sheet`
 * **BMRtoAltID**: `ASSIGNED_ID_COLUMN`, `check_sheet`, `DATA_START`, `family_layout`, `fill_column`, `HEADER_ROW`, `open_sheet`, `ROW_ID_COLUMN`, `SHEET_TO_TEMPLATE`, `subset_rows`, `TemplateMismatch`, `TEMPLATES`
 * **eidr-dq**: `pad_groups`, `RepeatPlan`
 * **eidr-imdb**: `DATA_START`, `HEADER_ROW`, `TEMPLATES`, `write_sheet`
 * **eidr-wikidata**: `count_family`, `DATA_START`, `expand_family`, `families_for`, `family_layout`, `fix_shared_strings`, `HEADER_ROW`, `pad_groups`, `read_headers`, `read_sheet`, `RepeatPlan`, `rightmost_in`, `SCHEMA_MAX`, `transplant`, `write_sheet`
-* **XML_to_JSON**: `DATA_START`, `family_layout`, `HEADER_ROW`, `index_rows`, `read_headers`, `read_sheet`, `resolve_parent`, `SHEET_TO_TEMPLATE`, `template_for_creation_type`, `TEMPLATES`, `write_sheet`
+* **XML_to_JSON**: `DATA_START`, `HEADER_ROW`, `index_rows`, `read_headers`, `read_sheet`, `resolve_parent`, `SHEET_TO_TEMPLATE`, `template_for_creation_type`, `TEMPLATES`, `write_sheet`
 <!-- /dict-usedby -->
 
 **Specs.** No versioned spec governs this module. `specs/merge-rules.md` (DRAFT) makes `SCHEMA_MAX` (as `write_sheet` uses it) the per-family caps of the planned merge engine, never the .NET tool's hardcoded caps, and requires the planned B5 mapper to read families sparsely, as `family_layout` does. `specs/vendoring.md` 1.0.0 section 6 notes that a vendored `bmr_io.read_sheet` still needs openpyxl. `specs/merge-rules.md` also plans for python-tools' `MergeTool` to vendor `bmr_io` (S4), and since 0.49.0 it is vendorable: the comments that named its own package are reworded, and `resolve_parent` needs `ids` vendored with it (list both).
@@ -1486,7 +1513,7 @@ Source `src/eidr_core/bmr_io/subset.py`. Public names: 1 function (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io.subset -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `required_headers`
 <!-- /dict-usedby -->
 
@@ -1532,7 +1559,7 @@ Source `src/eidr_core/codes/__init__.py`. Public names: 1 function, 1 constant (
 
 **Used by.**
 <!-- dict-usedby:eidr_core.codes -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **eidr-wikidata**: `normalize_country_code`
 <!-- /dict-usedby -->
 
@@ -1585,7 +1612,7 @@ Source `src/eidr_core/compare/__init__.py`. Public names: 20 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `cmp_alt_ids`, `COMPARATORS`, `FieldResult`, `set_params`
 * **De-Dupe UI**: `cmp_alt_ids`, `cmp_length`, `cmp_release_date`, `cmp_titles`, `fuzzy`
 <!-- /dict-usedby -->
@@ -2052,7 +2079,7 @@ Source `src/eidr_core/compare/nonlinear.py`. Public names: 3 functions (declared
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.nonlinear -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `accumulate`, `aggregate`, `corroborate`, (the module)
 * **De-Dupe UI**: `accumulate`
 <!-- /dict-usedby -->
@@ -2140,7 +2167,7 @@ Source `src/eidr_core/compare/spec.py`. Public names: 2 functions (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.spec -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_spec`, `spec_path`, (the module)
 <!-- /dict-usedby -->
 
@@ -2201,7 +2228,7 @@ Source `src/eidr_core/compare/states.py`. Public names: 4 functions (declared by
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.states -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `band`, `field_not_counted`, `field_states`, `ui_field_key`, (the module)
 <!-- /dict-usedby -->
 
@@ -2308,7 +2335,7 @@ Source `src/eidr_core/compare/titles.py`. Public names: 7 functions, 2 constants
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.titles -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `parse_part`, `parts_conflict`, `segments`, `select_titles`, `title_similarity`
 * **De-Dupe UI**: `COMBINATION_DIFFERS_QUALITY`, `parse_part`, `PART_AMBIGUOUS_QUALITY`, `parts_conflict`, `segments`, `title_similarity`
 * **LanguageTool**: `title_similarity`
@@ -2492,7 +2519,7 @@ Source `src/eidr_core/db_schemas/__init__.py`. Public names: 4 functions, 1 cons
 
 **Used by.**
 <!-- dict-usedby:eidr_core.db_schemas -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `assert_tables`, `contract_version`, `DATABASES`, `load_manifest`, `table_columns`
 * **BMRtoAltID**: `assert_tables`
 * **eidr-dq**: `assert_tables`, `contract_version`, `load_manifest`, `table_columns`
@@ -2618,7 +2645,7 @@ needs no extra.
 
 **Used by.**
 <!-- dict-usedby:eidr_core.dictionary -->
-No consumer imports it directly (scan of 2026-10-13).
+No consumer imports it directly (scan of 2026-10-14).
 <!-- /dict-usedby -->
 
 ### `changes`
@@ -2695,7 +2722,7 @@ Source `src/eidr_core/external/__init__.py`. Public names: 3 functions, 5 classe
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **eidr-dq**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `Entry`, `FactCache`, `FATAL`, `Key`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
 * **eidr-imdb**: `call_with_failover`, `endpoint_chain`, `FATAL`, `NEXT_ENDPOINT`, `OUTAGE`, `RETRY`
 * **eidr-wikidata**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `FactCache`, `FATAL`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
@@ -2935,7 +2962,7 @@ Source `src/eidr_core/external/failover.py`. Public names: 5 functions, 8 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external.failover -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `retry_after_seconds`
 * **eidr-imdb**: `DEFAULT_RATE_LIMIT_FLOOR`, `http_status`
 * **eidr-wikidata**: `http_status`, `is_bad_query_error`, `is_outage_error`, `retry_after_seconds`
@@ -3121,7 +3148,7 @@ Source `src/eidr_core/ids/__init__.py`. Public names: 8 functions, 10 constants 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ids -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `category`, `fault`, `find_content_ids`, `is_valid_eidr_id`
 * **BMRtoAltID**: `fault`
 * **De-Dupe UI**: `ALPHABET`, `check_character`, `is_valid_eidr_id`
@@ -3385,7 +3412,7 @@ Source `src/eidr_core/inheritance/__init__.py`. Public names: 6 functions, 1 cla
 
 **Used by.**
 <!-- dict-usedby:eidr_core.inheritance -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `build_full_record`, `provenance`, `RECORD_ATTRS`, `TitleConstructionError`, (the module)
 * **XML_to_JSON**: `build_full_base`, `INHERITABLE_FIELDS`, `is_absent`, `TitleConstructionError`
 <!-- /dict-usedby -->
@@ -3603,7 +3630,7 @@ Source `src/eidr_core/normalize/__init__.py`. Public names: 13 functions (declar
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `ascii_fold`, `cmp_key`, `days_between`, `nfkc`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **De-Dupe UI**: `ascii_fold`, `cmp_key`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **eidr-wikidata**: `norm_title`, `sanitize_field`
@@ -3875,7 +3902,7 @@ Source `src/eidr_core/normalize/aliases.py`. Public names: 2 functions, 1 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize.aliases -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `alias_name`, `alias_title`, `ORDINALS`
 <!-- /dict-usedby -->
 
@@ -3948,7 +3975,7 @@ Source `src/eidr_core/ordering/__init__.py`. Public names: 10 functions (declare
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ordering -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `altid_canonical_key`, `altid_collapsed_canonical_key`, `altid_display_key`, `altid_kind`, `is_shortdoi`, `title_bucket`, `title_sort_key`
 * **XML_to_JSON**: `altid_collapsed_canonical_key`, `title_sort_key`
 <!-- /dict-usedby -->
@@ -4171,7 +4198,7 @@ Source `src/eidr_core/registry/__init__.py`. Public names: 5 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.registry -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `get_registry_client`
 * **eidr-dq**: `build_registry_credentials`, `get_registry_client`
 * **eidr-wikidata**: `build_registry_credentials`, `CODE_SUCCESS`, `DEFAULT_REGISTRY`, `get_registry_client`, `OperationStatus`, `parse_operation_status`, `parse_operation_statuses`, `token_operation_status`
@@ -4351,7 +4378,7 @@ Source `src/eidr_core/secrets_loader/__init__.py`. Public names: 3 functions, 1 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.secrets_loader -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_local`
 * **BMRtoAltID**: `load_secrets`, `SecretsError`
 * **eidr-dq**: `load_secrets`, `SecretsError`
@@ -4465,7 +4492,7 @@ Source `src/eidr_core/vendor/__init__.py`. Public names: 3 functions, 3 classes,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.vendor -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **python-tools**: `check`, `load_manifest`, (the module)
 <!-- /dict-usedby -->
 
@@ -4628,7 +4655,7 @@ Source `src/eidr_core/verify/__init__.py`. Public names: 5 functions (declared b
 
 **Used by.**
 <!-- dict-usedby:eidr_core.verify -->
-Scan of 2026-10-13; regenerated at each release from the consumer trees.
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
 * **eidr-dq**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 * **eidr-wikidata**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 <!-- /dict-usedby -->
@@ -4763,7 +4790,8 @@ Source `src/eidr_core/bmr_map/__init__.py`. Public names: 7 functions, 3 constan
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_map -->
-No consumer imports it directly (scan of 2026-10-13).
+Scan of 2026-10-14; regenerated at each release from the consumer trees.
+* **XML_to_JSON**: `NEVER_PRODUCED`, `PRODUCED_BASES`, `record_from_row`, `row_from_record`
 <!-- /dict-usedby -->
 
 ### `administrators_of`
@@ -4839,7 +4867,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 **Returns** `dict` -- `{"CreationType": ..., "SelfDefinedMetadata": {...}}` with absent values pruned (`inheritance.is_absent`).
 <!-- /dict -->
 
-**Does.** Builds the self-defined record a row describes. Every family is read on `bmr_io.family_layout` (a bare header is group 1; companion columns pair by the sheet's own group index). Metadata Authority comes from the Party ID column only. `IMDb`, `ISAN` and `V-ISAN` come back as Alt IDs with Domain `IMDB` / `ISAN`. Languages and countries are de-duplicated and sorted case-insensitively (the BMR-input canonical order). Parent references are left as written.
+**Does.** Builds the self-defined record a row describes. Every family is read on `bmr_io.family_layout` (a bare header is group 1; companion columns pair by the sheet's own group index). Metadata Authority comes from the Party ID column only. `IMDb`, `ISAN` and `V-ISAN` come back as Alt IDs with Domain `IMDB` / `ISAN`. Languages and countries are de-duplicated and sorted case-insensitively (the BMR-input canonical order); since 0.51.0 the template's own language family comes back with its `Language Mode` as `{"value": lang, "_mode": mode}` (plain string when there is no mode). Every Details group is read, where the reference read group 1 only. Parent references are left as written.
 
 ### `row_from_blocks`
 
@@ -4860,7 +4888,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 **Returns** `dict[str, str | None]` -- one row, `{column header: text or None}`, numbered families as `"<base> N"`; never `Unique Row ID`.
 <!-- /dict -->
 
-**Does.** Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title; Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line. Behaviour is the reference's, row for row (checked against it on real sheets and 20,000 synthetic records, 2026-10-13).
+**Does.** Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title; Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line; `Language Mode N` only from the template's own language family (Original Language on Abstraction templates, Version Language on Edit and Manifestation, none on Clip; 0.51.0). Otherwise the reference's behaviour, row for row (checked against it on real sheets and 20,000 synthetic records, 2026-10-13).
 
 ### `row_from_record`
 
@@ -4915,7 +4943,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 <!-- dict:eidr_core.bmr_map.PRODUCED_BASES -->
 Defined in `src/eidr_core/bmr_map/__init__.py`.
 
-**Value** `PRODUCED_BASES: dict[str, frozenset[str]] = { "non_episodic": _COMMON \| _ISAN, "episodic": _COMMON \| _ISAN \| _EPISODIC, "edit": _CO...` -- per supported template, every header base the mapper can write (derived from a record that takes every branch and pinned by a test, together with the rule that every stock template column is here or in `NEVER_PRODUCED`). A produced base need not be a column of that template: Clip carries no Alternate Title, and `write_sheet` reports such a value as dropped.
+**Value** `PRODUCED_BASES: dict[str, frozenset[str]] = { "non_episodic": _COMMON \| _ISAN \| _MODE, "episodic": _COMMON \| _ISAN \| _EPISODIC \| _M...` -- per supported template, every header base the mapper can write (derived from a record that takes every branch and pinned by a test, together with the rule that every stock template column is here or in `NEVER_PRODUCED`). A produced base need not be a column of that template: Clip carries no Alternate Title, and `write_sheet` reports such a value as dropped.
 <!-- /dict -->
 
 ### `SUPPORTED_TEMPLATES` (constant)

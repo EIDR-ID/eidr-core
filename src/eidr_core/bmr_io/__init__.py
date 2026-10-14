@@ -85,7 +85,6 @@ differ per consumer and belong above this layer.
 from __future__ import annotations
 
 import contextlib
-import html
 import logging
 import os
 import re
@@ -272,6 +271,32 @@ def transplant(template_xlsx: str, edited_xlsx: str) -> None:
         except Exception:
             pass
 
+_XML_REF = re.compile(r"&(#[0-9]+|#x[0-9A-Fa-f]+|amp|lt|gt|quot|apos);")
+_XML_NAMED = {"amp": "&", "lt": "<", "gt": ">", "quot": '"', "apos": "'"}
+
+
+def _xml_unescape(text: str) -> str:
+    """Decode the references XML text can hold: the five named entities and
+    numeric character references, with XML's meaning.
+
+    Not ``html.unescape``: HTML5 maps numeric references 128-159 to
+    Windows-1252, so ``&#150;`` (U+0096, which openpyxl writes for a C1
+    control character) came back as an en dash. ``fix_shared_strings`` used
+    it until 0.51.0 and silently changed every such value on the way through
+    ``write_sheet`` (python-tools, 2026-10-14: three Service names in the
+    production registry). Anything that is not one of those references is
+    left as written.
+    """
+    def _one(m: re.Match) -> str:
+        ref = m.group(1)
+        if ref.startswith("#x"):
+            return chr(int(ref[2:], 16))
+        if ref.startswith("#"):
+            return chr(int(ref[1:]))
+        return _XML_NAMED[ref]
+    return _XML_REF.sub(_one, text)
+
+
 def fix_shared_strings(xlsx_path: str) -> None:
     """Convert inlineStr cells to shared-string references for EPPlus compatibility."""
     out_dir = os.path.dirname(os.path.abspath(xlsx_path)) or "."
@@ -316,9 +341,10 @@ def fix_shared_strings(xlsx_path: str) -> None:
                     texts = []
                     for tm in t_re.finditer(m.group(2)):
                         try:
-                            texts.append(html.unescape(tm.group(1).decode("utf-8")))
-                        except Exception:
-                            texts.append(html.unescape(tm.group(1).decode("utf-8", "replace")))
+                            raw = tm.group(1).decode("utf-8")
+                        except UnicodeDecodeError:
+                            raw = tm.group(1).decode("utf-8", "replace")
+                        texts.append(_xml_unescape(raw))
                     idx = _add("".join(texts)); total += 1
                     # count MUST be a keyword: positional `count` is deprecated
                     # since CPython 3.13 and slated to become a TypeError. On

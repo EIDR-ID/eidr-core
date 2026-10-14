@@ -1,0 +1,105 @@
+{
+  "id": "crosstype-anthology-episode-meets-basic-at-review",
+  "added": "2026-10-13",
+  "why": "Cross-type rule (operator, 2026-09-26; compare-spec 2.16.0): an Episode with a USER-SUPPLIED title whose SERIES is classed Anthology is a candidate for a Basic record -- scored on the Basic profile and capped into Review, never auto-matched. The episode itself carries no class and runs 25 minutes, so neither the Pilot/Special/Standalone rule nor the feature-length rule (2.19.0) can make it eligible: ONLY the Series' class can, and the Series is neither the submission nor the candidate. It arrives through the `ancestry` block (specs/golden-pairs.md section 2; De-Dupe UI S-32), and an implementation that cannot climb to it -- or ignores the block -- scores the pair as ineligible (Reject) and FAILS this fixture loudly, as the format requires. Shape: an anthology play broadcast as an episode and later listed as a stand-alone short.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "The Long Night",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1962",
+    "length_minutes": "25",
+    "directors": [
+      "John Brahm"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": []
+  },
+  "candidate": {
+    "eidr_id": "10.5240/FEED-0000-0000-000D-0000-9",
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-000D-0001-7",
+    "titles": [
+      {
+        "text": "The Long Night",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "1962",
+    "length_minutes": "25",
+    "directors": [
+      "John Brahm"
+    ],
+    "countries": [
+      "US"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": []
+  },
+  "ancestry": [
+    {
+      "eidr_id": "10.5240/FEED-0000-0000-000D-0001-7",
+      "creation_type": "Series",
+      "titles": [
+        [
+          "Thriller Hour",
+          "en",
+          true,
+          false,
+          "",
+          true
+        ]
+      ],
+      "release_date": "1960",
+      "series_class": "Anthology"
+    }
+  ],
+  "invariants": {
+    "verdict_in": [
+      "Review"
+    ],
+    "score_min": 30.0
+  },
+  "expected": {
+    "spec_version": "2.20.0",
+    "confidence": 79.0,
+    "verdict": "Review",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 1.0,
+      "director": 1.0,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": 1.0,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "identical",
+      "director": "identical",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "identical",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

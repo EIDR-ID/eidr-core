@@ -1,0 +1,124 @@
+{
+  "id": "crosstype-pilot-meets-basic-under-series-title",
+  "added": "2026-10-13",
+  "why": "Cross-type rule (operator, 2026-09-26; compare-spec 2.16.0): an Episode classed Pilot is a candidate for a Basic record and is compared under its SERIES' title -- a pilot sold or listed as a TV movie carries the show's name, while the registry record for the episode is titled 'Pilot'. Scored on the Basic profile and capped into Review. The Series' title is on a record that is neither the submission nor the candidate (Episode -> Season -> Series), so it arrives through the `ancestry` block (specs/golden-pairs.md section 2; De-Dupe UI S-32). Pins that the comparison happens under the Series' title: title quality reaches 0.95 and the pair reaches Review; an implementation that cannot climb compares 'Pilot' against 'Night Train' and FAILS loudly. S-32 described this fixture as a pilot with only a SYSTEM title; on the registry such titles are '<Series>: Season 1: Episode 1' (sampled 2026-10-13), which already contain the Series' title, so the climb decides nothing there and a fixture of that shape would pass without the block. The user-titled 'Pilot' is the shape the climb exists for, and a common one",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Night Train",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2004",
+    "length_minutes": "48",
+    "directors": [
+      "Ann Lee"
+    ],
+    "countries": [
+      "GB"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": []
+  },
+  "candidate": {
+    "eidr_id": "10.5240/FEED-0000-0000-000E-0000-E",
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-000E-0001-C",
+    "episode_class": "Pilot",
+    "titles": [
+      {
+        "text": "Pilot",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2004",
+    "length_minutes": "48",
+    "directors": [
+      "Ann Lee"
+    ],
+    "countries": [
+      "GB"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": []
+  },
+  "ancestry": [
+    {
+      "eidr_id": "10.5240/FEED-0000-0000-000E-0001-C",
+      "creation_type": "Season",
+      "titles": [
+        [
+          "Night Train: Season 1",
+          "en",
+          false,
+          true,
+          "",
+          true
+        ]
+      ],
+      "parent_id": "10.5240/FEED-0000-0000-000E-0002-A",
+      "release_date": "2004"
+    },
+    {
+      "eidr_id": "10.5240/FEED-0000-0000-000E-0002-A",
+      "creation_type": "Series",
+      "titles": [
+        [
+          "Night Train",
+          "en",
+          true,
+          false,
+          "",
+          true
+        ]
+      ],
+      "release_date": "2004"
+    }
+  ],
+  "invariants": {
+    "verdict_in": [
+      "Review"
+    ],
+    "score_min": 30.0,
+    "field_quality_min": {
+      "title": 0.95
+    }
+  },
+  "expected": {
+    "spec_version": "2.20.0",
+    "confidence": 79.0,
+    "verdict": "Review",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 1.0,
+      "director": 1.0,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": 1.0,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "identical",
+      "director": "identical",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "identical",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

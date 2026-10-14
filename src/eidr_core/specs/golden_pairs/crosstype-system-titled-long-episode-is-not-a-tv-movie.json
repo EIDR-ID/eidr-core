@@ -1,0 +1,87 @@
+{
+  "id": "crosstype-system-titled-long-episode-is-not-a-tv-movie",
+  "added": "2026-10-09",
+  "why": "The feature-length-episode rule (compare-spec 2.19.0; operator, 2026-10-03) makes an Episode over an hour a candidate for a Basic TV movie ONLY when the episode carries a USER-SUPPLIED title. A system-generated title (built by the registry from the parent's title and the episode's number) says nothing a TV movie's title can be matched against, so a long episode that has only one is not a candidate, however its text reads. Asked for by De-Dupe UI's mutation test of 2.19.0 (relayed by eidr-core, 2026-10-08): moving the length test outside the user-title requirement survived all 40 fixtures, because the only fixture for the rule has a user title. Here the episode runs 95 minutes and its only title is system-generated, with the SAME text as the Basic's title so that a title-blind implementation scores the pair as a strong candidate. Expected: not a candidate (Reject). Pair with crosstype-feature-length-episode-meets-tv-movie-at-review, the same shape with a user title, which must reach Review; an implementation that drops the user-title requirement passes that one and fails this one.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Night Train",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2004",
+    "length_minutes": "93",
+    "directors": [
+      "Ann Lee"
+    ],
+    "countries": [
+      "GB"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": []
+  },
+  "candidate": {
+    "eidr_id": "10.5240/FEED-0000-0000-000C-0000-4",
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-000C-0001-2",
+    "titles": [
+      {
+        "text": "Night Train",
+        "lang": "en",
+        "is_resource": true,
+        "system_generated": true
+      }
+    ],
+    "release_date": "2004",
+    "length_minutes": "95",
+    "directors": [
+      "Ann Lee"
+    ],
+    "countries": [
+      "GB"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": []
+  },
+  "invariants": {
+    "verdict_in": [
+      "Reject"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.20.0",
+    "confidence": 10.7,
+    "verdict": "Reject",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 1.0,
+      "director": 1.0,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": 0.979,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "identical",
+      "director": "identical",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "similar",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

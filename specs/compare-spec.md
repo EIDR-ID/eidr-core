@@ -134,7 +134,9 @@ BMR-Review.
    cannot climb loses real matches silently: 12 labelled anthology matches
    (Looney Tunes, Beck, Screen One, Unter Verdacht, Halifax f.p., Cinema 16)
    read as terminal no-matches in our own mirror-less harness and reach
-   Review at 79.0 live.
+   Review at 79.0 live. **Pinned since 2.20.0** by the three fixtures that
+   carry an `ancestry` block (golden-pairs.md section 2): a port that cannot
+   climb fails them, it does not pass them.
 2. **The recovered sole-Accept uses only-Rejects, never the weak-rival test.**
    A port that reuses the shortlist branch's weak-rival exception clears
    `recovered-accept-with-review-rival-is-reviewed` wrongly; that fixture
@@ -157,7 +159,9 @@ BMR-Review.
    with no source it does not apply -- never infer the count from the records
    at hand. The serial rule reads the Series record's OWN release year and
    length. The feature-length rule needs a user-supplied title, so a
-   system-generated "Season 1: Episode 3" never qualifies.
+   system-generated "Season 1: Episode 3" never qualifies (pinned since
+   2.20.0 by `crosstype-system-titled-long-episode-is-not-a-tv-movie`, the
+   one fixture that fails when the length test runs before the title test).
 
 ## Date profiles: the ANCHOR is per creation type, the SHAPE is measured
 

@@ -1,0 +1,123 @@
+{
+  "id": "crosstype-retitled-edit-meets-ancestor-sibling-at-review",
+  "added": "2026-10-13",
+  "why": "Cross-type rule (operator, 2026-09-26; compare-spec 2.16.0): an Edit whose user-supplied title DIFFERS from its nearest Abstraction ancestor's (or whose Edit Class is Split) may be compared with the SIBLINGS of that ancestor, never with the ancestor itself -- the shape of an edit registered under the wrong episode. Scored on the Basic profile and capped into Review. Here the Edit 'The Reckoning' sits under the Episode 'Part One', and the candidate is that episode's sibling 'The Reckoning' under the same Season. The ancestor is neither the submission nor the candidate, so it arrives through the `ancestry` block (specs/golden-pairs.md section 2; De-Dupe UI S-32); without it the ancestor is unknown, the pair is ineligible, and an implementation that ignores the block FAILS this fixture loudly.",
+  "submitted": {
+    "creation_type": "Edit",
+    "parent_id": "10.5240/FEED-0000-0000-000F-0001-H",
+    "titles": [
+      {
+        "text": "The Reckoning",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2011",
+    "length_minutes": "44",
+    "directors": [
+      "Ann Lee"
+    ],
+    "countries": [
+      "GB"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": []
+  },
+  "candidate": {
+    "eidr_id": "10.5240/FEED-0000-0000-000F-0003-D",
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-000F-0002-F",
+    "titles": [
+      {
+        "text": "The Reckoning",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2011",
+    "length_minutes": "44",
+    "directors": [
+      "Ann Lee"
+    ],
+    "countries": [
+      "GB"
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "alt_ids": []
+  },
+  "ancestry": [
+    {
+      "eidr_id": "10.5240/FEED-0000-0000-000F-0001-H",
+      "creation_type": "Episode",
+      "titles": [
+        [
+          "Part One",
+          "en",
+          true,
+          false,
+          "",
+          true
+        ]
+      ],
+      "parent_id": "10.5240/FEED-0000-0000-000F-0002-F",
+      "release_date": "2011",
+      "length_minutes": "44"
+    },
+    {
+      "eidr_id": "10.5240/FEED-0000-0000-000F-0002-F",
+      "creation_type": "Season",
+      "titles": [
+        [
+          "Season 3",
+          "en",
+          true,
+          false,
+          "",
+          true
+        ]
+      ],
+      "release_date": "2011",
+      "parent_id": "10.5240/FEED-0000-0000-000F-0000-J"
+    }
+  ],
+  "invariants": {
+    "verdict_in": [
+      "Review"
+    ],
+    "score_min": 30.0
+  },
+  "expected": {
+    "spec_version": "2.20.0",
+    "confidence": 79.0,
+    "verdict": "Review",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 1.0,
+      "director": 1.0,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": 1.0,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "identical",
+      "director": "identical",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "identical",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

@@ -2,7 +2,7 @@
 
 **Status:** all three modes LANDED — `pair` 2026-07-29; `case` ratified 2026-09-10 (S-26),
 evaluator 2026-09-11; `recovery_pool` ratified 2026-09-10 (S-9), first captured instance and
-evaluator 2026-09-11 (BMR-Review T17). Corpus: 26 `pair`, 13 `case`, 1 `recovery_pool` (40) at compare-spec 2.19.0.
+evaluator 2026-09-11 (BMR-Review T17). Corpus: 30 `pair`, 13 `case`, 1 `recovery_pool` (44) at compare-spec 2.20.0.
 **Owner of the format:** eidr-core. **Owner of the evaluator:** BMR-Review
 (`eidr_dedup_score/golden.py`). **Conforming implementation:** De-Dupe UI,
 in JavaScript, with no database.
@@ -111,13 +111,19 @@ confirms No Match, and the match stays in the registry.
   submission nor a candidate, so without it no fixture can pin them and a
   port that cannot climb loses those matches silently (compare-spec.md,
   porting requirement 1). Rule, as for `related_targets`: a loader that
-  ignores the block must make its fixture FAIL loudly, never pass. **No
-  fixture carries it yet:** BMR-Review's evaluator support in `golden.py` and
-  the three fixtures that use it (an Anthology Episode meets a Basic at
-  Review; a Pilot with only a system title meets its Basic under the Series'
-  title; a retitled Edit meets a sibling of its Episode/Abstraction ancestor)
-  arrive as their own compare-spec version, because they pin behaviour the
-  corpus cannot see today (§7).
+  ignores the block must make its fixture FAIL loudly, never pass. **Three
+  fixtures carry it (since 2.20.0):**
+  `crosstype-anthology-episode-meets-basic-at-review`,
+  `crosstype-pilot-meets-basic-under-series-title` and
+  `crosstype-retitled-edit-meets-ancestor-sibling-at-review`. Each fails with
+  its block removed and under its own rule switched off (BMR-Review measured;
+  its `tests/test_golden_ancestry.py` checks the block-removed half on the
+  live corpus). An engine's record source must hand out a FRESH record per
+  `load`: the engine materializes records in place, so a shared object leaks
+  between comparisons. The pilot fixture's episode is user-titled "Pilot",
+  not system-titled as S-32 first described it: a pilot's system title
+  (`<Series>: Season 1: Episode 1`) already contains the Series' title, so
+  that shape passed with the block ignored and could pin nothing.
 * **A `mode` the evaluator does not yet implement must fail LOUDLY**, naming
   what it waits for, rather than being absent. (`recovery_pool` raised
   `NotImplementedError` for the one day between ratification and its first

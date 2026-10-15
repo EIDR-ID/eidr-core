@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.54.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.55.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,21 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.55.0 (2026-10-15)
+
+* **`altid_audit` never writes to the tombstone.** A deleted record aliases
+  `10.5240/0000-0000-0000-0000-0000-X`, which is itself a valid record, so
+  an asserted ID of a deleted record was followed there and the row's Alt
+  IDs offered to the tombstone. Such a row is now `ASSERTED_ID_DELETED`, a
+  new row-level finding class: nothing on the row is written, in either
+  quarantine mode. A caller that maps finding classes to a vocabulary of
+  its own must add it (BMRtoAltID's `report.ERROR_CLASSES` has it). Found
+  while measuring C1's premise; no sheet on this machine had such a row,
+  and the tombstone carries only its own ShortDOI.
+* **New: `ids.TOMBSTONE_ID`**, the content tombstone, for every caller that
+  follows alias chains (eidr-wikidata, python-sdk and python-tools each spell
+  it out). Additive.
 
 ### 0.54.0 (2026-10-15)
 
@@ -537,6 +552,7 @@ edition's Changes entry.
 | [`eidr_core.ids.PARTY_ID_SUFFIX`](#party_id_suffix-constant) | constant | Regex source string (not compiled) for the part after `10.5237/`: `XXXX-XXXX` hex in either case, or the literal lower-case `superparty`. |
 | [`eidr_core.ids.SERVICE_ID_RE`](#service_id_re-constant) | constant | Compiled, anchored service DOI pattern: `10.5239/` plus `SERVICE_ID_SUFFIX`. |
 | [`eidr_core.ids.SERVICE_ID_SUFFIX`](#service_id_suffix-constant) | constant | Regex source string for the part after `10.5239/`: `XXXX-XXXX`, hex, either case, no check character. |
+| [`eidr_core.ids.TOMBSTONE_ID`](#tombstone_id-constant) | constant | the content tombstone. |
 | [`eidr_core.ids.USER_ID_RE`](#user_id_re-constant) | constant | Compiled, anchored user DOI pattern: `10.5238/` plus `USER_ID_SUFFIX`. |
 | [`eidr_core.ids.USER_ID_SUFFIX`](#user_id_suffix-constant) | constant | Regex source string for the username after `10.5238/`: 3 to 32 characters from `0-9 a-z A-Z _ # . |
 | [`eidr_core.inheritance.build_full_base`](#build_full_base) | function | Builds a child's full registry-JSON `BaseObjectData` from its self-defined one plus its parent's full one. |
@@ -3224,7 +3240,7 @@ Defined in `src/eidr_core/external/failover.py`.
 ## `eidr_core.ids`
 
 <!-- dict-module:eidr_core.ids -->
-Source `src/eidr_core/ids/__init__.py`. Public names: 8 functions, 10 constants (declared by `__all__`).
+Source `src/eidr_core/ids/__init__.py`. Public names: 8 functions, 11 constants (declared by `__all__`).
 <!-- /dict-module -->
 
 **Purpose.** The one implementation of EIDR identifier syntax. It validates Content IDs (`10.5240/`) including the ISO 7064 Mod 37,36 check character, pattern-checks party (`10.5237/`), user (`10.5238/`) and service (`10.5239/`) DOIs (which carry no check character), classifies a DOI by prefix, and pulls Content IDs out of free text. It was accepted on 2026-08-26 from BMR-Review's proposal, seeded from its `validate_returned_ids.py`, and shared without waiting for a second consumer because the ID shape and the checksum are published standards: a local copy is a second chance to get them wrong silently (BMR-Review's first copy reported all 2,996 valid production IDs it checked as broken). It imports only `re`, so it is closed under imports and a package that cannot depend on eidr-core (python-sdk) can vendor it whole.
@@ -3484,6 +3500,14 @@ Defined in `src/eidr_core/ids/__init__.py`.
 Defined in `src/eidr_core/ids/__init__.py`.
 
 **Value** `CONTENT_ID_SUFFIX = r"[0-9A-Fa-f]{4}(?:-[0-9A-Fa-f]{4}){4}-[0-9A-Za-z]"` -- Regex source string (not compiled, case-explicit) for the part after `10.5240/`: five 4-hex groups and the check character. `EIDR_CONTENT_ID_RE` and `CONTENT_ID_SEARCH_RE` are built from it (0.47.0, python-sdk), so a validator of a bare suffix composes from it as it can for party, service and user. Shape only: use `check_character` or `is_valid_eidr_id` for the checksum.
+<!-- /dict -->
+
+### `TOMBSTONE_ID` (constant)
+
+<!-- dict:eidr_core.ids.TOMBSTONE_ID -->
+Defined in `src/eidr_core/ids/__init__.py`.
+
+**Value** `TOMBSTONE_ID = "10.5240/0000-0000-0000-0000-0000-X"` -- the content tombstone. A deleted record becomes an alias of it, and it is itself a valid record, so anything that follows an alias chain and then writes must test for it (`altid_audit` does since 0.55.0). The party tombstone, `10.5237/0000-0000`, is a different ID.
 <!-- /dict -->
 
 ## `eidr_core.inheritance`
@@ -5430,7 +5454,7 @@ Defined in `src/eidr_core/altid_audit/__init__.py`.
 | `rows` | `Iterable[AuditRow]` | required | The rows to audit, consumed lazily; a caller can contain its own reading errors inside the iterable. |
 | `client` | - | required | A `MirrorClient` (or a stand-in with `resolve_aliases`, `lookup_alt_ids`, `existing_alt_ids`). |
 | `batch_alt_ids` | `int` | `DEFAULT_BATCH_ALT_IDS` (keyword-only) | Alt IDs accumulated before a batch goes to the mirror: three queries per batch whatever its size. |
-| `quarantine` | `str` | `"row"` (keyword-only) | `"row"` (BMRtoAltID's ruling): any identity finding withholds every Alt ID of the row, and the rest come back as `collateral`. `"alt_id"` (eidr-wikidata's writer): only the Alt ID in conflict is withheld. A finding with no Alt ID of its own (invalid asserted ID, unending alias chain, reviewer relation naming another record) withholds the row in both. Anything else raises ValueError. |
+| `quarantine` | `str` | `"row"` (keyword-only) | `"row"` (BMRtoAltID's ruling): any identity finding withholds every Alt ID of the row, and the rest come back as `collateral`. `"alt_id"` (eidr-wikidata's writer): only the Alt ID in conflict is withheld. A finding with no Alt ID of its own (invalid asserted ID, unending alias chain, deleted record, reviewer relation naming another record) withholds the row in both. Anything else raises ValueError. |
 | `multi_form_domains` | `frozenset[str] \| None` | `None` (keyword-only) | The Proprietary domains (lower-case) exempt from rule 6: pass `altidtool_io.multi_form_domains()`. None means unknown, and then only named types are checked. |
 | `contributed` | `Contributed \| None` | `None` (keyword-only) | The contribution-ledger gate, `contributed(eidr_id, alt) -> bool`: True means the value was contributed before and is not on the record now, so it is not offered again. Counted in `already_contributed`, not reported. |
 

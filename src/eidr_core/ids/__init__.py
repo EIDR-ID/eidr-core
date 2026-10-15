@@ -67,7 +67,16 @@ __all__ = ["ALPHABET", "CONTENT_ID_SUFFIX", "EIDR_CONTENT_ID_RE", "CONTENT_ID_SE
            "PARTY_ID_RE", "SERVICE_ID_RE", "USER_ID_RE",
            "PARTY_ID_SUFFIX", "SERVICE_ID_SUFFIX", "USER_ID_SUFFIX",
            "is_valid_party_id", "is_valid_service_id", "is_valid_user_id",
-           "category"]
+           "category", "TOMBSTONE_ID"]
+
+# The content tombstone (0.55.0). A deleted record becomes an alias of this
+# ID, so following an alias chain can end here, and the ID still resolves:
+# the tombstone is itself a valid record (mirror, 2026-10-15: status
+# 'valid', 11,812 records alias to it directly). A caller that writes to
+# wherever a chain ends must test for it, or it writes onto the tombstone.
+# eidr-wikidata, python-sdk and python-tools each spelled it out; the party
+# tombstone is 10.5237/0000-0000 and is not this.
+TOMBSTONE_ID = "10.5240/0000-0000-0000-0000-0000-X"
 
 # ISO 7064 Mod 37,36 works over base-36: digits then letters, in order.
 ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"

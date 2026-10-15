@@ -12,7 +12,8 @@ is formatting the findings into a report.
 The procedure, per row (BMRtoAltID's operator specification, 2026-08-26):
 
 1. If the row has an asserted EIDR ID, follow its alias chain and write to the
-   target instead.
+   target instead. A chain that ends at the tombstone (``ids.TOMBSTONE_ID``)
+   means the record was deleted: ``ASSERTED_ID_DELETED``, nothing written.
 2. An Alt ID with an EXPRESSED relation other than IsSameAs is not audited:
    it asserts no identity, so it cannot conflict with another record's.
    Blank is the registry default and means IsSameAs, so blank IS audited.
@@ -43,8 +44,8 @@ themselves in conflict come back as ``collateral`` so the caller can list
 them. ``"alt_id"``, eidr-wikidata's writer: an identity finding withholds
 only its own Alt ID. Either way a finding with no Alt ID of its own (the
 asserted ID is invalid, its alias chain does not end, the reviewer's relation
-names another record) leaves nothing to write against, so it withholds the
-row; rule 7 and the emission checks are always per Alt ID.
+names another record, the record was deleted) leaves nothing to write
+against, so it withholds the row; rule 7 and the emission checks are always per Alt ID.
 
 Rows are audited in batches so the mirror is queried three times per batch,
 not once per Alt ID (a 60k-row sheet at 200 Alt IDs a row is 12M lookups).
@@ -69,7 +70,7 @@ from eidr_core.altidtool_io import (
     is_identity_relation,
 )
 from eidr_core.db_schemas import assert_tables
-from eidr_core.ids import fault
+from eidr_core.ids import TOMBSTONE_ID, fault
 
 __all__ = [
     "ALT_ID_TABLES",
@@ -106,6 +107,7 @@ IS_SAME_AS = "IsSameAs"
 # stable); their descriptions and the report's columns stay with the caller.
 FINDING_CLASSES = frozenset({
     "INVALID_ASSERTED_ID", "ALIAS_DEPTH_EXCEEDED", "REVIEWER_RELATION_MISMATCH",
+    "ASSERTED_ID_DELETED",
     "MULTI_RECORD_ALT_ID", "ASSERTED_ID_MISMATCH", "ALT_IDS_DISAGREE",
     "SAME_KIND_CONFLICT", "UNASSERTED_RESOLVED", "REVIEWER_RELATION_APPLIED",
     "ALT_ID_RELATION_CONFLICT", "MISSING_ALT_ID_TYPE", "NON_ASCII_VALUE",
@@ -117,6 +119,7 @@ INFO_CLASSES = frozenset({"UNASSERTED_RESOLVED", "REVIEWER_RELATION_APPLIED"})
 # any of them withholds the row; the rest never do.
 _IDENTITY_CLASSES = frozenset({
     "INVALID_ASSERTED_ID", "ALIAS_DEPTH_EXCEEDED", "REVIEWER_RELATION_MISMATCH",
+    "ASSERTED_ID_DELETED",
     "MULTI_RECORD_ALT_ID", "ASSERTED_ID_MISMATCH", "ALT_IDS_DISAGREE",
     "SAME_KIND_CONFLICT",
 })
@@ -603,6 +606,17 @@ def _adjudicate(work: AuditRow, aliases: dict, matches: dict, existing: dict,
                 f"Alias chain from {work.asserted_id} did not "
                 f"terminate within the configured depth (reached "
                 f"{effective}); it may be cyclic.", effective))
+        elif effective == TOMBSTONE_ID:
+            # A deleted record aliases the tombstone, and the tombstone is a
+            # valid record, so without this test the row's Alt IDs would be
+            # written onto it (0.55.0; found measuring C1's premise).
+            findings.append(_find(
+                "ASSERTED_ID_DELETED", None,
+                f"{work.asserted_id} was deleted: it "
+                + (f"is an alias for the tombstone {TOMBSTONE_ID}"
+                   if resolution.depth else "is the tombstone")
+                + ". Nothing on the row is written; find the record that "
+                  "replaced it.", effective))
         elif resolution.depth:
             alias_followed = True
             alias_note = (f" (asserted {work.asserted_id} is an alias for "

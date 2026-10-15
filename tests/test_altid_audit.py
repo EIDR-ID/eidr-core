@@ -22,6 +22,7 @@ from eidr_core.altid_audit import (
     same_relation,
 )
 from eidr_core.altidtool_io import AltIdRow, emission_problem
+from eidr_core.ids import TOMBSTONE_ID
 
 E1 = "10.5240/7791-8534-2C23-9030-8610-5"
 E2 = "10.5240/FB57-D43B-1EED-CAD7-929C-N"
@@ -122,7 +123,7 @@ def test_rule_7_is_per_alt_id_and_presence_is_silent():
 def test_batch_size_and_the_single_row_form_never_change_an_answer():
     fake = Fake([(E2, "Proprietary", "a.com", "1", None),
                  (E1, "Proprietary", "c.com", "9", None)],
-                aliases={"10.5240/0000-0000-0000-0000-0000-X": E1})
+                aliases={E2: E1})
     C = AltId("Proprietary", "c.com", "8", "", "Alt ID 3")
     rows = [row(4, E1, A, B), row(5, E1, B), row(6, "", A), row(7, E2, C, B),
             row(8, E1, C)]
@@ -180,3 +181,17 @@ def test_emission_problem_order_and_wording():
     cls, detail = emission_problem(AltIdRow(E1, "Proprietary", "café", "a.com"))
     assert cls == "NON_ASCII_VALUE" and detail.startswith("Alt ID Value")
     assert emission_problem(AltIdRow(E1, "IMDB", "tt1")) is None
+
+
+def test_a_deleted_record_is_never_written_to():
+    # A deleted record aliases the tombstone, and the tombstone is a valid
+    # record: following the chain and writing there would put the row's Alt
+    # IDs on the tombstone (0.55.0). Asserting the tombstone itself is the
+    # same case.
+    fake = Fake(aliases={E1: TOMBSTONE_ID})
+    for asserted in (E1, TOMBSTONE_ID):
+        for mode in ("row", "alt_id"):
+            [r] = audit_rows([row(4, asserted, A, B)], fake, quarantine=mode)
+            assert [f.error_class for f in r.findings] == ["ASSERTED_ID_DELETED"]
+            assert r.additions == () and r.collateral == (A, B) and not r.clean
+            assert r.effective_id == TOMBSTONE_ID

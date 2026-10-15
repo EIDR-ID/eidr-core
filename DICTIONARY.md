@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.53.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.54.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,23 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.54.0 (2026-10-15)
+
+* **New module `eidr_core.altid_audit` (reconciliation C5):** the Alt-ID
+  audit ladder. `audit_rows(rows, client)` checks the Alt IDs a source
+  asserts for a record against the mirror (aliases, identity lookups, the
+  asserted record, rule 6, rule 7, emission) and returns per row the
+  AltIDTool lines safe to write and structured findings; `audit()` is the
+  one-record form and `MirrorClient` the batched mirror reader. Extracted
+  from BMRtoAltID's audit, with two parameters for the other writers:
+  `quarantine` (`"row"`, BMRtoAltID's ruling, or `"alt_id"`) and the
+  `contributed` ledger gate. Checked back to back against BMRtoAltID's own
+  audit on the live mirror: AltIDTool files and reports byte-identical on
+  every sheet run. Additive.
+* **New: `altidtool_io.emission_problem(row, *, source="")`**, the format's
+  two write checks (missing Type, non-ASCII), moved from BMRtoAltID so every
+  producer of the format can run them. Additive.
 
 ### 0.53.0 (2026-10-15)
 
@@ -346,6 +363,26 @@ edition's Changes entry.
 <!-- dict-index -->
 | Name | Kind | Does |
 |---|---|---|
+| [`eidr_core.altid_audit.audit`](#audit) | function | Audits one record's Alt IDs: `audit_rows` over a single `AuditRow`. |
+| [`eidr_core.altid_audit.audit_rows`](#audit_rows) | function | Audits rows in batches: aliases, identity lookups and the targets' existing Alt IDs are fetched once per batch, then each row is adjudicated. |
+| [`eidr_core.altid_audit.is_audited`](#is_audited) | function | Says whether the Alt ID asserts identity, so the audit tests it. |
+| [`eidr_core.altid_audit.is_single_form`](#is_single_form) | function | Every named type is single-form; a Proprietary Kind is unless its domain is exempt. |
+| [`eidr_core.altid_audit.kind_key`](#kind_key) | function | The R8 identity of an Alt ID: Kind plus value, a blank domain matching only blank. |
+| [`eidr_core.altid_audit.same_relation`](#same_relation) | function | Compares relations with blank and `IsSameAs` as one, otherwise case-insensitively. |
+| [`eidr_core.altid_audit.AliasResolution`](#aliasresolution-class) | class | Where an asserted EIDR ID actually points. |
+| [`eidr_core.altid_audit.AltId`](#altid-class) | class | One Alt ID as its source asserts it. |
+| [`eidr_core.altid_audit.AuditRow`](#auditrow-class) | class | One row to audit: the record it claims and the Alt IDs it carries. |
+| [`eidr_core.altid_audit.Finding`](#finding-class) | class | One thing the audit found. |
+| [`eidr_core.altid_audit.MirrorClient`](#mirrorclient-class) | class | Batched, read-only mirror queries, three per batch. |
+| [`eidr_core.altid_audit.MirrorError`](#mirrorerror-class) | class | Any failure talking to the mirror. |
+| [`eidr_core.altid_audit.RowAudit`](#rowaudit-class) | class | The audit of one row. |
+| [`eidr_core.altid_audit.ALT_ID_TABLES`](#alt_id_tables-constant) | constant | the two mirror tables of Alt IDs; `_self` is the default (Alt IDs are never inherited, so they hold the same values). |
+| [`eidr_core.altid_audit.DEFAULT_BATCH_ALT_IDS`](#default_batch_alt_ids-constant) | constant | Alt IDs per mirror batch. |
+| [`eidr_core.altid_audit.FINDING_CLASSES`](#finding_classes-constant) | constant | every class a `Finding` can carry. |
+| [`eidr_core.altid_audit.INFO_CLASSES`](#info_classes-constant) | constant | the two informational classes: something learned, not something wrong. |
+| [`eidr_core.altid_audit.IS_SAME_AS`](#is_same_as-constant) | constant | the identity relation's name; blank means the same. |
+| [`eidr_core.altid_audit.MIRROR_NEEDS`](#mirror_needs-constant) | constant | the mirror tables and columns the client reads, for `db_schemas.assert_tables`. |
+| [`eidr_core.altidtool_io.emission_problem`](#emission_problem) | function | Checks a line against the format's two constraints, in this order: `MISSING_ALT_ID_TYPE` (AltIDTool needs a Type; a defect to fix in the source), then `NON_ASCII_VALUE` (its input is ASCII; a transport limit), naming the first offending field. |
 | [`eidr_core.altidtool_io.format_line`](#format_line) | function | Composes one AltIDTool input line from its fields under the canonical variable-width rules. |
 | [`eidr_core.altidtool_io.identity_relation_sql`](#identity_relation_sql) | function | Returns the identity-relation test as a SQL condition for mirror queries. |
 | [`eidr_core.altidtool_io.is_identity_relation`](#is_identity_relation) | function | Tests whether an Alt ID with this relation is an identity link (altidtool-format rule 1: a blank relation means `IsSameAs`). |
@@ -590,7 +627,7 @@ edition's Changes entry.
 ## `eidr_core.altidtool_io`
 
 <!-- dict-module:eidr_core.altidtool_io -->
-Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 7 functions, 2 classes (declared by `__all__`).
+Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 8 functions, 2 classes (declared by `__all__`).
 <!-- /dict-module -->
 
 **Purpose.** The one implementation of the EIDR AltIDTool input-file line format: tab-separated `EIDR_ID, Type, Value[, Domain][, Relation]`, UTF-8, no header, 3 to 5 columns wide. It was extracted on 2026-08-04 from eidr-wikidata `bmr/altidtool.py` (the production feed generator) so that every producer composes lines the same way and every reader parses them the same way. Since spec v1.1 it also reads AltIDTool edit files (removal lines and `//` comments). Since v1.4 it also hosts the declared list of Proprietary domains exempt from rule 6 (`multi_form_domains`).
@@ -611,7 +648,7 @@ Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 7 functions, 2 cl
 
 **Used by.**
 <!-- dict-usedby:eidr_core.altidtool_io -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `format_line`, `is_identity_relation`, `multi_form_domains`
 * **eidr-dq**: `identity_relation_sql`
 * **eidr-imdb**: `AltIdRow`, `format_line`, `parse_line`, `write_lines`
@@ -795,6 +832,25 @@ Defined in `src/eidr_core/altidtool_io/__init__.py`.
 
 **Does.** Tests whether an Alt ID with this relation is an identity link (altidtool-format rule 1: a blank relation means `IsSameAs`). It is the one Python definition; `compare.cmp_alt_ids` uses it since 0.47.0. Do not write `relation in ("", "IsSameAs")` again: the copies across the portfolio are where this went wrong.
 
+### `emission_problem`
+
+<!-- dict:eidr_core.altidtool_io.emission_problem -->
+```python
+def emission_problem(row: AltIdRow, *, source: str = "") -> tuple[str, str] | None
+```
+
+Defined in `src/eidr_core/altidtool_io/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `row` | `AltIdRow` | required | The line to check. |
+| `source` | `str` | `""` (keyword-only) | Where the Alt ID came from (a BMR sheet's column header); when given, a missing-Type detail names that column's Domain. |
+
+**Returns** `tuple[str, str] | None` -- `(error_class, detail)`, or None when the line can be written.
+<!-- /dict -->
+
+**Does.** Checks a line against the format's two constraints, in this order: `MISSING_ALT_ID_TYPE` (AltIDTool needs a Type; a defect to fix in the source), then `NON_ASCII_VALUE` (its input is ASCII; a transport limit), naming the first offending field. Extracted from BMRtoAltID's `emit.py` (C5 item 13), because every producer of the format needs it. Run it before `format_line`; the audit already does.
+
 ## `eidr_core.bmr_io`
 
 <!-- dict-module:eidr_core.bmr_io -->
@@ -820,7 +876,7 @@ Source `src/eidr_core/bmr_io/__init__.py`. Public names: 21 functions, 9 classes
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `families_for`, `header_map`, `index_rows`, `read_headers`, `resolve_parent`, `template_for_creation_type`, `write_sheet`
 * **BMRtoAltID**: `ASSIGNED_ID_COLUMN`, `check_sheet`, `DATA_START`, `family_layout`, `fill_column`, `HEADER_ROW`, `open_sheet`, `ROW_ID_COLUMN`, `SHEET_TO_TEMPLATE`, `subset_rows`, `TemplateMismatch`, `TEMPLATES`
 * **eidr-dq**: `pad_groups`, `RepeatPlan`
@@ -1554,7 +1610,7 @@ Source `src/eidr_core/bmr_io/subset.py`. Public names: 1 function (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io.subset -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `required_headers`
 <!-- /dict-usedby -->
 
@@ -1600,7 +1656,7 @@ Source `src/eidr_core/codes/__init__.py`. Public names: 1 function, 1 constant (
 
 **Used by.**
 <!-- dict-usedby:eidr_core.codes -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **eidr-wikidata**: `normalize_country_code`
 <!-- /dict-usedby -->
 
@@ -1653,7 +1709,7 @@ Source `src/eidr_core/compare/__init__.py`. Public names: 20 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `cmp_alt_ids`, `COMPARATORS`, `FieldResult`, `set_params`
 * **De-Dupe UI**: `cmp_alt_ids`, `cmp_length`, `cmp_release_date`, `cmp_titles`, `fuzzy`
 <!-- /dict-usedby -->
@@ -2120,7 +2176,7 @@ Source `src/eidr_core/compare/nonlinear.py`. Public names: 3 functions (declared
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.nonlinear -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `accumulate`, `aggregate`, `corroborate`, (the module)
 * **De-Dupe UI**: `accumulate`
 <!-- /dict-usedby -->
@@ -2208,7 +2264,7 @@ Source `src/eidr_core/compare/spec.py`. Public names: 2 functions (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.spec -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_spec`, `spec_path`, (the module)
 <!-- /dict-usedby -->
 
@@ -2269,7 +2325,7 @@ Source `src/eidr_core/compare/states.py`. Public names: 4 functions (declared by
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.states -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `band`, `field_not_counted`, `field_states`, `ui_field_key`, (the module)
 <!-- /dict-usedby -->
 
@@ -2376,7 +2432,7 @@ Source `src/eidr_core/compare/titles.py`. Public names: 7 functions, 2 constants
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.titles -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `parse_part`, `parts_conflict`, `segments`, `select_titles`, `title_similarity`
 * **De-Dupe UI**: `COMBINATION_DIFFERS_QUALITY`, `parse_part`, `PART_AMBIGUOUS_QUALITY`, `parts_conflict`, `segments`, `title_similarity`
 * **LanguageTool**: `title_similarity`
@@ -2560,7 +2616,7 @@ Source `src/eidr_core/db_schemas/__init__.py`. Public names: 4 functions, 1 cons
 
 **Used by.**
 <!-- dict-usedby:eidr_core.db_schemas -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `assert_tables`, `contract_version`, `DATABASES`, `load_manifest`, `table_columns`
 * **BMRtoAltID**: `assert_tables`
 * **eidr-dq**: `assert_tables`, `contract_version`, `load_manifest`, `table_columns`
@@ -2686,7 +2742,7 @@ needs no extra.
 
 **Used by.**
 <!-- dict-usedby:eidr_core.dictionary -->
-No consumer imports it directly (scan of 2026-10-14).
+No consumer imports it directly (scan of 2026-10-15).
 <!-- /dict-usedby -->
 
 ### `changes`
@@ -2763,7 +2819,7 @@ Source `src/eidr_core/external/__init__.py`. Public names: 3 functions, 5 classe
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **eidr-dq**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `Entry`, `FactCache`, `FATAL`, `Key`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
 * **eidr-imdb**: `call_with_failover`, `endpoint_chain`, `FATAL`, `NEXT_ENDPOINT`, `OUTAGE`, `RETRY`
 * **eidr-wikidata**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `FactCache`, `FATAL`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
@@ -3003,7 +3059,7 @@ Source `src/eidr_core/external/failover.py`. Public names: 5 functions, 8 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external.failover -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `retry_after_seconds`
 * **eidr-imdb**: `DEFAULT_RATE_LIMIT_FLOOR`, `http_status`
 * **eidr-wikidata**: `http_status`, `is_bad_query_error`, `is_outage_error`, `retry_after_seconds`
@@ -3189,7 +3245,7 @@ Source `src/eidr_core/ids/__init__.py`. Public names: 8 functions, 10 constants 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ids -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `category`, `fault`, `find_content_ids`, `is_valid_eidr_id`
 * **BMRtoAltID**: `fault`
 * **De-Dupe UI**: `ALPHABET`, `check_character`, `is_valid_eidr_id`
@@ -3453,7 +3509,7 @@ Source `src/eidr_core/inheritance/__init__.py`. Public names: 6 functions, 1 cla
 
 **Used by.**
 <!-- dict-usedby:eidr_core.inheritance -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `build_full_record`, `provenance`, `RECORD_ATTRS`, `TitleConstructionError`, (the module)
 * **XML_to_JSON**: `build_full_base`, `INHERITABLE_FIELDS`, `is_absent`, `TitleConstructionError`
 <!-- /dict-usedby -->
@@ -3671,7 +3727,7 @@ Source `src/eidr_core/normalize/__init__.py`. Public names: 13 functions (declar
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `ascii_fold`, `cmp_key`, `days_between`, `nfkc`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **De-Dupe UI**: `ascii_fold`, `cmp_key`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **eidr-wikidata**: `norm_title`, `sanitize_field`
@@ -3943,7 +3999,7 @@ Source `src/eidr_core/normalize/aliases.py`. Public names: 2 functions, 1 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize.aliases -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `alias_name`, `alias_title`, `ORDINALS`
 <!-- /dict-usedby -->
 
@@ -4016,7 +4072,7 @@ Source `src/eidr_core/ordering/__init__.py`. Public names: 10 functions (declare
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ordering -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `altid_canonical_key`, `altid_collapsed_canonical_key`, `altid_display_key`, `altid_kind`, `is_shortdoi`, `title_bucket`, `title_sort_key`
 * **XML_to_JSON**: `altid_collapsed_canonical_key`, `title_sort_key`
 <!-- /dict-usedby -->
@@ -4239,7 +4295,7 @@ Source `src/eidr_core/registry/__init__.py`. Public names: 5 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.registry -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `get_registry_client`
 * **eidr-dq**: `build_registry_credentials`, `get_registry_client`
 * **eidr-wikidata**: `build_registry_credentials`, `CODE_SUCCESS`, `DEFAULT_REGISTRY`, `get_registry_client`, `OperationStatus`, `parse_operation_status`, `parse_operation_statuses`, `token_operation_status`
@@ -4419,7 +4475,7 @@ Source `src/eidr_core/secrets_loader/__init__.py`. Public names: 3 functions, 1 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.secrets_loader -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_local`
 * **BMRtoAltID**: `load_secrets`, `SecretsError`
 * **eidr-dq**: `load_secrets`, `SecretsError`
@@ -4533,7 +4589,7 @@ Source `src/eidr_core/vendor/__init__.py`. Public names: 3 functions, 3 classes,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.vendor -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **python-tools**: `check`, `load_manifest`, (the module)
 <!-- /dict-usedby -->
 
@@ -4696,7 +4752,7 @@ Source `src/eidr_core/verify/__init__.py`. Public names: 5 functions (declared b
 
 **Used by.**
 <!-- dict-usedby:eidr_core.verify -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **eidr-dq**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 * **eidr-wikidata**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 <!-- /dict-usedby -->
@@ -4832,7 +4888,7 @@ Source `src/eidr_core/bmr_map/__init__.py`. Public names: 8 functions, 3 constan
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_map -->
-Scan of 2026-10-14; regenerated at each release from the consumer trees.
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **XML_to_JSON**: `NEVER_PRODUCED`, `PRODUCED_BASES`, `record_from_row`, `row_from_record`
 <!-- /dict-usedby -->
 
@@ -5034,7 +5090,8 @@ Source `src/eidr_core/verdicts/__init__.py`. Public names: 8 functions, 3 classe
 
 **Used by.**
 <!-- dict-usedby:eidr_core.verdicts -->
-No consumer imports it directly (scan of 2026-10-14).
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
+* **BMRtoAltID**: `ASSESSMENT_COLUMN`, `clears_without_a_human`, `fill_map`, `HUMAN_REVIEW_COLUMN`, `NO_MATCH`, `Resolution`, `resolve_row`, `resolve_sheet`, `ResolveStats`, `reviewer_relation`, `STATUSES`, `summarize`, `TERMINAL_ASSESSMENTS`
 <!-- /dict-usedby -->
 
 ### `clears_without_a_human`
@@ -5308,6 +5365,353 @@ Defined in `src/eidr_core/verdicts/__init__.py`.
 Defined in `src/eidr_core/verdicts/__init__.py`.
 
 **Value** `TERMINAL_ASSESSMENTS = frozenset({ "Agree", "Agree: no match", "Disagree: all candidates rejected", })` -- clause one of the no-review rule; not the list of clearing verdicts.
+<!-- /dict -->
+
+## `eidr_core.altid_audit`
+
+<!-- dict-module:eidr_core.altid_audit -->
+Source `src/eidr_core/altid_audit/__init__.py`. Public names: 6 functions, 7 classes, 6 constants (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** The one shared Alt-ID audit: given the Alt IDs a source asserts for a record, check them against the mirror and say which are safe to send to AltIDTool, which are already there, and which conflict, and why. Reconciliation plan component C5, extracted 2026-10-15 from BMRtoAltID `bmr_altid/audit.py` and `mirror.py` on the interfaces ruled in eidr-core-ops `PHASE2-3-INTERFACES-2026-10-15.md`. BMRtoAltID audits through it since its adoption, and the release was checked back to back against BMRtoAltID's own audit on the live mirror: AltIDTool files and reports identical. The ladder: alias following, the identity lookups (IsSameAs or blank only), agreement with the asserted record, rule 6 (one identity value per single-form Kind), rule 7 (already on the record under another relation), and the AltIDTool emission checks. Input is Alt ID tuples, not sheet rows; reading a source and formatting a report stay with the caller.
+
+**Use it when.** 
+* You are about to write AltIDTool lines for Alt IDs a source asserts about a known record: `audit_rows` over your rows with a `MirrorClient` on your own mirror connection, then write `RowAudit.lines`.
+* One record at a time, a few times: `audit(eidr_id, alt_ids, conn=...)`.
+* You keep a contribution ledger (values offered before must not be offered again): pass `contributed`.
+* You want BMRtoAltID's per-row withholding (`quarantine="row"`, the default) or only the conflicting Alt ID withheld (`quarantine="alt_id"`).
+
+**Do not use it when.** 
+* The row has no confirmed record: an Alt ID match alone never confirms one. The audit reports `UNASSERTED_RESOLVED` and writes nothing; the confirmation is BMR-Review's (C4, `eidr_core.verdicts`, on the reviewed sheet).
+* You only need to format or parse an AltIDTool line: `altidtool_io`.
+* You need a record's status or alias chain for its own sake: that is C1 (`eidr_core.lookup`, not yet built); the client here follows aliases only to find where a line would be written.
+* Never call `audit` in a loop over many records: it costs three queries a call. Batch through `audit_rows`.
+
+**Used by.**
+<!-- dict-usedby:eidr_core.altid_audit -->
+No consumer imports it directly (scan of 2026-10-15).
+<!-- /dict-usedby -->
+
+### `audit`
+
+<!-- dict:eidr_core.altid_audit.audit -->
+```python
+def audit(eidr_id: str, alt_ids: Sequence[AltId], *, client=None, conn=None, quarantine: str = "row", multi_form_domains: frozenset[str] | None = None, contributed: Contributed | None = None) -> RowAudit
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `eidr_id` | `str` | required | The record to write to; `""` for none. Validated with `ids.fault` and upper-cased; an invalid ID is an `INVALID_ASSERTED_ID` finding. |
+| `alt_ids` | `Sequence[AltId]` | required | The Alt IDs the source asserts, any relation applied already. |
+| `client` | - | `None` (keyword-only) | A `MirrorClient`, or anything with its three batch methods. |
+| `conn` | - | `None` (keyword-only) | A DB-API connection to the mirror, used when no `client` is given to build a default `MirrorClient`. |
+| `quarantine` | `str` | `"row"` (keyword-only) | `"row"` or `"alt_id"`, as for `audit_rows`. |
+| `multi_form_domains` | `frozenset[str] \| None` | `None` (keyword-only) | As for `audit_rows`. |
+| `contributed` | `Contributed \| None` | `None` (keyword-only) | As for `audit_rows`. |
+
+**Returns** `RowAudit` -- the audit of the one record.
+<!-- /dict -->
+
+**Does.** Audits one record's Alt IDs: `audit_rows` over a single `AuditRow`. Raises ValueError with neither `client` nor `conn`.
+
+### `audit_rows`
+
+<!-- dict:eidr_core.altid_audit.audit_rows -->
+```python
+def audit_rows(rows: Iterable[AuditRow], client, *, batch_alt_ids: int = DEFAULT_BATCH_ALT_IDS, quarantine: str = "row", multi_form_domains: frozenset[str] | None = None, contributed: Contributed | None = None) -> Iterator[RowAudit]
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `rows` | `Iterable[AuditRow]` | required | The rows to audit, consumed lazily; a caller can contain its own reading errors inside the iterable. |
+| `client` | - | required | A `MirrorClient` (or a stand-in with `resolve_aliases`, `lookup_alt_ids`, `existing_alt_ids`). |
+| `batch_alt_ids` | `int` | `DEFAULT_BATCH_ALT_IDS` (keyword-only) | Alt IDs accumulated before a batch goes to the mirror: three queries per batch whatever its size. |
+| `quarantine` | `str` | `"row"` (keyword-only) | `"row"` (BMRtoAltID's ruling): any identity finding withholds every Alt ID of the row, and the rest come back as `collateral`. `"alt_id"` (eidr-wikidata's writer): only the Alt ID in conflict is withheld. A finding with no Alt ID of its own (invalid asserted ID, unending alias chain, reviewer relation naming another record) withholds the row in both. Anything else raises ValueError. |
+| `multi_form_domains` | `frozenset[str] \| None` | `None` (keyword-only) | The Proprietary domains (lower-case) exempt from rule 6: pass `altidtool_io.multi_form_domains()`. None means unknown, and then only named types are checked. |
+| `contributed` | `Contributed \| None` | `None` (keyword-only) | The contribution-ledger gate, `contributed(eidr_id, alt) -> bool`: True means the value was contributed before and is not on the record now, so it is not offered again. Counted in `already_contributed`, not reported. |
+
+**Returns** `Iterator[RowAudit]` -- one `RowAudit` per row, in input order.
+<!-- /dict -->
+
+**Does.** Audits rows in batches: aliases, identity lookups and the targets' existing Alt IDs are fetched once per batch, then each row is adjudicated. An unexpected error in one row comes back as that row's `error`; `MirrorError` propagates and ends the run.
+
+### `is_audited`
+
+<!-- dict:eidr_core.altid_audit.is_audited -->
+```python
+def is_audited(alt: AltId) -> bool
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `alt` | `AltId` | required | An Alt ID. |
+
+**Returns** `bool` -- True when its relation is blank or `IsSameAs`.
+<!-- /dict -->
+
+**Does.** Says whether the Alt ID asserts identity, so the audit tests it. Any other relation asserts none and passes untested. Delegates to `altidtool_io.is_identity_relation`.
+
+### `is_single_form`
+
+<!-- dict:eidr_core.altid_audit.is_single_form -->
+```python
+def is_single_form(alt: AltId, multi_form_domains: frozenset[str] | None) -> bool
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `alt` | `AltId` | required | An Alt ID. |
+| `multi_form_domains` | `frozenset[str] \| None` | required | The rule-6 exemptions, or None for unknown. |
+
+**Returns** `bool` -- True when rule 6 applies to its Kind.
+<!-- /dict -->
+
+**Does.** Every named type is single-form; a Proprietary Kind is unless its domain is exempt. With no set, a Proprietary Kind counts as exempt: a false conflict withholds a row, a missed one costs nothing the registry's own rules do not catch.
+
+### `kind_key`
+
+<!-- dict:eidr_core.altid_audit.kind_key -->
+```python
+def kind_key(alt: AltId) -> tuple[str, str, str]
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `alt` | `AltId` | required | An Alt ID. |
+
+**Returns** `tuple[str, str, str]` -- `(type, domain, value)`.
+<!-- /dict -->
+
+**Does.** The R8 identity of an Alt ID: Kind plus value, a blank domain matching only blank.
+
+### `same_relation`
+
+<!-- dict:eidr_core.altid_audit.same_relation -->
+```python
+def same_relation(existing: set[str], relation: str) -> bool
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `existing` | `set[str]` | required | The relations a record already carries the Alt ID under. |
+| `relation` | `str` | required | The relation the source asserts. |
+
+**Returns** `bool` -- True when they match.
+<!-- /dict -->
+
+**Does.** Compares relations with blank and `IsSameAs` as one, otherwise case-insensitively. The test behind rule 7.
+
+### `AliasResolution` (class)
+
+<!-- dict:eidr_core.altid_audit.AliasResolution -->
+```python
+class AliasResolution(NamedTuple)
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `target` | `str` | required | Where the chain ends (the ID itself when it is not an alias). |
+| `depth` | `int` | required | Hops followed. |
+| `exceeded` | `bool` | required | True when the chain hit the depth cap or cycled. |
+<!-- /dict -->
+
+**Does.** Where an asserted EIDR ID actually points.
+
+### `AltId` (class)
+
+<!-- dict:eidr_core.altid_audit.AltId -->
+```python
+class AltId(NamedTuple)
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `alt_type` | `str` | required | The AltIDTool Type, in the registry's casing (`IMDB`, `Proprietary`). |
+| `domain` | `str` | required | The domain for a Proprietary Kind; `""` for a named type. |
+| `value` | `str` | required | The identifier. |
+| `relation` | `str` | `""` | The asserted relation; blank means IsSameAs. |
+| `source` | `str` | `""` | Where the Alt ID came from (a sheet's column header), quoted in findings; no part in the audit. |
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `kind` | `def kind() -> tuple[str, str]` (property) | `(alt_type, domain)`: the Kind. |
+<!-- /dict -->
+
+**Does.** One Alt ID as its source asserts it. Field order is BMRtoAltID's, so its tuples pass unchanged.
+
+### `AuditRow` (class)
+
+<!-- dict:eidr_core.altid_audit.AuditRow -->
+```python
+class AuditRow(NamedTuple)
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `sheet_row` | `int` | required | Identifies the row to the caller; carried, not used. |
+| `row_id` | `str` | required | Identifies the row to the caller; carried, not used. |
+| `asserted_raw` | `str` | required | The asserted ID as the source gave it, quoted in findings. |
+| `asserted_id` | `str` | required | The valid asserted ID, upper-cased; `""` when absent or invalid. |
+| `asserted_invalid` | `bool` | required | True when the source asserted an ID that is not valid. |
+| `asserted_reason` | `str` | `""` | Why it is invalid (`ids.fault`'s text). |
+| `alt_ids` | `tuple[AltId, ...]` | `()` | The row's Alt IDs, any reviewer relation already applied. |
+| `reviewer_relation` | `str` | `""` | The reviewer's relation applied to the Alt IDs, for the `REVIEWER_RELATION_APPLIED` finding. |
+| `relation_overrides` | `tuple[str, ...]` | `()` | The `source`s whose own relation the reviewer's replaced. |
+| `reviewer_relation_mismatch` | `str` | `""` | When the reviewer's `RELATION:` line named a record other than the asserted one: the finding's detail. Withholds the row. |
+<!-- /dict -->
+
+**Does.** One row to audit: the record it claims and the Alt IDs it carries.
+
+### `Finding` (class)
+
+<!-- dict:eidr_core.altid_audit.Finding -->
+```python
+class Finding(NamedTuple)
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `error_class` | `str` | required | One of `FINDING_CLASSES`; BMRtoAltID's report vocabulary, spelling kept. |
+| `alt_id` | `AltId \| None` | required | The Alt ID it is about; None for a row-level finding. |
+| `detail` | `str` | required | Why, in words, for a report. |
+| `effective_id` | `str` | `""` | The record the row would be written to (after aliases); `""` when none. |
+| `relation` | `str` | `""` | The Alt ID's relation, or the reviewer's for `REVIEWER_RELATION_APPLIED`. |
+| `conflicting` | `tuple[str, ...]` | `()` | The records involved, sorted. |
+<!-- /dict -->
+
+**Does.** One thing the audit found. Severity is the caller's: `INFO_CLASSES` are informational.
+
+### `MirrorClient` (class)
+
+<!-- dict:eidr_core.altid_audit.MirrorClient -->
+```python
+class MirrorClient
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `__init__` | `def __init__(conn, *, alt_id_table: str = ALT_ID_TABLES[0], alias_status: str = "alias", max_alias_depth: int = 10)` | Wraps a DB-API connection; `alt_id_table` one of `ALT_ID_TABLES` (ValueError otherwise); `alias_status` the `content_core.status` of an alias; `max_alias_depth` the hop cap. |
+| `assert_schema` | `def assert_schema() -> None` | Raises when the mirror's schema contract lacks a table or column this needs (`MIRROR_NEEDS`); call at startup. |
+| `known_id_types` | `def known_id_types() -> dict[str, str]` | `{UPPERCASED type: the registry's casing}`, for a caller to canonicalise Types before the audit. |
+| `resolve_aliases` | `def resolve_aliases(eidr_ids: list[str]) -> dict[str, AliasResolution]` | Follows each ID's alias chain, capped and cycle-guarded. |
+| `lookup_alt_ids` | `def lookup_alt_ids(kinds: list[tuple[str, str, str]]) -> dict[tuple[str, str, str], set[str]]` | `{(type, domain, value): {content_id}}` over identity rows only, on the partial index's predicate verbatim. |
+| `existing_alt_ids` | `def existing_alt_ids(content_ids: list[str]) -> dict[str, dict[tuple[str, str, str], set[str]]]` | `{content_id: {(type, domain, value): {relation}}}`, every relation, NULL as `""`. |
+<!-- /dict -->
+
+**Does.** Batched, read-only mirror queries, three per batch. eidr-core declares no driver: open the connection yourself. Every query failure is a `MirrorError`.
+
+### `MirrorError` (class)
+
+<!-- dict:eidr_core.altid_audit.MirrorError -->
+```python
+class MirrorError(RuntimeError)
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+<!-- /dict -->
+
+**Does.** Any failure talking to the mirror. Never contained: it ends the run, because a run that went on would write rows that are clean only because their lookups never happened.
+
+### `RowAudit` (class)
+
+<!-- dict:eidr_core.altid_audit.RowAudit -->
+```python
+class RowAudit(NamedTuple)
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `row` | `AuditRow` | required | The row audited. |
+| `effective_id` | `str` | `""` | The record written to, after aliases; `""` when none. |
+| `additions` | `tuple[AltIdRow, ...]` | `()` | The lines safe to write, as `AltIdRow`s. |
+| `findings` | `tuple[Finding, ...]` | `()` | Everything found, in the order found. |
+| `collateral` | `tuple[AltId, ...]` | `()` | Under quarantine `"row"`: the Alt IDs withheld only because another on the row is in conflict. |
+| `clean` | `bool` | `False` | True when no finding questions which record the row is (rule 7 and emission findings do not). |
+| `error` | `BaseException \| None` | `None` | An unexpected exception contained to this row; when set, everything else is empty and the tallies zero. |
+| `audited` | `int` | `0` | Alt IDs tested for identity. |
+| `skipped` | `int` | `0` | Alt IDs passed untested (a relation other than IsSameAs). |
+| `already_present` | `int` | `0` | Alt IDs already on the record under the same relation: skipped silently. |
+| `relation_conflicts` | `int` | `0` | Alt IDs on the record under another relation: `ALT_ID_RELATION_CONFLICT`. |
+| `already_contributed` | `int` | `0` | Alt IDs the `contributed` gate held back. |
+| `alias_followed` | `bool` | `False` | True when the asserted ID was an alias and its target was used. |
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `lines` | `def lines() -> list[str]` (property) | `additions` as AltIDTool lines, without line ends. |
+<!-- /dict -->
+
+**Does.** The audit of one row.
+
+### `ALT_ID_TABLES` (constant)
+
+<!-- dict:eidr_core.altid_audit.ALT_ID_TABLES -->
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+**Value** `ALT_ID_TABLES = ("content_alternate_ids_self", "content_alternate_ids")` -- the two mirror tables of Alt IDs; `_self` is the default (Alt IDs are never inherited, so they hold the same values).
+<!-- /dict -->
+
+### `DEFAULT_BATCH_ALT_IDS` (constant)
+
+<!-- dict:eidr_core.altid_audit.DEFAULT_BATCH_ALT_IDS -->
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+**Value** `DEFAULT_BATCH_ALT_IDS = 20_000` -- Alt IDs per mirror batch.
+<!-- /dict -->
+
+### `FINDING_CLASSES` (constant)
+
+<!-- dict:eidr_core.altid_audit.FINDING_CLASSES -->
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+**Value** `FINDING_CLASSES = frozenset({ "INVALID_ASSERTED_ID", "ALIAS_DEPTH_EXCEEDED", "REVIEWER_RELATION_MISMATCH"...` -- every class a `Finding` can carry.
+<!-- /dict -->
+
+### `INFO_CLASSES` (constant)
+
+<!-- dict:eidr_core.altid_audit.INFO_CLASSES -->
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+**Value** `INFO_CLASSES = frozenset({"UNASSERTED_RESOLVED", "REVIEWER_RELATION_APPLIED"})` -- the two informational classes: something learned, not something wrong.
+<!-- /dict -->
+
+### `IS_SAME_AS` (constant)
+
+<!-- dict:eidr_core.altid_audit.IS_SAME_AS -->
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+**Value** `IS_SAME_AS = "IsSameAs"` -- the identity relation's name; blank means the same.
+<!-- /dict -->
+
+### `MIRROR_NEEDS` (constant)
+
+<!-- dict:eidr_core.altid_audit.MIRROR_NEEDS -->
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+**Value** `MIRROR_NEEDS = { "content_core": ["content_id", "status", "target_id"], "content_alternate_ids_self": ...` -- the mirror tables and columns the client reads, for `db_schemas.assert_tables`.
 <!-- /dict -->
 
 ## Specs and data files

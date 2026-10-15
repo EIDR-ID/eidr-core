@@ -158,8 +158,9 @@ def reviewer_relation(notes: object) -> tuple[str, str] | None:
 # Confidence` informs a human, not us; and `Human Review Notes` is read for
 # ONE thing -- its first line, when BMR-Review's Relation control wrote it
 # (their CONTRACT section 4, 2026-09-21): `RELATION: <EIDR ID> <Relation>`.
-# The parser lives in bmr_altid.extract, because the audit and standard
-# modes apply the same line to every Alt ID on the row (T8, 2026-09-23).
+# The parser is ``reviewer_relation`` above; applying the relation to every
+# Alt ID on the row (T8, 2026-09-23) is the caller's step before
+# ``altid_audit`` (C5 item 10).
 ASSESSMENT_COLUMN = "EIDR Assessment"
 PROPOSED_MATCH_COLUMN = "EIDR Proposed Match"
 HUMAN_REVIEW_COLUMN = "Human Review"

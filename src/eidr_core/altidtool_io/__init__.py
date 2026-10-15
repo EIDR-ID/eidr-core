@@ -33,7 +33,8 @@ from typing import NamedTuple
 __all__ = ["AltIdRow", "AltIdRemoval", "format_line", "write_lines", "parse_line",
            "multi_form_domains",
            "parse_edit_line",
-           "is_identity_relation", "identity_relation_sql"]
+           "is_identity_relation", "identity_relation_sql",
+           "emission_problem"]
 
 
 class AltIdRow(NamedTuple):
@@ -206,3 +207,40 @@ def identity_relation_sql(column: str = "relation") -> str:
         raise ValueError(f"not a SQL column identifier: {column!r}")
     return f"({column} IS NULL OR {column} = '' OR {column} = 'IsSameAs')"
 
+
+
+# -- fit to write (0.54.0, reconciliation C5) --------------------------------
+# Extracted from BMRtoAltID ``emit.emission_problem`` (content-sha1
+# 64cb667f788b). The two checks are constraints of THIS format, not of any one
+# producer: AltIDTool needs a Type, and its input is ASCII. Every producer of
+# the format needs them, so they live beside ``format_line``.
+
+_EMISSION_FIELDS = ("EIDR ID", "Alt ID Type", "Alt ID Value", "Alt ID Domain",
+                    "Alt ID Relation")
+
+
+def emission_problem(row: AltIdRow, *, source: str = "") -> tuple[str, str] | None:
+    """Why this line cannot be written, or ``None`` if it can.
+
+    Returns ``(error_class, detail)``, with ``error_class`` one of
+    ``MISSING_ALT_ID_TYPE`` and ``NON_ASCII_VALUE``. A missing Type is
+    reported first: it is a defect to fix in the source, where non-ASCII is a
+    limit of the transport. ``source`` names where the Alt ID came from (a
+    BMR sheet's column header); when given, the detail says the Type was to
+    come from that column's Domain, which is how a BMR sheet carries it.
+    """
+    if not row.alt_type:
+        if source:
+            detail = (f"Column {source!r} has a value but its Domain column is "
+                      f"empty, so no Alt ID Type can be derived.")
+        else:
+            detail = (f"Alt ID value {row.value!r} has no Alt ID Type; AltIDTool "
+                      f"requires one.")
+        return ("MISSING_ALT_ID_TYPE", detail)
+    for label, value in zip(_EMISSION_FIELDS, (row.eidr_id, row.alt_type, row.value,
+                                                row.domain, row.relation), strict=True):
+        if value and not value.isascii():
+            return ("NON_ASCII_VALUE",
+                    f"{label} contains non-ASCII characters ({value!r}); AltIDTool "
+                    f"input must be ASCII.")
+    return None

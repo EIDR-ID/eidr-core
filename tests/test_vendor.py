@@ -328,3 +328,27 @@ def test_real_bmr_map_closure_vendors_and_works_without_eidr_core(tmp_path, sour
     r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() == "ok"
+
+
+def test_real_verdicts_closure_vendors_and_works_without_eidr_core(tmp_path, source):
+    """C4 (0.53.0) is meant to be vendorable with bmr_io and ids."""
+    import shutil
+    pkg = source / "src" / "eidr_core"
+    for mod in ("verdicts", "bmr_io"):
+        shutil.copytree(_SRC / mod, pkg / mod, ignore=shutil.ignore_patterns("__pycache__"))
+    _git("-c", "user.email=t@t", "-c", "user.name=t", "add", "-A", cwd=source)
+    _git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "verdicts", cwd=source)
+    m = _manifest(tmp_path, source, ["verdicts", "bmr_io", "ids"])
+    sync(m, source_path=source)
+    code = (
+        "import sys\n"
+        "sys.modules['eidr_core'] = None\n"
+        f"sys.path.insert(0, {str(tmp_path / 'consumer' / 'src')!r})\n"
+        "from eidr._core.verdicts import resolve_row\n"
+        "row = {'EIDR Assessment': 'Accept: sole match',\n"
+        "       'EIDR Proposed Match': '10.5240/7791-8534-2C23-9030-8610-5'}\n"
+        "assert resolve_row(row, 4).status == 'CONFIRMED'\n"
+        "print('ok')\n")
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == "ok"

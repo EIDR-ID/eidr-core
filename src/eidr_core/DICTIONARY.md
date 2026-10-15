@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.52.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.53.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,16 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.53.0 (2026-10-15)
+
+* **New module `eidr_core.verdicts` (reconciliation C4):** reads BMR-Review's
+  verdicts off an assessed and reviewed sheet (`resolve_sheet`,
+  `resolve_row`, `fill_map`, `Resolution`). Extracted from BMRtoAltID's
+  resolver; its 60 verdict tests pass against this module and every assessed
+  sheet on this machine resolves identically. Two parameters added, each
+  defaulting to BMRtoAltID's behaviour: `assigned_id_role` (`"proposal"` for
+  a sheet that pre-fills the claimant) and `no_id_sentinels`. Additive.
 
 ### 0.52.0 (2026-10-15)
 
@@ -552,6 +562,24 @@ edition's Changes entry.
 | [`eidr_core.vendor.VendorError`](#vendorerror-class) | class | Signals that the manifest, the eidr-core source, or the vendored tree breaks the vendoring contract. |
 | [`eidr_core.vendor.MANIFEST_FILE`](#manifest_file-constant) | constant | File name of the hash manifest that `sync` writes in the target directory and `check` reads. |
 | [`eidr_core.vendor.SPEC_VERSION`](#spec_version-constant) | constant | Version of `specs/vendoring.md` this tool implements. |
+| [`eidr_core.verdicts.clears_without_a_human`](#clears_without_a_human) | function | Applies BMR-Review's own no-review rule as three clauses: one of `TERMINAL_ASSESSMENTS`, or starting with `Skip`, or starting with `Accept:` (prefix tests, so a new verdict in those families needs no change). |
+| [`eidr_core.verdicts.fill_map`](#fill_map) | function | Turns resolutions into what a sheet-fill step writes. |
+| [`eidr_core.verdicts.read_asserted_id`](#read_asserted_id) | function | Reads an `Assigned EIDR ID` or decided-ID cell: empty or a sentinel is absent; anything else must be a valid EIDR Content ID, or it is invalid (a typo never degrades to "unassigned"). |
+| [`eidr_core.verdicts.resolve_row`](#resolve_row) | function | Resolves one row: the human first (`Human Review` decides, `MATCH_NOT_LISTED` with no named record is UNRESOLVED, an unknown code is reported), then BMR-Review's three-clause rule, then the member check (role `member`), then the reviewer's `RELATION:` line (a line naming a different record holds the row). |
+| [`eidr_core.verdicts.resolve_sheet`](#resolve_sheet) | function | Resolves every data row (stops at the first blank first column). |
+| [`eidr_core.verdicts.reviewer_relation`](#reviewer_relation) | function | Reads BMR-Review's Relation control (its CONTRACT section 4). |
+| [`eidr_core.verdicts.summarize`](#summarize) | function | Counts resolutions by status. |
+| [`eidr_core.verdicts.trim`](#trim) | function | Normalises a cell for comparison. |
+| [`eidr_core.verdicts.AssertedId`](#assertedid-class) | class | The three outcomes of reading an ID cell, kept distinct because they lead to different places. |
+| [`eidr_core.verdicts.Resolution`](#resolution-class) | class | One row's resolution. |
+| [`eidr_core.verdicts.ResolveStats`](#resolvestats-class) | class | Counts of one sheet's resolutions. |
+| [`eidr_core.verdicts.ASSESSMENT_COLUMN`](#assessment_column-constant) | constant | the assessment column BMR-Review appends. |
+| [`eidr_core.verdicts.HUMAN_REVIEW_COLUMN`](#human_review_column-constant) | constant | the reviewer's code column. |
+| [`eidr_core.verdicts.NO_ID_SENTINELS`](#no_id_sentinels-constant) | constant | the BMR tool's cell values meaning "no EIDR ID" (operator 2026-08-26). |
+| [`eidr_core.verdicts.NO_MATCH`](#no_match-constant) | constant | the value BMR-Review writes for "no registry record is right". |
+| [`eidr_core.verdicts.NOTES_COLUMN`](#notes_column-constant) | constant | the reviewer's notes column, read only for its first `RELATION:` line. |
+| [`eidr_core.verdicts.STATUSES`](#statuses-constant) | constant | every status a resolution can carry: CONFIRMED, NO_MATCH, UNRESOLVED, NEEDS_REVIEW, NOT_CLEARED, INVALID. |
+| [`eidr_core.verdicts.TERMINAL_ASSESSMENTS`](#terminal_assessments-constant) | constant | clause one of the no-review rule; not the list of clearing verdicts. |
 | [`eidr_core.verify.compare_release_date`](#compare_release_date) | function | Compares a registered release date or year with an external release-date fact, honouring the fact's precision. |
 | [`eidr_core.verify.compare_runtime`](#compare_runtime) | function | Compares a registered runtime with the closest external runtime, within the larger of two tolerances. |
 | [`eidr_core.verify.compare_year_arbitration`](#compare_year_arbitration) | function | Reports which of a record's two disagreeing date fields an external release date supports. |
@@ -4985,6 +5013,302 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 <!-- /dict -->
 
 **Does.** Builds the standard record (the shape XML_to_JSON builds from the mirror, which `row_from_record` takes) from registry XML, on the standard library's ElementTree, so `bmr_map` stays vendorable. Values are as the XML states them, not normalised (`PT2H0M` stays `PT2H0M`); ShortDOI Alt IDs are kept (the caller decides); there is no `CreationType`, `DisplayName` or `ProvenanceMetadata`, which the blocks do not carry. Checked before release against XML_to_JSON's mirror export of the same 363 records: 722 of 722 rows equal, apart from the export's own rendering (duration normalisation, dropped ShortDOI, a Self `Status` the SelfDefined XML does not state). Not a substitute: the SDK codec (`eidr.codecs.xml.to_codec_dict`), whose MovieLabs JSON encoding differs in about 40 paths.
+
+## `eidr_core.verdicts`
+
+<!-- dict-module:eidr_core.verdicts -->
+Source `src/eidr_core/verdicts/__init__.py`. Public names: 8 functions, 3 classes, 7 constants (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** The one shared reading of BMR-Review's verdicts off an assessed and reviewed BMR sheet: per row, whether BMR-Review and its reviewer resolved it to an EIDR ID, to NO MATCH, or to nothing usable, and on whose authority. Reconciliation plan component C4, extracted 2026-10-15 from BMRtoAltID `bmr_altid/verdicts.py` (its T5a) on the interfaces ruled in eidr-core-ops `PHASE2-3-INTERFACES-2026-10-15.md`; BMRtoAltID's 60 verdict tests and every assessed sheet on this machine give identical results through both. Shared because eidr-imdb and eidr-wikidata read the same sheets back (R6), and a private reading is where the documented traps live.
+
+**Use it when.** 
+* You read a reviewed BMR sheet back: `resolve_sheet` (or `resolve_row` per row), then `fill_map` for `{sheet_row: eidr_id}` of the confirmed rows.
+* Your sheet pre-filled `Assigned EIDR ID` with the claimant ("is this pairing right?"): pass `assigned_id_role="proposal"`.
+* You need the reviewer's `RELATION:` line: `Resolution.relation` (or `reviewer_relation`).
+
+**Do not use it when.** 
+* You want AltIDTool lines: that is the audit ladder (C5), run on the confirmed rows.
+* You want BMR-Review's no-review rule as a list of verdicts: it is a rule (`clears_without_a_human`), and enumerating it is the documented defect.
+* Never read `EIDR Proposed Match` yourself before knowing the human did not decide: under `MATCH_NOT_LISTED` a blank `Human Reviewed Match` means "not among those shown", not "use the proposal".
+
+**Used by.**
+<!-- dict-usedby:eidr_core.verdicts -->
+No consumer imports it directly (scan of 2026-10-14).
+<!-- /dict-usedby -->
+
+### `clears_without_a_human`
+
+<!-- dict:eidr_core.verdicts.clears_without_a_human -->
+```python
+def clears_without_a_human(assessment: str) -> bool
+```
+
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `assessment` | `str` | required | The row's `EIDR Assessment`. |
+
+**Returns** `bool` -- True when BMR-Review clears the row without a reviewer.
+<!-- /dict -->
+
+**Does.** Applies BMR-Review's own no-review rule as three clauses: one of `TERMINAL_ASSESSMENTS`, or starting with `Skip`, or starting with `Accept:` (prefix tests, so a new verdict in those families needs no change).
+
+### `fill_map`
+
+<!-- dict:eidr_core.verdicts.fill_map -->
+```python
+def fill_map(resolutions: list[Resolution]) -> dict[int, str]
+```
+
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `resolutions` | `list[Resolution]` | required | Resolutions from `resolve_sheet`. |
+
+**Returns** `dict[int, str]` -- `{sheet_row: resolved_id}` for the CONFIRMED rows only.
+<!-- /dict -->
+
+**Does.** Turns resolutions into what a sheet-fill step writes.
+
+### `read_asserted_id`
+
+<!-- dict:eidr_core.verdicts.read_asserted_id -->
+```python
+def read_asserted_id(cell: object, sentinels: Collection[str] = NO_ID_SENTINELS) -> AssertedId
+```
+
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `cell` | `object` | required | An ID cell's value (any type). |
+| `sentinels` | `Collection[str]` | `NO_ID_SENTINELS` | The values that mean "no ID"; widen with a union, never narrow. |
+
+**Returns** `AssertedId` -- absent, valid (value upper-cased) or invalid (with `reason` from `ids.fault`).
+<!-- /dict -->
+
+**Does.** Reads an `Assigned EIDR ID` or decided-ID cell: empty or a sentinel is absent; anything else must be a valid EIDR Content ID, or it is invalid (a typo never degrades to "unassigned").
+
+### `resolve_row`
+
+<!-- dict:eidr_core.verdicts.resolve_row -->
+```python
+def resolve_row(row: dict, sheet_row: int, *, require_human: bool = False, assigned_id_role: str = "member", no_id_sentinels: Collection[str] = NO_ID_SENTINELS) -> Resolution
+```
+
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `row` | `dict` | required | One assessed and reviewed row, keyed by column header. |
+| `sheet_row` | `int` | required | The row's sheet row number, carried into the result. |
+| `require_human` | `bool` | `False` (keyword-only) | True holds a row BMR-Review cleared without a reviewer as `NOT_CLEARED` (the opt-out; the operator ruled 2026-09-12 that BMR-Review's clearance is accepted). |
+| `assigned_id_role` | `str` | `"member"` (keyword-only) | `"member"`: a valid ID already in `Assigned EIDR ID` is a member's assertion, and a different confirmed record becomes UNRESOLVED. `"proposal"`: the column holds the claimant, and the reviewer's choice is the answer. |
+| `no_id_sentinels` | `Collection[str]` | `NO_ID_SENTINELS` (keyword-only) | The cell values that mean "no ID". |
+
+**Returns** `Resolution` -- what the row resolved to, on whose authority.
+<!-- /dict -->
+
+**Does.** Resolves one row: the human first (`Human Review` decides, `MATCH_NOT_LISTED` with no named record is UNRESOLVED, an unknown code is reported), then BMR-Review's three-clause rule, then the member check (role `member`), then the reviewer's `RELATION:` line (a line naming a different record holds the row). Pure.
+
+### `resolve_sheet`
+
+<!-- dict:eidr_core.verdicts.resolve_sheet -->
+```python
+def resolve_sheet(path: str, sheet: str, *, require_human: bool = False, assigned_id_role: str = "member", no_id_sentinels: Collection[str] = NO_ID_SENTINELS) -> list[Resolution]
+```
+
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `path` | `str` | required | The workbook. |
+| `sheet` | `str` | required | The data tab. |
+| `require_human` | `bool` | `False` (keyword-only) | As for `resolve_row`. |
+| `assigned_id_role` | `str` | `"member"` (keyword-only) | As for `resolve_row`. |
+| `no_id_sentinels` | `Collection[str]` | `NO_ID_SENTINELS` (keyword-only) | As for `resolve_row`. |
+
+**Returns** `list[Resolution]` -- one `Resolution` per data row.
+<!-- /dict -->
+
+**Does.** Resolves every data row (stops at the first blank first column). Raises ValueError when the tab has no `EIDR Assessment` column: not an assessed sheet.
+
+### `reviewer_relation`
+
+<!-- dict:eidr_core.verdicts.reviewer_relation -->
+```python
+def reviewer_relation(notes: object) -> tuple[str, str] | None
+```
+
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `notes` | `object` | required | The `Human Review Notes` cell. |
+
+**Returns** `tuple[str, str] | None` -- `(eidr_id, relation)` from a first line `RELATION: <ID> <Relation>`, else None.
+<!-- /dict -->
+
+**Does.** Reads BMR-Review's Relation control (its CONTRACT section 4). Only the first line is examined.
+
+### `summarize`
+
+<!-- dict:eidr_core.verdicts.summarize -->
+```python
+def summarize(resolutions: list[Resolution]) -> ResolveStats
+```
+
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `resolutions` | `list[Resolution]` | required | Resolutions. |
+
+**Returns** `ResolveStats` -- rows read and counts by status.
+<!-- /dict -->
+
+**Does.** Counts resolutions by status.
+
+### `trim`
+
+<!-- dict:eidr_core.verdicts.trim -->
+```python
+def trim(v: object) -> str
+```
+
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `v` | `object` | required | Any cell value. |
+
+**Returns** `str` -- the value as a stripped string; `None` is `""`.
+<!-- /dict -->
+
+**Does.** Normalises a cell for comparison.
+
+### `AssertedId` (class)
+
+<!-- dict:eidr_core.verdicts.AssertedId -->
+```python
+class AssertedId
+```
+
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `__init__` | `def __init__(raw: str, value: str = "", invalid: bool = False, reason: str = "")` | Builds the result; `value` is the canonical ID when valid. |
+| `absent` | `def absent() -> bool` (property) | True when the cell held no ID (neither valid nor invalid). |
+<!-- /dict -->
+
+**Does.** The three outcomes of reading an ID cell, kept distinct because they lead to different places.
+
+### `Resolution` (class)
+
+<!-- dict:eidr_core.verdicts.Resolution -->
+```python
+class Resolution(NamedTuple)
+```
+
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `sheet_row` | `int` | required | Sheet row number. |
+| `row_id` | `str` | required | The row's `Unique Row ID`. |
+| `status` | `str` | required | One of `STATUSES`. |
+| `resolved_id` | `str` | required | The EIDR ID, only when CONFIRMED. |
+| `source` | `str` | required | The column or code that decided it. |
+| `assessment` | `str` | required | `EIDR Assessment`, verbatim. |
+| `human_review` | `str` | required | `Human Review`, verbatim. |
+| `merged_ids` | `tuple[str, ...]` | required | The merged IDs, for `DUPLICATES_MERGE` only. |
+| `detail` | `str` | required | Why, in words, for a report. |
+| `relation` | `str` | `""` | The reviewer's clarifying relation, or `""` when the row is the IsSameAs claimant. |
+<!-- /dict -->
+
+**Does.** One row's resolution.
+
+### `ResolveStats` (class)
+
+<!-- dict:eidr_core.verdicts.ResolveStats -->
+```python
+class ResolveStats(NamedTuple)
+```
+
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `rows_read` | `int` | required | Rows read. |
+| `by_status` | `dict[str, int]` | required | Counts by status. |
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `confirmed` | `def confirmed() -> int` (property) | CONFIRMED rows. |
+| `findings` | `def findings() -> int` (property) | UNRESOLVED plus INVALID rows: what a human must look at. |
+<!-- /dict -->
+
+**Does.** Counts of one sheet's resolutions.
+
+### `ASSESSMENT_COLUMN` (constant)
+
+<!-- dict:eidr_core.verdicts.ASSESSMENT_COLUMN -->
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+**Value** `ASSESSMENT_COLUMN = "EIDR Assessment"` -- the assessment column BMR-Review appends.
+<!-- /dict -->
+
+### `HUMAN_REVIEW_COLUMN` (constant)
+
+<!-- dict:eidr_core.verdicts.HUMAN_REVIEW_COLUMN -->
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+**Value** `HUMAN_REVIEW_COLUMN = "Human Review"` -- the reviewer's code column.
+<!-- /dict -->
+
+### `NO_ID_SENTINELS` (constant)
+
+<!-- dict:eidr_core.verdicts.NO_ID_SENTINELS -->
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+**Value** `NO_ID_SENTINELS = frozenset({"candidates found", "no match"})` -- the BMR tool's cell values meaning "no EIDR ID" (operator 2026-08-26).
+<!-- /dict -->
+
+### `NO_MATCH` (constant)
+
+<!-- dict:eidr_core.verdicts.NO_MATCH -->
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+**Value** `NO_MATCH = "NO MATCH"` -- the value BMR-Review writes for "no registry record is right".
+<!-- /dict -->
+
+### `NOTES_COLUMN` (constant)
+
+<!-- dict:eidr_core.verdicts.NOTES_COLUMN -->
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+**Value** `NOTES_COLUMN = "Human Review Notes"` -- the reviewer's notes column, read only for its first `RELATION:` line.
+<!-- /dict -->
+
+### `STATUSES` (constant)
+
+<!-- dict:eidr_core.verdicts.STATUSES -->
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+**Value** `STATUSES = ( "CONFIRMED", # a resolved EIDR ID exists and validates -> fill it "NO_MATCH", # resol...` -- every status a resolution can carry: CONFIRMED, NO_MATCH, UNRESOLVED, NEEDS_REVIEW, NOT_CLEARED, INVALID.
+<!-- /dict -->
+
+### `TERMINAL_ASSESSMENTS` (constant)
+
+<!-- dict:eidr_core.verdicts.TERMINAL_ASSESSMENTS -->
+Defined in `src/eidr_core/verdicts/__init__.py`.
+
+**Value** `TERMINAL_ASSESSMENTS = frozenset({ "Agree", "Agree: no match", "Disagree: all candidates rejected", })` -- clause one of the no-review rule; not the list of clearing verdicts.
+<!-- /dict -->
 
 ## Specs and data files
 

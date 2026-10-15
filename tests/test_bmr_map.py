@@ -290,3 +290,103 @@ def test_language_mode_is_read_back_into_its_family(template, family, key):
     back = M.row_from_record(M.record_from_row(row, template), template)
     pairs = {(back[f"{family} {i}"], back.get(f"Language Mode {i}")) for i in (1, 2, 3)}
     assert pairs == {("de", None), ("en", "Audio"), ("fr", "Visual")}
+
+
+# ── registry XML -> standard record (0.52.0; BMR-Review T20) ────────────────
+# Differentially checked before release: for 363 registry records (60 each of
+# Basic, Series, Season, Episode, Edit, Manifestation, chosen for group 2+ of
+# every family), row_from_record(record_from_xml(resolve XML)) equals
+# row_from_record(XML_to_JSON's mirror export) on 722 of 722 rows (self and
+# full), except where XML_to_JSON's rendering differs from the XML itself:
+# duration normalisation (PT0H vs PT0S), ShortDOI (the export drops it) and a
+# Self Status the SelfDefined XML does not state.
+
+_MSG = """<Message xmlns="http://www.eidr.org/schema"
+ xmlns:md="http://www.movielabs.com/schema/md/v2.8/md"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><Operation name="create">
+<FullMetadata><BaseObjectData><ID>10.5240/AAAA-0000-0000-0000-0000-A</ID>
+<StructuralType>Abstraction</StructuralType><Mode>AudioVisual</Mode>
+<ReferentType>TV</ReferentType>
+<ResourceName lang="en" titleClass="release">Pilot</ResourceName>
+<AlternateResourceName lang="fr" titleClass="translated">Le Pilote</AlternateResourceName>
+<OriginalLanguage mode="Audio">en</OriginalLanguage><OriginalLanguage>fr</OriginalLanguage>
+<AssociatedOrg idType="EIDRPartyID" organizationID="10.5237/B03D-06E1" role="producer">
+<md:DisplayName>Org One</md:DisplayName><md:AlternateName>Org 1</md:AlternateName>
+</AssociatedOrg>
+<AssociatedOrg role="broadcaster"><md:DisplayName>Org Two</md:DisplayName></AssociatedOrg>
+<ReleaseDate>2017-02-01</ReleaseDate><CountryOfOrigin>US</CountryOfOrigin>
+<CountryOfOrigin>FR</CountryOfOrigin>
+<Status>valid</Status><ApproximateLength>PT1H0M</ApproximateLength>
+<AlternateID xsi:type="IMDB">tt0000001</AlternateID>
+<AlternateID domain="example.org" xsi:type="Proprietary" relation="IsSameAs">X1</AlternateID>
+<AlternateID xsi:type="ShortDOI">10/abcd</AlternateID>
+<Administrators><Registrant>10.5237/REG1</Registrant>
+<MetadataAuthority>10.5237/MA1</MetadataAuthority></Administrators>
+<Credits><Director><md:DisplayName>D One</md:DisplayName></Director>
+<Actor><md:DisplayName>A One</md:DisplayName></Actor><Actor>
+<md:DisplayName>A Two</md:DisplayName></Actor></Credits>
+<Description lang="en">A test</Description></BaseObjectData>
+<ExtraObjectMetadata><EpisodeInfo><Parent>10.5240/BBBB-0000-0000-0000-0000-B</Parent>
+<SequenceInfo><md:DistributionNumber domain="rovicorp.com">1</md:DistributionNumber>
+<md:HouseSequence domain="rovicorp.com">101</md:HouseSequence>
+<md:AlternateNumber domain="x.com">7</md:AlternateNumber></SequenceInfo></EpisodeInfo>
+</ExtraObjectMetadata>
+</FullMetadata>
+<SelfDefinedMetadata><BaseObjectData><ID>10.5240/AAAA-0000-0000-0000-0000-A</ID>
+<StructuralType>Abstraction</StructuralType>
+<ResourceName lang="en" titleClass="release">Pilot</ResourceName>
+</BaseObjectData></SelfDefinedMetadata></Operation></Message>"""
+
+
+def test_record_from_xml_builds_the_standard_shape():
+    rec = M.record_from_xml(_MSG)
+    base = rec["FullMetadata"]["BaseObjectData"]
+    assert base["ResourceName"] == [
+        {"Title": "Pilot", "TitleClass": "release", "_lang": "en"},
+        {"Title": "Le Pilote", "TitleClass": "translated", "_lang": "fr",
+         "SystemGenerated": "false"}]
+    assert base["OriginalLanguage"] == [{"value": "en", "_mode": "Audio"}, "fr"]
+    assert base["AssociatedOrg"][0] == {
+        "_idType": "EIDRPartyID", "_organizationID": "10.5237/B03D-06E1",
+        "_role": "producer", "DisplayName": "Org One", "AlternateName": ["Org 1"]}
+    assert base["AlternateID"][0] == {"AltID": "tt0000001", "Type": "IMDB"}
+    # kept: whether a ShortDOI belongs in a registration is the caller's policy
+    assert {"AltID": "10/abcd", "Type": "ShortDOI"} in base["AlternateID"]
+    assert base["Administrators"] == {"Registrant": "10.5237/REG1",
+                                      "MetadataAuthority": ["10.5237/MA1"]}
+    seq = rec["FullMetadata"]["ExtraObjectMetadata"]["EpisodeInfo"]["SequenceInfo"]
+    assert seq == {"DistributionNumber": {"Number": "1", "Domain": "rovicorp.com"},
+                   "HouseSequence": {"Number": "101", "Domain": "rovicorp.com"},
+                   "AlternateNumber": [{"Number": "7", "Domain": "x.com"}]}
+    assert rec["SelfDefinedMetadata"]["BaseObjectData"]["ResourceName"] == [
+        {"Title": "Pilot", "TitleClass": "release", "_lang": "en"}]
+
+
+def test_record_from_xml_feeds_row_from_record():
+    row = M.row_from_record(M.record_from_xml(_MSG), "episodic", source="full")
+    assert row["IMDb"] == "tt0000001"
+    assert (row["Alt ID 1"], row["Domain 1"]) == ("X1", "example.org")
+    assert row["Parent EIDR/Row ID"] == "10.5240/BBBB-0000-0000-0000-0000-B"
+    assert (row["Distribution No."], row["Alternate No. 1"]) == ("1", "7")
+    assert row["Language Mode 1"] == "Audio" and row["Original Language 2"] == "fr"
+    assert (row["Associated Org 2"], row["Actor 2"]) == ("Org Two", "A Two")
+    assert row["Metadata Authority Party ID 1"] == "10.5237/MA1"
+
+
+def test_record_from_xml_reads_one_block_and_edit_details():
+    xml = ('<FullMetadata xmlns="http://www.eidr.org/schema">'
+           '<BaseObjectData><ID>x</ID></BaseObjectData>'
+           '<ExtraObjectMetadata><EditInfo><Parent>p</Parent><EditClass>a</EditClass>'
+           '<EditDetails domain="d1">one</EditDetails><EditDetails domain="d2">two</EditDetails>'
+           '</EditInfo></ExtraObjectMetadata></FullMetadata>')
+    rec = M.record_from_xml(xml)
+    assert set(rec) == {"FullMetadata"}
+    ei = rec["FullMetadata"]["ExtraObjectMetadata"]["EditInfo"]
+    assert ei == {"Parent": "p", "EditClass": ["a"],
+                  "Details": [{"Details": "one", "Domain": "d1"},
+                              {"Details": "two", "Domain": "d2"}]}
+
+
+def test_record_from_xml_refuses_xml_without_a_block():
+    with pytest.raises(ValueError):
+        M.record_from_xml("<Message xmlns='http://www.eidr.org/schema'/>")

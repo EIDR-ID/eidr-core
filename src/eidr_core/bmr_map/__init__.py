@@ -42,6 +42,7 @@ Stdlib only, plus ``bmr_io`` (for ``family_layout``) and ``inheritance``
 from __future__ import annotations
 
 import re
+import xml.etree.ElementTree as ET
 from collections.abc import Iterable, Mapping
 from typing import Any
 
@@ -51,7 +52,7 @@ from eidr_core.inheritance import is_absent
 __all__ = ["SUPPORTED_TEMPLATES", "PRODUCED_BASES", "NEVER_PRODUCED", "header_base",
            "select_blocks", "administrators_of",
            "row_from_blocks", "row_from_record",
-           "creation_type_from_row", "record_from_row"]
+           "creation_type_from_row", "record_from_row", "record_from_xml"]
 
 # Template keys are bmr_io.TEMPLATES keys. Compilation has a Template-22
 # sheet, but this mapper cannot populate its Header/Entry structure, so it is
@@ -781,3 +782,216 @@ def record_from_row(row: Mapping[str, Any], template: str) -> dict:
             "ExtraObjectMetadata": _extra_from_row(row, template, creation_type),
         },
     })
+
+
+# --------------------------------------------------------------------------
+# Registry XML -> standard record (0.52.0; BMR-Review T20, python-tools)
+# --------------------------------------------------------------------------
+#
+# The "standard record" is the shape XML_to_JSON builds from the mirror; this
+# builds the same shape from the registry's own XML, so a consumer holding XML
+# (the API Shim's messages, a resolve result) can call row_from_record without
+# a private reader. Stdlib ElementTree, so the module stays vendorable. The
+# SDK's codec (eidr.codecs.xml) parses the same XML but yields the MovieLabs
+# JSON encoding, which differs in about 40 paths (md:DisplayName, _xsi:type,
+# list-valued Parent, EditDetails, md:DistributionNumber with value), so it is
+# not a substitute for this shape.
+
+def _local(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def _attr(el: ET.Element, name: str) -> str | None:
+    """An attribute by local name (namespaced ones, such as xsi:type, arrive
+    as '{uri}type')."""
+    for k, v in el.attrib.items():
+        if _local(k) == name:
+            return v
+    return None
+
+
+def _kids(el: ET.Element, name: str) -> list[ET.Element]:
+    return [c for c in el if _local(c.tag) == name]
+
+
+def _kid_text(el: ET.Element, name: str) -> str | None:
+    found = _kids(el, name)
+    return found[0].text if found else None
+
+
+def _language(el: ET.Element) -> Any:
+    mode = _attr(el, "mode")
+    return {"value": el.text, "_mode": mode} if mode else el.text
+
+
+# Children that the schema repeats, so a single occurrence is still a list,
+# as XML_to_JSON emits them.
+_LIST_TAGS = {"SeasonClass", "EpisodeClass", "EditClass", "MadeForRegion",
+              "ManifestationClass", "Entry", "Element"}
+_DETAILS_TAGS = {"EditDetails", "ManifestationDetails", "Details"}
+_LIGHTWEIGHT = {"AlternateContentInfo", "PackagingInfo", "PromotionInfo",
+                "SupplementalContentInfo"}
+
+
+def _number(el: ET.Element) -> dict:
+    return {"Number": el.text, "Domain": _attr(el, "domain")}
+
+
+def _generic(el: ET.Element) -> Any:
+    """An element with no special rule: its text; or a dict of its children
+    (a repeated or _LIST_TAGS child becomes a list) and attributes (as
+    '_name'), with the text as 'value' when it has attributes too."""
+    children = list(el)
+    attrs = {f"_{_local(k)}": v for k, v in el.attrib.items()}
+    if not children:
+        if attrs:
+            return {"value": el.text, **attrs} if el.text is not None else attrs
+        return el.text
+    out: dict[str, Any] = dict(attrs)
+    for c in children:
+        name = _local(c.tag)
+        val = _generic(c)
+        if name in out:
+            if not isinstance(out[name], list):
+                out[name] = [out[name]]
+            out[name].append(val)
+        else:
+            out[name] = [val] if name in _LIST_TAGS else val
+    return out
+
+
+def _info(el: ET.Element) -> dict:
+    """One ExtraObjectMetadata *Info block in the standard shape."""
+    out: dict[str, Any] = {}
+    for c in el:
+        name = _local(c.tag)
+        if name in _DETAILS_TAGS:
+            out.setdefault("Details", []).append(
+                {"Details": c.text, "Domain": _attr(c, "domain")})
+        elif name == "SequenceInfo":
+            seq: dict[str, Any] = {}
+            for n in c:
+                key = _local(n.tag)
+                if key == "AlternateNumber":
+                    seq.setdefault("AlternateNumber", []).append(_number(n))
+                elif key in ("DistributionNumber", "HouseSequence"):
+                    seq[key] = _number(n)
+                else:
+                    seq[key] = _generic(n)
+            out["SequenceInfo"] = seq
+        elif name == "Digital":
+            # Carried as XML text, XML_to_JSON's shape; row_from_blocks
+            # writes it to Operator's Notes on one line.
+            out["Digital"] = ET.tostring(c, encoding="unicode")
+        elif name in _LIST_TAGS:
+            out.setdefault(name, []).append(_generic(c))
+        elif name in out:
+            if not isinstance(out[name], list):
+                out[name] = [out[name]]
+            out[name].append(_generic(c))
+        else:
+            out[name] = _generic(c)
+    return out
+
+
+def _base_from_xml(bod: ET.Element) -> dict:
+    titles: list[dict] = []
+    for t in _kids(bod, "ResourceName"):
+        titles.append({"Title": t.text, "TitleClass": _attr(t, "titleClass"),
+                       "_lang": _attr(t, "lang"),
+                       "SystemGenerated": _attr(t, "systemGenerated")})
+    for t in _kids(bod, "AlternateResourceName"):
+        # XML_to_JSON marks every alternate SystemGenerated "false" (the
+        # conversion table's note for alternates); kept, so both agree.
+        titles.append({"Title": t.text, "TitleClass": _attr(t, "titleClass"),
+                       "_lang": _attr(t, "lang"), "SystemGenerated": "false"})
+    orgs = []
+    for o in _kids(bod, "AssociatedOrg"):
+        names = [n.text for n in _kids(o, "DisplayName") + _kids(o, "AlternateName") if n.text]
+        orgs.append({"_idType": _attr(o, "idType"),
+                     "_organizationID": _attr(o, "organizationID"),
+                     "_role": _attr(o, "role"),
+                     "DisplayName": names[0] if names else None,
+                     "AlternateName": names[1:]})
+    alt_ids = [{"AltID": a.text, "Type": _attr(a, "type"), "Domain": _attr(a, "domain"),
+                "Relation": _attr(a, "relation")} for a in _kids(bod, "AlternateID")]
+    admins: dict[str, Any] = {}
+    for a_el in _kids(bod, "Administrators")[:1]:
+        admins = {"Registrant": _kid_text(a_el, "Registrant"),
+                  "MetadataAuthority": [m.text for m in _kids(a_el, "MetadataAuthority")]}
+    credits: dict[str, list] = {}
+    for c_el in _kids(bod, "Credits"):
+        for role in ("Director", "Actor"):
+            for person in _kids(c_el, role):
+                credits.setdefault(role, []).append(
+                    {"DisplayName": _kid_text(person, "DisplayName"),
+                     "SortName": _kid_text(person, "SortName")})
+    desc = _kids(bod, "Description")
+    return {
+        "ID": _kid_text(bod, "ID"),
+        "StructuralType": _kid_text(bod, "StructuralType"),
+        "Mode": _kid_text(bod, "Mode"),
+        "ReferentType": _kid_text(bod, "ReferentType"),
+        "ResourceName": titles,
+        "OriginalLanguage": [_language(e) for e in _kids(bod, "OriginalLanguage")],
+        "VersionLanguage": [_language(e) for e in _kids(bod, "VersionLanguage")],
+        "AssociatedOrg": orgs,
+        "ReleaseDate": _kid_text(bod, "ReleaseDate"),
+        "CountryOfOrigin": [e.text for e in _kids(bod, "CountryOfOrigin")],
+        "Status": _kid_text(bod, "Status"),
+        "ApproximateLength": _kid_text(bod, "ApproximateLength"),
+        "AlternateID": alt_ids,
+        "Administrators": admins,
+        "Credits": credits,
+        "RegistrantExtra": _kid_text(bod, "RegistrantExtra"),
+        "Description": ({"Description": desc[0].text, "_lang": _attr(desc[0], "lang")}
+                        if desc else None),
+    }
+
+
+_BLOCKS = ("SelfDefinedMetadata", "FullMetadata")
+_XMLNS = {"_xmlns": "http://www.eidr.org/schema",
+          "_xmlns:md": "http://www.movielabs.com/schema/md/v2.8/md",
+          "_xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"}
+
+
+def record_from_xml(xml: str | bytes | ET.Element) -> dict:
+    """The standard record a piece of registry XML describes.
+
+    ``xml`` is a ``SelfDefinedMetadata`` or ``FullMetadata`` element (a
+    resolve result), or any element holding one or both (an API Shim
+    ``Message``), as text, bytes or a parsed ElementTree element. Returns
+    ``{"SelfDefinedMetadata": {...}, "FullMetadata": {...}}`` with whichever
+    blocks the XML carries, each in the shape XML_to_JSON builds from the
+    mirror, absent values pruned. Values are as the XML states them, not
+    normalised (``PT2H0M`` stays ``PT2H0M``), and nothing is filtered:
+    ShortDOI Alt IDs are kept (XML_to_JSON's mirror export drops them).
+    No ``CreationType``, ``DisplayName`` or ``ProvenanceMetadata``: the
+    blocks do not carry them, and routing is the caller's. Raises
+    ``ValueError`` when the XML holds neither block.
+    """
+    root = xml if isinstance(xml, ET.Element) else ET.fromstring(xml)
+    found: dict[str, ET.Element] = {}
+    for el in root.iter():
+        name = _local(el.tag)
+        if name in _BLOCKS and name not in found:
+            found[name] = el
+    if not found:
+        raise ValueError("no SelfDefinedMetadata or FullMetadata element in the XML")
+    out: dict[str, Any] = {}
+    for name in _BLOCKS:
+        if name not in found:
+            continue
+        blk = found[name]
+        bod = _kids(blk, "BaseObjectData")
+        extra: dict[str, Any] = {}
+        for eom in _kids(blk, "ExtraObjectMetadata")[:1]:
+            for info in eom:
+                key = _local(info.tag)
+                if key in _LIGHTWEIGHT:
+                    extra.setdefault(key, []).append(_generic(info))
+                else:
+                    extra[key] = _info(info)
+        out[name] = {**_XMLNS, "BaseObjectData": _base_from_xml(bod[0]) if bod else None,
+                     "ExtraObjectMetadata": extra or None}
+    return _prune(out)

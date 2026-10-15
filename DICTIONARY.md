@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.51.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.52.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,18 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.52.0 (2026-10-15)
+
+* **New: `bmr_map.record_from_xml(xml)`**, registry XML (a resolve result's
+  block, or an API Shim `Message`) to the standard record `row_from_record`
+  takes, on stdlib ElementTree. For BMR-Review's T20 and python-tools'
+  FlattenTool, which hold registry XML rather than XML_to_JSON's JSON.
+  Additive. Checked against XML_to_JSON's mirror export of 363 records: 722
+  of 722 BMR rows equal, apart from that export's own rendering (it
+  normalises durations, drops ShortDOI, and gives a Self `Status` the
+  SelfDefined XML does not state). It replaces no existing reader:
+  XML_to_JSON reads the mirror database, not XML.
 
 ### 0.51.0 (2026-10-14)
 
@@ -377,6 +389,7 @@ edition's Changes entry.
 | [`eidr_core.bmr_map.creation_type_from_row`](#creation_type_from_row) | function | Decides the creation type a row describes. |
 | [`eidr_core.bmr_map.header_base`](#header_base) | function | Strips the group number from a family column header, so template columns compare with `PRODUCED_BASES`. |
 | [`eidr_core.bmr_map.record_from_row`](#record_from_row) | function | Builds the self-defined record a row describes. |
+| [`eidr_core.bmr_map.record_from_xml`](#record_from_xml) | function | Builds the standard record (the shape XML_to_JSON builds from the mirror, which `row_from_record` takes) from registry XML, on the standard library's ElementTree, so `bmr_map` stays vendorable. |
 | [`eidr_core.bmr_map.row_from_blocks`](#row_from_blocks) | function | Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title; Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line; `Language Mode N` only from the template's own language family (Original Language on Abstraction templates, Version Language on Edit and Manifestation, none on Clip; 0.51.0). |
 | [`eidr_core.bmr_map.row_from_record`](#row_from_record) | function | Maps a whole record with the documented defaults: exactly what XML_to_JSON's `--sheet-out` did per record, minus the `Unique Row ID` column and the echo of an unconvertible row, which stay with the caller. |
 | [`eidr_core.bmr_map.select_blocks`](#select_blocks) | function | Picks the blocks a sheet is built from. |
@@ -4770,7 +4783,7 @@ Defined in `src/eidr_core/verify/__init__.py`.
 ## `eidr_core.bmr_map`
 
 <!-- dict-module:eidr_core.bmr_map -->
-Source `src/eidr_core/bmr_map/__init__.py`. Public names: 7 functions, 3 constants (declared by `__all__`).
+Source `src/eidr_core/bmr_map/__init__.py`. Public names: 8 functions, 3 constants (declared by `__all__`).
 <!-- /dict-module -->
 
 **Purpose.** The one implementation of mapping a standard record (the registry-shaped JSON XML_to_JSON emits) to a Template-22 BMR row, and a row back to the self-defined record it describes. Extracted 2026-10-13 (register B5) from XML_to_JSON's `_bmr_rows_from_standard_records` and `build_standard_record_from_bmr_row`, on the six conditions XML_to_JSON set and eidr-core accepted on 2026-09-24. Second consumer: python-tools (`FlattenTool -f bmr`, `-bmrin`). It is cell <-> field mechanism for one record and one row; routing, family expansion, row IDs, parent resolution and Full-record construction stay where they already live.
@@ -4778,6 +4791,7 @@ Source `src/eidr_core/bmr_map/__init__.py`. Public names: 7 functions, 3 constan
 **Use it when.** 
 * You turn a standard record into a BMR row: `row_from_record` (select the block, take Administrators from where the record carries them), or `row_from_blocks` if you hold the blocks. Route first with `bmr_io.template_for_creation_type`, write with `bmr_io.write_sheet`.
 * You read a BMR row back into a record (for a Modify, or a `--sheet` pass): `record_from_row`, then resolve the parent with `bmr_io.resolve_parent` and build Full with `inheritance.build_full_base` if you need them.
+* You hold registry XML (a resolve result, an API Shim message): `record_from_xml` first, then `row_from_record`.
 * Your guardrail checks that every column of a template is accounted for: compare the template's header bases (`header_base`) with `PRODUCED_BASES[template] | NEVER_PRODUCED`.
 
 **Do not use it when.** 
@@ -4953,6 +4967,24 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 
 **Value** `SUPPORTED_TEMPLATES: tuple[str, ...] = ( "non_episodic", "episodic", "edit", "manifestation", "clip")` -- the template keys `row_from_blocks` writes; Compilation has a sheet but is refused.
 <!-- /dict -->
+
+### `record_from_xml`
+
+<!-- dict:eidr_core.bmr_map.record_from_xml -->
+```python
+def record_from_xml(xml: str | bytes | ET.Element) -> dict
+```
+
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `xml` | `str \| bytes \| ET.Element` | required | Registry XML: a `SelfDefinedMetadata` or `FullMetadata` element (a resolve result), or any element holding them (an API Shim `Message`), as text, bytes or a parsed element. |
+
+**Returns** `dict` -- `{"SelfDefinedMetadata": {...}, "FullMetadata": {...}}` with whichever blocks the XML carries, in the standard-record shape, absent values pruned.
+<!-- /dict -->
+
+**Does.** Builds the standard record (the shape XML_to_JSON builds from the mirror, which `row_from_record` takes) from registry XML, on the standard library's ElementTree, so `bmr_map` stays vendorable. Values are as the XML states them, not normalised (`PT2H0M` stays `PT2H0M`); ShortDOI Alt IDs are kept (the caller decides); there is no `CreationType`, `DisplayName` or `ProvenanceMetadata`, which the blocks do not carry. Checked before release against XML_to_JSON's mirror export of the same 363 records: 722 of 722 rows equal, apart from the export's own rendering (duration normalisation, dropped ShortDOI, a Self `Status` the SelfDefined XML does not state). Not a substitute: the SDK codec (`eidr.codecs.xml.to_codec_dict`), whose MovieLabs JSON encoding differs in about 40 paths.
 
 ## Specs and data files
 

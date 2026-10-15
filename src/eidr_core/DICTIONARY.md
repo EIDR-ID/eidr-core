@@ -665,7 +665,7 @@ Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 8 functions, 2 cl
 **Used by.**
 <!-- dict-usedby:eidr_core.altidtool_io -->
 Scan of 2026-10-15; regenerated at each release from the consumer trees.
-* **BMRtoAltID**: `format_line`, `is_identity_relation`, `multi_form_domains`
+* **BMRtoAltID**: `AltIdRow`, `emission_problem`, `format_line`, `multi_form_domains`
 * **eidr-dq**: `identity_relation_sql`
 * **eidr-imdb**: `AltIdRow`, `format_line`, `parse_line`, `write_lines`
 * **eidr-wikidata**: `format_line`, `multi_form_domains`, `parse_line`
@@ -2634,7 +2634,6 @@ Source `src/eidr_core/db_schemas/__init__.py`. Public names: 4 functions, 1 cons
 <!-- dict-usedby:eidr_core.db_schemas -->
 Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMR-Review**: `assert_tables`, `contract_version`, `DATABASES`, `load_manifest`, `table_columns`
-* **BMRtoAltID**: `assert_tables`
 * **eidr-dq**: `assert_tables`, `contract_version`, `load_manifest`, `table_columns`
 * **eidr-imdb**: `assert_tables`, `load_manifest`
 * **eidr-wikidata**: `assert_tables`, `contract_version`
@@ -5115,7 +5114,7 @@ Source `src/eidr_core/verdicts/__init__.py`. Public names: 8 functions, 3 classe
 **Used by.**
 <!-- dict-usedby:eidr_core.verdicts -->
 Scan of 2026-10-15; regenerated at each release from the consumer trees.
-* **BMRtoAltID**: `ASSESSMENT_COLUMN`, `clears_without_a_human`, `fill_map`, `HUMAN_REVIEW_COLUMN`, `NO_MATCH`, `Resolution`, `resolve_row`, `resolve_sheet`, `ResolveStats`, `reviewer_relation`, `STATUSES`, `summarize`, `TERMINAL_ASSESSMENTS`
+* **BMRtoAltID**: `AssertedId`, `ASSESSMENT_COLUMN`, `clears_without_a_human`, `fill_map`, `HUMAN_REVIEW_COLUMN`, `NO_ID_SENTINELS`, `NO_MATCH`, `read_asserted_id`, `Resolution`, `resolve_row`, `resolve_sheet`, `ResolveStats`, `reviewer_relation`, `STATUSES`, `summarize`, `TERMINAL_ASSESSMENTS`, `trim`
 <!-- /dict-usedby -->
 
 ### `clears_without_a_human`
@@ -5413,7 +5412,8 @@ Source `src/eidr_core/altid_audit/__init__.py`. Public names: 6 functions, 7 cla
 
 **Used by.**
 <!-- dict-usedby:eidr_core.altid_audit -->
-No consumer imports it directly (scan of 2026-10-15).
+Scan of 2026-10-15; regenerated at each release from the consumer trees.
+* **BMRtoAltID**: `AliasResolution`, `ALT_ID_TABLES`, `AltId`, `audit_rows`, `AuditRow`, `DEFAULT_BATCH_ALT_IDS`, `Finding`, `is_audited`, `IS_SAME_AS`, `is_single_form`, `kind_key`, `MIRROR_NEEDS`, `MirrorClient`, `MirrorError`, `RowAudit`, `same_relation`
 <!-- /dict-usedby -->
 
 ### `audit`

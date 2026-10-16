@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.58.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.59.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,17 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.59.0 (2026-10-16)
+
+* **New module `eidr_core.swap` (reconciliation C9):** the non-Abstraction
+  swap. `abstraction_ancestors(ids, conn=...)` finds the first valid
+  Abstraction above each record, `plan_swaps(claims, types, ancestors,
+  verified=...)` decides keep, swap or Help-Desk, and `swap_note` and
+  `SWAP_NOTE` give the fixed `SWAPPED:` note. Extracted from eidr-imdb and
+  eidr-wikidata, which each carried a copy, and checked against both on the
+  live mirror: 21,548 records, identical ancestors, decisions and notes.
+  Additive.
 
 ### 0.58.0 (2026-10-16)
 
@@ -673,6 +684,10 @@ edition's Changes entry.
 | [`eidr_core.secrets_loader.load_local`](#load_local) | function | Reads a local secrets JSON file, tolerating trailing commas before `}` or `]`. |
 | [`eidr_core.secrets_loader.load_secrets`](#load_secrets) | function | Loads a program's secrets in the portfolio order: explicit path, local-mode flag, then AWS with local fallback. |
 | [`eidr_core.secrets_loader.SecretsError`](#secretserror-class) | class | Signals that secrets could not be loaded: missing or invalid local file, missing boto3, or an AWS failure. |
+| [`eidr_core.swap.abstraction_ancestors`](#abstraction_ancestors) | function | Walks up `edits`, `manifestations` and `clips` `parent_id` from each record's parent to the first Abstraction, and returns it only if its status is `valid`. |
+| [`eidr_core.swap.plan_swaps`](#plan_swaps) | function | Decides each claim: KEEP for an Abstraction, an unknown type or a verified claim; SWAP with the ancestor otherwise, when there is one; HELPDESK when there is none. |
+| [`eidr_core.swap.swap_note`](#swap_note) | function | Formats `SWAP_NOTE`. |
+| [`eidr_core.swap.SWAP_NOTE`](#swap_note-constant) | constant | the fixed note form BMR-Review's "Swapped original" control parses. |
 | [`eidr_core.vendor.check`](#check) | function | Returns the drift problems between a vendored copy and its manifest; an empty list means clean. |
 | [`eidr_core.vendor.load_manifest`](#load_manifest) | function | Reads and validates a consumer's `vendor.toml` into a Manifest. |
 | [`eidr_core.vendor.sync`](#sync) | function | Replaces the consumer's target directory with the listed modules copied from the pinned commit, imports rewritten. |
@@ -6000,6 +6015,96 @@ Defined in `src/eidr_core/lookup/__init__.py`.
 Defined in `src/eidr_core/lookup/__init__.py`.
 
 **Value** `OUTCOMES = ("live", "tombstoned", "cycle", "missing", "exceeded")` -- why an alias chain stopped: only `live` names a usable record.
+<!-- /dict -->
+
+## `eidr_core.swap`
+
+<!-- dict-module:eidr_core.swap -->
+Source `src/eidr_core/swap/__init__.py`. Public names: 3 functions, 1 constant (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** The non-Abstraction swap: when the record claiming a source ID (an IMDb title, a Wikidata item) is a Performance, Edit or Manifestation, the row proposes its Abstraction ancestor instead and `Operator's Notes` opens with the fixed `SWAPPED:` note; with no valid ancestor, the claim goes to the Help-Desk path (operator rulings 2026-09-13 and 2026-09-21). Reconciliation plan component C9, extracted from the two copies eidr-imdb and eidr-wikidata carried, and checked against both on the live mirror before release: 21,548 Edits, Manifestations and Clips, the same ancestors, decisions and notes.
+
+**Use it when.** 
+* You build a BMR batch row from a source ID's claimant: `abstraction_ancestors` for the non-Abstraction claimants, `plan_swaps` for the decision, `swap_note` for the note.
+* A pairing a human approved must not be re-pointed: pass it in `verified`.
+
+**Do not use it when.** 
+* You want to drop or de-duplicate rows that end up proposing the same Abstraction: the operator overruled that, and BMR-Review decides between them.
+* Never reword the note: BMR-Review's "Swapped original" control parses `SWAP_NOTE` exactly.
+
+**Used by.**
+<!-- dict-usedby:eidr_core.swap -->
+No consumer imports it directly (scan of 2026-10-16).
+<!-- /dict-usedby -->
+
+### `abstraction_ancestors`
+
+<!-- dict:eidr_core.swap.abstraction_ancestors -->
+```python
+def abstraction_ancestors(eidr_ids: Iterable[str], *, conn, max_depth: int = 12) -> dict[str, str | None]
+```
+
+Defined in `src/eidr_core/swap/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `eidr_ids` | `Iterable[str]` | required | Non-Abstraction EIDR IDs; blanks are skipped. |
+| `conn` | - | required (keyword-only) | A DB-API connection to the mirror. |
+| `max_depth` | `int` | `12` (keyword-only) | Parent hops before giving up; a cycle ends as no ancestor. |
+
+**Returns** `dict[str, str | None]` -- `{eidr_id: ancestor or None}`.
+<!-- /dict -->
+
+**Does.** Walks up `edits`, `manifestations` and `clips` `parent_id` from each record's parent to the first Abstraction, and returns it only if its status is `valid`. One query per child table and one status query per level.
+
+### `plan_swaps`
+
+<!-- dict:eidr_core.swap.plan_swaps -->
+```python
+def plan_swaps(claims: Iterable[tuple[str, str]], structural_types: Mapping[str, str | None], ancestors: Mapping[str, str | None], *, verified: Collection[tuple[str, str]] = frozenset()) -> dict[tuple[str, str], tuple[str, str | None]]
+```
+
+Defined in `src/eidr_core/swap/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `claims` | `Iterable[tuple[str, str]]` | required | `(source_id, eidr_id)` pairs. |
+| `structural_types` | `Mapping[str, str \| None]` | required | `{eidr_id: structural_type}`; missing or None means the mirror does not say. |
+| `ancestors` | `Mapping[str, str \| None]` | required | `{eidr_id: ancestor}` from `abstraction_ancestors`. |
+| `verified` | `Collection[tuple[str, str]]` | `frozenset()` (keyword-only) | Claims a human approved; they are kept as they are. |
+
+**Returns** `dict[tuple[str, str], tuple[str, str | None]]` -- `{claim: (decision, ancestor)}`, the decision one of `KEEP`, `SWAP`, `HELPDESK`.
+<!-- /dict -->
+
+**Does.** Decides each claim: KEEP for an Abstraction, an unknown type or a verified claim; SWAP with the ancestor otherwise, when there is one; HELPDESK when there is none. It never looks at the other claimants of the same source ID. Pure.
+
+### `swap_note`
+
+<!-- dict:eidr_core.swap.swap_note -->
+```python
+def swap_note(asserted: str, structural_type: str, ancestor: str) -> str
+```
+
+Defined in `src/eidr_core/swap/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `asserted` | `str` | required | The claimant the source asserted. |
+| `structural_type` | `str` | required | Its structural type. |
+| `ancestor` | `str` | required | The Abstraction ancestor proposed instead. |
+
+**Returns** `str` -- the `SWAPPED:` note.
+<!-- /dict -->
+
+**Does.** Formats `SWAP_NOTE`.
+
+### `SWAP_NOTE` (constant)
+
+<!-- dict:eidr_core.swap.SWAP_NOTE -->
+Defined in `src/eidr_core/swap/__init__.py`.
+
+**Value** `SWAP_NOTE = "SWAPPED: asserted {asserted} ({structural_type}) -> " "Abstraction ancestor {ancestor}"` -- the fixed note form BMR-Review's "Swapped original" control parses.
 <!-- /dict -->
 
 ## Specs and data files

@@ -48,6 +48,7 @@ from typing import Any
 
 from eidr_core.bmr_io import family_layout
 from eidr_core.inheritance import is_absent
+from eidr_core.ordering import is_shortdoi
 
 __all__ = ["SUPPORTED_TEMPLATES", "PRODUCED_BASES", "NEVER_PRODUCED", "header_base",
            "select_blocks", "administrators_of",
@@ -273,7 +274,8 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
       ``ISAN`` / ``ISAN Relation``, except on the Clip template, where it is
       ``V-ISAN`` / ``V-ISAN Relation``; everything else to ``Alt ID N`` /
       ``Domain N`` / ``Relation N`` in record order, uncapped (``write_sheet``
-      caps and reports).
+      caps and reports). A ShortDOI is never written (0.58.0): the registry
+      issues it, so it is not part of a submission.
     * Titles: ``ResourceName`` entry 0 is ``Title`` / ``Title Class`` /
       ``Title Language``; the rest are ``Alternate Title N`` and companions in
       record order (no re-sort on this path). ``system_titles="drop"``
@@ -429,6 +431,14 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
         dom = _text(a.get("Domain")) or _text(a.get("_domain"))
         typ = _text(a.get("Type")) or _text(a.get("_type"))
         rel = _text(a.get("Relation")) or _text(a.get("_relation"))
+        if is_shortdoi(typ, dom):
+            # A ShortDOI is issued by the registry, never submitted, so a BMR
+            # row does not carry one (0.58.0). record_from_xml keeps it, as
+            # the export spec requires (normalized-record 4.2), so without
+            # this every XML-built row put it in an Alt ID column: BMR-Review
+            # dropped it as a caller step, and XML_to_JSON asked for the rule
+            # here before its exporter stops omitting ShortDOI.
+            continue
         dom_out = dom if dom else typ
         if dom_out == "IMDB":
             named["IMDb"] = (aid, rel)
@@ -995,7 +1005,8 @@ def record_from_xml(xml: str | bytes | ET.Element) -> dict:
     blocks the XML carries, each in the shape XML_to_JSON builds from the
     mirror, absent values pruned. Values are as the XML states them, not
     normalised (``PT2H0M`` stays ``PT2H0M``), and nothing is filtered:
-    ShortDOI Alt IDs are kept (XML_to_JSON's mirror export drops them).
+    ShortDOI Alt IDs are kept, as the export spec requires (``row_from_blocks``
+    leaves them out of a sheet row).
     No ``CreationType``, ``DisplayName`` or ``ProvenanceMetadata``: the
     blocks do not carry them, and routing is the caller's. Raises
     ``ValueError`` when the XML holds neither block.

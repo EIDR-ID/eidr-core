@@ -36,6 +36,14 @@ pip install "eidr-core[bmr,aws] @ git+https://github.com/EIDR-ID/eidr-core.git@m
 or as a line in `requirements.txt` / `pyproject.toml` `dependencies`, with
 whichever extras the consumer actually needs (table below).
 
+**Check which copy you import.** A plain (non-editable) copy installed
+earlier can shadow the checkout or the `@main` install whenever the editable
+link goes missing, and every tool then runs on that old copy without an
+error (2026-10-16: a 0.17.0 copy in the system site-packages, 40 versions
+behind). After installing, run
+`python -c "import eidr_core; print(eidr_core.__version__, eidr_core.__file__)"`
+and confirm the version and path are the ones you expect.
+
 **Pin to `@main`, not a version tag.** Consumers are expected to track
 eidr-core's tip, so that a change to shared logic reaches every consumer in
 the same work cycle rather than waiting on a release bump in each one. What
@@ -93,7 +101,7 @@ after a later `git pull`. `eidr_core.__version__` reads the checkout's own
 | Module | Contents |
 |---|---|
 | `eidr_core.bmr_io` | Workbook surgery (writer primitives: HEADER_ROW, read/count/rightmost/expand family, transplant, fix_shared_strings) **+** the reader half — `open_sheet` (streaming context manager, lazy rows with absolute sheet row numbers), `read_sheet` (a `list()` over it), `read_headers`, sparse `family_layout`, shared `RepeatPlan`/`pad_groups` **+** the writer composition (0.29.0) — `write_sheet` over rows already mapped to `{column: value}`, `TEMPLATES`/`families_for`/`SCHEMA_MAX` (Template-22 facts, registry maxima from the schema), `template_for_creation_type` (routing), `header_map` (the header-row policy over a plain row). Mapping (what a row says) stays per consumer; the writer reports every value it could not place **+** `subset_rows` (0.30.0) — row-subset COPY of a BMR sheet onto a copy of the source workbook, template resolved from the tab name, conformance to `Template.headers` checked at emit, `blank_columns=` the one sanctioned edit |
-| `eidr_core.bmr_map` | Standard record <-> Template-22 BMR row (B5, 0.49.0): `row_from_record` / `row_from_blocks` (record -> row, the documented defaults: Alt-ID promotion, main title, Party-ID-only Metadata Authority, Administrators from Provenance else the block), `record_from_row` (row -> self-defined record on `family_layout`), `select_blocks`, `PRODUCED_BASES` / `NEVER_PRODUCED` for template guardrails. Routing, expansion, row IDs, parent resolution and Full construction stay in `bmr_io` / `inheritance` / the caller. Vendorable with `bmr_io`, `inheritance`, `ids` |
+| `eidr_core.bmr_map` | Standard record <-> Template-22 BMR row (B5, 0.49.0): `row_from_record` / `row_from_blocks` (record -> row, the documented defaults: Alt-ID promotion, main title, Party-ID-only Metadata Authority, Administrators from Provenance else the block), `record_from_row` (row -> self-defined record on `family_layout`), `select_blocks`, `PRODUCED_BASES` / `NEVER_PRODUCED` for template guardrails. Routing, expansion, row IDs, parent resolution and Full construction stay in `bmr_io` / `inheritance` / the caller. Vendorable with `bmr_io`, `inheritance`, `ids`, `ordering` |
 | `eidr_core.verdicts` | BMR-Review's verdicts read back off an assessed and reviewed BMR sheet (C4, 0.53.0): `resolve_sheet` / `resolve_row` -> `Resolution` (CONFIRMED, NO_MATCH, UNRESOLVED, NEEDS_REVIEW, NOT_CLEARED, INVALID), `fill_map`, the reviewer's `RELATION:` line, `assigned_id_role` member/proposal. Vendorable with `bmr_io`, `ids` |
 | `eidr_core.altid_audit` | The Alt-ID audit ladder (C5, 0.54.0): `audit_rows` / `audit` check a source's Alt IDs against the mirror and return the AltIDTool lines safe to write plus structured findings; `MirrorClient` is the batched reader on a connection the caller opens (no driver declared); `quarantine` row/alt_id; the `contributed` ledger gate |
 | `eidr_core.vendor` | The vendoring mechanism (0.31.0, `specs/vendoring.md`) for packages that cannot depend on eidr-core (the SDK, the CLI tools): `python -m eidr_core.vendor sync|check --config vendor.toml` copies pinned-commit modules, rewrites imports to the consumer's package, refuses a module list not closed under imports, and `check` is the consumer's CI gate against drift. The copy imports with no other eidr-core file present. Stdlib only |

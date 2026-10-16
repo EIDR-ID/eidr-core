@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.57.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.58.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,21 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.58.0 (2026-10-16)
+
+* **`bmr_map.row_from_blocks` / `row_from_record` never write a ShortDOI.**
+  The registry issues it, so it is not part of a submission. `record_from_xml`
+  keeps it, as the export spec requires, so until now every row built from
+  XML put the ShortDOI in an `Alt ID N` column; BMR-Review dropped it as a
+  caller step, and XML_to_JSON asked for the rule here before its exporter
+  retains ShortDOI. No output changes for either today. The vendoring
+  closure of `bmr_map` gains `ordering` (`is_shortdoi`).
+* **Docs: the identity lookup does not ride the partial index.** BMRtoAltID
+  measured on the live mirror that `lookup_alt_ids` (and `claimants_of`) are
+  driven by the plain `alt_id` index whatever the predicate's wording; the
+  comments and `identity_relation_sql`'s "when not to use" no longer say a
+  reword loses an index. No code change.
 
 ### 0.57.0 (2026-10-15)
 
@@ -241,7 +256,7 @@ Newest first. Each entry says what a consumer could notice.
 * **`bmr_io` and `inheritance` are now vendorable.** Seven comments and
   docstrings named their own package, which `vendor sync` refuses; reworded,
   no code changed. The vendoring closure for `bmr_map` is
-  `["bmr_map", "bmr_io", "inheritance", "ids"]`, tested by a real sync.
+  `["bmr_map", "bmr_io", "inheritance", "ids", "ordering"]`, tested by a real sync.
 
 ### 0.48.0 (2026-10-03)
 
@@ -715,7 +730,7 @@ Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 8 functions, 2 cl
 
 **Used by.**
 <!-- dict-usedby:eidr_core.altidtool_io -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `AltIdRow`, `emission_problem`, `format_line`, `multi_form_domains`
 * **eidr-dq**: `identity_relation_sql`
 * **eidr-imdb**: `AltIdRow`, `format_line`, `parse_line`, `write_lines`
@@ -879,7 +894,7 @@ Defined in `src/eidr_core/altidtool_io/__init__.py`.
 
 **Does.** Returns the identity-relation test as a SQL condition for mirror queries. It compares `IsSameAs` exactly, as the mirror stores it; the Python `is_identity_relation` also folds case and whitespace. Use it instead of writing the condition by hand: a NULL-only form hid 69.6% of IMDb identity links on 2026-09-23.
 
-**When not to use.** A query that must ride one of the mirror's partial identity indexes (for example `idx_cais_type_domain_relnorm_altid`, whose predicate is `relation IS NULL OR relation = 'IsSameAs'`) must repeat that predicate verbatim: the extra `= ''` term falls outside the index, and the planner then gives it up. The term matches nothing today (0 empty relations since MCP's 2026-09-23 repair), so dropping it there loses nothing. Queries keyed on `content_id` (a plain index) are safe with this helper, which is what BMR-Review's and eidr-dq's are. Found by BMRtoAltID, 2026-10-13, which keeps its own predicate in `mirror.lookup_alt_ids` for this reason.
+**When not to use.** A query meant to ride one of the mirror's partial identity indexes (whose predicate is `relation IS NULL OR relation = 'IsSameAs'`) must repeat that predicate verbatim, because the extra `= ''` term falls outside such an index. The term matches nothing today (0 empty relations since MCP's 2026-09-23 repair). But check the plan before relying on it: the portfolio's identity lookup by Alt ID value (`altid_audit.MirrorClient.lookup_alt_ids`, `lookup.claimants_of`) is driven by the plain `alt_id` index whatever the predicate's wording (BMRtoAltID, EXPLAIN ANALYZE on the live mirror, 2026-10-16), so no measured query rides the partial index. Queries keyed on `content_id` are safe with this helper, which is what BMR-Review's and eidr-dq's are.
 
 ### `is_identity_relation`
 
@@ -943,7 +958,7 @@ Source `src/eidr_core/bmr_io/__init__.py`. Public names: 21 functions, 9 classes
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `families_for`, `header_map`, `index_rows`, `read_headers`, `resolve_parent`, `template_for_creation_type`, `write_sheet`
 * **BMRtoAltID**: `ASSIGNED_ID_COLUMN`, `check_sheet`, `DATA_START`, `family_layout`, `fill_column`, `HEADER_ROW`, `open_sheet`, `ROW_ID_COLUMN`, `SHEET_TO_TEMPLATE`, `subset_rows`, `TemplateMismatch`, `TEMPLATES`
 * **eidr-dq**: `pad_groups`, `RepeatPlan`
@@ -1677,7 +1692,7 @@ Source `src/eidr_core/bmr_io/subset.py`. Public names: 1 function (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io.subset -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `required_headers`
 <!-- /dict-usedby -->
 
@@ -1723,7 +1738,7 @@ Source `src/eidr_core/codes/__init__.py`. Public names: 1 function, 1 constant (
 
 **Used by.**
 <!-- dict-usedby:eidr_core.codes -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **eidr-wikidata**: `normalize_country_code`
 <!-- /dict-usedby -->
 
@@ -1776,7 +1791,7 @@ Source `src/eidr_core/compare/__init__.py`. Public names: 20 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `cmp_alt_ids`, `COMPARATORS`, `FieldResult`, `set_params`
 * **De-Dupe UI**: `cmp_alt_ids`, `cmp_length`, `cmp_release_date`, `cmp_titles`, `fuzzy`
 <!-- /dict-usedby -->
@@ -2243,7 +2258,7 @@ Source `src/eidr_core/compare/nonlinear.py`. Public names: 3 functions (declared
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.nonlinear -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `accumulate`, `aggregate`, `corroborate`, (the module)
 * **De-Dupe UI**: `accumulate`
 <!-- /dict-usedby -->
@@ -2331,7 +2346,7 @@ Source `src/eidr_core/compare/spec.py`. Public names: 2 functions (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.spec -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_spec`, `spec_path`, (the module)
 <!-- /dict-usedby -->
 
@@ -2392,7 +2407,7 @@ Source `src/eidr_core/compare/states.py`. Public names: 4 functions (declared by
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.states -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `band`, `field_not_counted`, `field_states`, `ui_field_key`, (the module)
 <!-- /dict-usedby -->
 
@@ -2499,7 +2514,7 @@ Source `src/eidr_core/compare/titles.py`. Public names: 7 functions, 2 constants
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.titles -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `parse_part`, `parts_conflict`, `segments`, `select_titles`, `title_similarity`
 * **De-Dupe UI**: `COMBINATION_DIFFERS_QUALITY`, `parse_part`, `PART_AMBIGUOUS_QUALITY`, `parts_conflict`, `segments`, `title_similarity`
 * **LanguageTool**: `title_similarity`
@@ -2683,7 +2698,7 @@ Source `src/eidr_core/db_schemas/__init__.py`. Public names: 4 functions, 1 cons
 
 **Used by.**
 <!-- dict-usedby:eidr_core.db_schemas -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `assert_tables`, `contract_version`, `DATABASES`, `load_manifest`, `table_columns`
 * **eidr-dq**: `assert_tables`, `contract_version`, `load_manifest`, `table_columns`
 * **eidr-imdb**: `assert_tables`, `load_manifest`
@@ -2808,7 +2823,7 @@ needs no extra.
 
 **Used by.**
 <!-- dict-usedby:eidr_core.dictionary -->
-No consumer imports it directly (scan of 2026-10-15).
+No consumer imports it directly (scan of 2026-10-16).
 <!-- /dict-usedby -->
 
 ### `changes`
@@ -2885,7 +2900,7 @@ Source `src/eidr_core/external/__init__.py`. Public names: 3 functions, 5 classe
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **eidr-dq**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `Entry`, `FactCache`, `FATAL`, `Key`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
 * **eidr-imdb**: `call_with_failover`, `endpoint_chain`, `FATAL`, `NEXT_ENDPOINT`, `OUTAGE`, `RETRY`
 * **eidr-wikidata**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `FactCache`, `FATAL`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
@@ -3125,7 +3140,7 @@ Source `src/eidr_core/external/failover.py`. Public names: 5 functions, 8 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external.failover -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `retry_after_seconds`
 * **eidr-imdb**: `DEFAULT_RATE_LIMIT_FLOOR`, `http_status`
 * **eidr-wikidata**: `http_status`, `is_bad_query_error`, `is_outage_error`, `retry_after_seconds`
@@ -3311,7 +3326,7 @@ Source `src/eidr_core/ids/__init__.py`. Public names: 8 functions, 11 constants 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ids -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `category`, `fault`, `find_content_ids`, `is_valid_eidr_id`
 * **BMRtoAltID**: `fault`
 * **De-Dupe UI**: `ALPHABET`, `check_character`, `is_valid_eidr_id`
@@ -3583,7 +3598,7 @@ Source `src/eidr_core/inheritance/__init__.py`. Public names: 6 functions, 1 cla
 
 **Used by.**
 <!-- dict-usedby:eidr_core.inheritance -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `build_full_record`, `provenance`, `RECORD_ATTRS`, `TitleConstructionError`, (the module)
 * **XML_to_JSON**: `build_full_base`, `INHERITABLE_FIELDS`, `is_absent`, `TitleConstructionError`
 <!-- /dict-usedby -->
@@ -3801,7 +3816,7 @@ Source `src/eidr_core/normalize/__init__.py`. Public names: 13 functions (declar
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `ascii_fold`, `cmp_key`, `days_between`, `nfkc`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **De-Dupe UI**: `ascii_fold`, `cmp_key`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **eidr-wikidata**: `norm_title`, `sanitize_field`
@@ -4073,7 +4088,7 @@ Source `src/eidr_core/normalize/aliases.py`. Public names: 2 functions, 1 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize.aliases -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `alias_name`, `alias_title`, `ORDINALS`
 <!-- /dict-usedby -->
 
@@ -4146,7 +4161,7 @@ Source `src/eidr_core/ordering/__init__.py`. Public names: 10 functions (declare
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ordering -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `altid_canonical_key`, `altid_collapsed_canonical_key`, `altid_display_key`, `altid_kind`, `is_shortdoi`, `title_bucket`, `title_sort_key`
 * **XML_to_JSON**: `altid_collapsed_canonical_key`, `title_sort_key`
 <!-- /dict-usedby -->
@@ -4369,7 +4384,7 @@ Source `src/eidr_core/registry/__init__.py`. Public names: 5 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.registry -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `get_registry_client`
 * **eidr-dq**: `build_registry_credentials`, `get_registry_client`
 * **eidr-wikidata**: `build_registry_credentials`, `CODE_SUCCESS`, `DEFAULT_REGISTRY`, `get_registry_client`, `OperationStatus`, `parse_operation_status`, `parse_operation_statuses`, `token_operation_status`
@@ -4549,7 +4564,7 @@ Source `src/eidr_core/secrets_loader/__init__.py`. Public names: 3 functions, 1 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.secrets_loader -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_local`
 * **BMRtoAltID**: `load_secrets`, `SecretsError`
 * **eidr-dq**: `load_secrets`, `SecretsError`
@@ -4663,7 +4678,7 @@ Source `src/eidr_core/vendor/__init__.py`. Public names: 3 functions, 3 classes,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.vendor -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **python-tools**: `check`, `load_manifest`, (the module)
 <!-- /dict-usedby -->
 
@@ -4826,7 +4841,7 @@ Source `src/eidr_core/verify/__init__.py`. Public names: 5 functions (declared b
 
 **Used by.**
 <!-- dict-usedby:eidr_core.verify -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **eidr-dq**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 * **eidr-wikidata**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 <!-- /dict-usedby -->
@@ -4958,11 +4973,11 @@ Source `src/eidr_core/bmr_map/__init__.py`. Public names: 8 functions, 3 constan
 * You want a per-family cap or a report of values with no column: `bmr_io.write_sheet` does both (`SCHEMA_MAX`, `WriteReport.dropped`); there is deliberately no second cap here.
 * You want `DisplayName` on a built record: it is a display convention of your output, not a registry field, and `record_from_row` leaves it out.
 * You want ShortDOI rows dropped from a registration: that is your policy; `record_from_row` keeps every Alt ID the row carries.
-* Vendoring: list `["bmr_map", "bmr_io", "inheritance", "ids"]`; that closure is tested by a real sync.
+* Vendoring: list `["bmr_map", "bmr_io", "inheritance", "ids", "ordering"]`; that closure is tested by a real sync.
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_map -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMR-Review**: `record_from_xml`, `row_from_record`
 * **XML_to_JSON**: `NEVER_PRODUCED`, `PRODUCED_BASES`, `record_from_row`, `row_from_record`
 <!-- /dict-usedby -->
@@ -5167,7 +5182,7 @@ Source `src/eidr_core/verdicts/__init__.py`. Public names: 8 functions, 3 classe
 
 **Used by.**
 <!-- dict-usedby:eidr_core.verdicts -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `AssertedId`, `ASSESSMENT_COLUMN`, `clears_without_a_human`, `fill_map`, `HUMAN_REVIEW_COLUMN`, `NO_ID_SENTINELS`, `NO_MATCH`, `read_asserted_id`, `Resolution`, `resolve_row`, `resolve_sheet`, `ResolveStats`, `reviewer_relation`, `STATUSES`, `summarize`, `TERMINAL_ASSESSMENTS`, `trim`
 <!-- /dict-usedby -->
 
@@ -5466,7 +5481,7 @@ Source `src/eidr_core/altid_audit/__init__.py`. Public names: 6 functions, 7 cla
 
 **Used by.**
 <!-- dict-usedby:eidr_core.altid_audit -->
-Scan of 2026-10-15; regenerated at each release from the consumer trees.
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `AliasResolution`, `ALT_ID_TABLES`, `AltId`, `audit_rows`, `AuditRow`, `DEFAULT_BATCH_ALT_IDS`, `Finding`, `is_audited`, `IS_SAME_AS`, `is_single_form`, `kind_key`, `MIRROR_NEEDS`, `MirrorClient`, `MirrorError`, `RowAudit`, `same_relation`
 <!-- /dict-usedby -->
 
@@ -5694,7 +5709,7 @@ Defined in `src/eidr_core/altid_audit/__init__.py`.
 | `assert_schema` | `def assert_schema() -> None` | Raises when the mirror's schema contract lacks a table or column this needs (`MIRROR_NEEDS`); call at startup. |
 | `known_id_types` | `def known_id_types() -> dict[str, str]` | `{UPPERCASED type: the registry's casing}`, for a caller to canonicalise Types before the audit. |
 | `resolve_aliases` | `def resolve_aliases(eidr_ids: list[str]) -> dict[str, AliasResolution]` | Follows each ID's alias chain, capped and cycle-guarded. |
-| `lookup_alt_ids` | `def lookup_alt_ids(kinds: list[tuple[str, str, str]]) -> dict[tuple[str, str, str], set[str]]` | `{(type, domain, value): {content_id}}` over identity rows only, on the partial index's predicate verbatim. |
+| `lookup_alt_ids` | `def lookup_alt_ids(kinds: list[tuple[str, str, str]]) -> dict[tuple[str, str, str], set[str]]` | `{(type, domain, value): {content_id}}` over identity rows only; a blank domain matches the mirror's `''`. Driven by the plain `alt_id` index. |
 | `existing_alt_ids` | `def existing_alt_ids(content_ids: list[str]) -> dict[str, dict[tuple[str, str, str], set[str]]]` | `{content_id: {(type, domain, value): {relation}}}`, every relation, NULL as `""`. |
 <!-- /dict -->
 
@@ -5813,7 +5828,8 @@ Source `src/eidr_core/lookup/__init__.py`. Public names: 6 functions, 2 classes,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.lookup -->
-No consumer imports it directly (scan of 2026-10-15).
+Scan of 2026-10-16; regenerated at each release from the consumer trees.
+* **eidr-imdb**: `live_status`
 <!-- /dict-usedby -->
 
 ### `claimants`
@@ -5857,7 +5873,7 @@ Defined in `src/eidr_core/lookup/__init__.py`.
 **Returns** `dict[tuple[str, str, str], list[Claimant]]` -- `{key: [Claimant, ...]}` for every key asked, `[]` for an unclaimed one.
 <!-- /dict -->
 
-**Does.** The batched form of `claimants`: one identity query, one status query and one alias walk for the whole batch. The relation predicate is the mirror's partial index verbatim.
+**Does.** The batched form of `claimants`: one identity query, one status query and one alias walk for the whole batch. The identity query is driven by the mirror's plain `alt_id` index.
 
 ### `live_status`
 

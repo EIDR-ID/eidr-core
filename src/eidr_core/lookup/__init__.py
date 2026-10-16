@@ -17,8 +17,8 @@ extracted, not written fresh:
   rows (measured 2026-10-15: 3,609,737 valid, 50,902 alias, nothing else).
   What none of them reported together is WHY a chain stopped, so
   ``AliasResult.outcome`` says it.
-* ``claimants`` is the identity lookup ``altid_audit`` uses (the partial
-  index's predicate verbatim), with each claimant's status and alias
+* ``claimants`` is the identity lookup ``altid_audit`` uses, with each
+  claimant's status and alias
   resolution attached, and it never chooses one (eidr-imdb's case 1, *The
   Smurfs*: two Series records claim one IMDb ID; the caller decides).
 * ``seasons_under`` is the lookup eidr-imdb measured R9 with (2026-10-14:
@@ -180,12 +180,10 @@ def claimants_of(kinds: Sequence[tuple[str, str, str]], *, conn,
     out: dict[tuple[str, str, str], list[Claimant]] = {k: [] for k in keys}
     if not keys:
         return out
-    # The relation predicate is the mirror's partial index
-    # idx_cais_type_domain_relnorm_altid VERBATIM (as altid_audit's lookup):
-    # rewording it, even to altidtool_io.identity_relation_sql(), costs the
-    # index on what can be millions of lookups. A blank domain is sent as ''
-    # because that is how the mirror stores it (never NULL; see
-    # altid_audit.MirrorClient.lookup_alt_ids, 0.57.0).
+    # The same statement as altid_audit's lookup; the planner drives it from
+    # the plain alt_id index (measured 2026-10-16), not the partial identity
+    # index. A blank domain is sent as '' because that is how the mirror
+    # stores it (never NULL; see altid_audit.MirrorClient.lookup_alt_ids).
     rows = _rows(conn,
                  "SELECT k.t, k.d, k.v, a.content_id "
                  "FROM unnest(%s::text[], %s::text[], %s::text[]) AS k(t, d, v) "

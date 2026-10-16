@@ -302,11 +302,11 @@ _SRC = Path(__file__).resolve().parent.parent / "src" / "eidr_core"
 def test_real_bmr_map_closure_vendors_and_works_without_eidr_core(tmp_path, source):
     import shutil
     pkg = source / "src" / "eidr_core"
-    for mod in ("bmr_map", "bmr_io", "inheritance"):
+    for mod in ("bmr_map", "bmr_io", "inheritance", "ordering"):
         shutil.copytree(_SRC / mod, pkg / mod, ignore=shutil.ignore_patterns("__pycache__"))
     _git("-c", "user.email=t@t", "-c", "user.name=t", "add", "-A", cwd=source)
     _git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "bmr_map", cwd=source)
-    m = _manifest(tmp_path, source, ["bmr_map", "bmr_io", "inheritance", "ids"])
+    m = _manifest(tmp_path, source, ["bmr_map", "bmr_io", "inheritance", "ids", "ordering"])
     sync(m, source_path=source)
     code = (
         "import sys\n"

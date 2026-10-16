@@ -442,3 +442,14 @@ def test_record_from_xml_reads_one_block_and_edit_details():
 def test_record_from_xml_refuses_xml_without_a_block():
     with pytest.raises(ValueError):
         M.record_from_xml("<Message xmlns='http://www.eidr.org/schema'/>")
+
+
+# ── a BMR row never carries a ShortDOI (0.58.0) ──────────────────────────────
+
+def test_a_shortdoi_never_reaches_a_row():
+    base = {"AlternateID": [{"AltID": "10/abcd", "Type": "ShortDOI", "Relation": "IsSameAs"},
+                            {"AltID": "p1", "Domain": "example.org"},
+                            {"AltID": "10/efgh", "Type": " shortdoi "}]}
+    row = M.row_from_blocks(base, {}, "non_episodic")
+    assert row["Alt ID 1"] == "p1" and "Alt ID 2" not in row
+    assert "10/abcd" not in row.values()

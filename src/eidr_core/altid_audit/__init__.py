@@ -405,12 +405,15 @@ class MirrorClient:
         # the planner drives the join from the alt_id index either way.
         domains: list[str] = [k[1] or "" for k in kinds]
         values = [k[2] for k in kinds]
-        # The relation predicate is the mirror's partial index
-        # idx_cais_type_domain_relnorm_altid VERBATIM, so the lookup stays
-        # index-only. Deliberately not altidtool_io.identity_relation_sql():
-        # its extra "OR relation = ''" falls outside that index, and since the
-        # 2026-09-23 mirror repair no relation is stored as '', so it would
-        # cost the index and match nothing (BMRtoAltID, decided 2026-10-13).
+        # The relation predicate repeats the partial index
+        # idx_cais_type_domain_relnorm_altid's own, but the planner does NOT
+        # use that index here: it drives the join from the plain alt_id index
+        # (idx_content_alt_ids_self_alt_id), whatever the domain and relation
+        # wording (BMRtoAltID, EXPLAIN ANALYZE on the live mirror, 2026-10-16;
+        # the earlier claim that a reword loses the index was never true for
+        # this query). It stays as written because identity_relation_sql()'s
+        # extra "OR relation = ''" matches nothing since the 2026-09-23 mirror
+        # repair, not to protect an index.
         rows = self._query(
             "SELECT k.t, k.d, k.v, a.content_id "
             "FROM unnest(%s::text[], %s::text[], %s::text[]) "

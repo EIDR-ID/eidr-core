@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.56.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.57.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,29 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.57.0 (2026-10-15)
+
+* **Fix, `altid_audit`: IMDB and ISAN identity lookups found nothing.** A
+  blank domain was sent as NULL and matched with `IS NOT DISTINCT FROM`, but
+  the mirror stores a named type's blank domain as `''` and never as NULL
+  (4,830,585 rows). So every named-type lookup came back empty, and the
+  audit never reported `MULTI_RECORD_ALT_ID`, `ASSERTED_ID_MISMATCH`,
+  `ALT_IDS_DISAGREE` or `UNASSERTED_RESOLVED` for an IMDb or ISAN ID. That
+  was inherited from BMRtoAltID's audit, where it had been since audit mode
+  began; a 20,000-key test batch matched 0 rows before and 20,080 after.
+  Blank is now sent as `''`, and a NULL domain still matches blank. **Audit
+  output changes:** more findings and fewer lines where a row's IMDb ID is on
+  another record (BMRtoAltID's `medium-resolved.xlsx`: 159 lines down to 153,
+  with 23 `ASSERTED_ID_MISMATCH` and 19 `MULTI_RECORD_ALT_ID` on IMDb). Runs
+  with `--write-only mediafilm.ca` are unchanged.
+* **New module `eidr_core.lookup` (reconciliation C1):** `resolve_aliases` /
+  `resolve_alias` (`AliasResult(target, chain, outcome)`, outcome `live`,
+  `tombstoned`, `cycle`, `missing` or `exceeded`), `live_status`,
+  `claimants` / `claimants_of` (every identity claimant, never chosen), and
+  `seasons_under` (R9). Extracted and checked against eidr-wikidata's,
+  eidr-imdb's and BMRtoAltID's code on the live mirror: identical on 52,904
+  IDs. Additive.
 
 ### 0.56.0 (2026-10-15)
 
@@ -587,6 +610,15 @@ edition's Changes entry.
 | [`eidr_core.inheritance.RECORD_ATTRS`](#record_attrs-constant) | constant | Default map from canonical EIDR field name to record attribute name for `build_full_record`. |
 | [`eidr_core.inheritance.TITLE_EXEMPT_TYPES`](#title_exempt_types-constant) | constant | The child types that never inherit the parent's title and get a system-generated one instead. |
 | [`eidr_core.inheritance.TITLE_INHERITING_TYPES`](#title_inheriting_types-constant) | constant | The child types that inherit the parent's ResourceName verbatim. |
+| [`eidr_core.lookup.claimants`](#claimants) | function | Returns every record that carries the value as an identity Alt ID (relation blank or IsSameAs), with its live status and alias resolution. |
+| [`eidr_core.lookup.claimants_of`](#claimants_of) | function | The batched form of `claimants`: one identity query, one status query and one alias walk for the whole batch. |
+| [`eidr_core.lookup.live_status`](#live_status) | function | Reads the mirror's current status in one query. |
+| [`eidr_core.lookup.resolve_alias`](#resolve_alias) | function | `resolve_aliases` for one ID. |
+| [`eidr_core.lookup.resolve_aliases`](#resolve_aliases) | function | Follows each chain breadth-first, with one query per level rather than one per ID, and says why each one stopped: `live`, `tombstoned` (it reached `ids.TOMBSTONE_ID`, so the record was deleted), `cycle`, `missing` (an ID on the chain has no record; the mirror holds 8 dangling aliases) or `exceeded`. |
+| [`eidr_core.lookup.seasons_under`](#seasons_under) | function | R9's lookup-first step. |
+| [`eidr_core.lookup.AliasResult`](#aliasresult-class) | class | Where an EIDR ID points, the IDs on the way, and why the chain stopped there. |
+| [`eidr_core.lookup.Claimant`](#claimant-class) | class | A record carrying a source ID as an identity Alt ID. |
+| [`eidr_core.lookup.OUTCOMES`](#outcomes-constant) | constant | why an alias chain stopped: only `live` names a usable record. |
 | [`eidr_core.normalize.ascii_fold`](#ascii_fold) | function | Folds Latin diacritics and ligatures to ASCII so they do not count as differences. |
 | [`eidr_core.normalize.cmp_key`](#cmp_key) | function | Builds the canonical comparison key; equal keys are treated as a match. |
 | [`eidr_core.normalize.days_between`](#days_between) | function | Returns the absolute number of days between two `(year, month, day)` tuples. |
@@ -5758,6 +5790,200 @@ Defined in `src/eidr_core/altid_audit/__init__.py`.
 Defined in `src/eidr_core/altid_audit/__init__.py`.
 
 **Value** `MIRROR_NEEDS = { "content_core": ["content_id", "status", "target_id"], "content_alternate_ids_self": ...` -- the mirror tables and columns the client reads, for `db_schemas.assert_tables`.
+<!-- /dict -->
+
+## `eidr_core.lookup`
+
+<!-- dict-module:eidr_core.lookup -->
+Source `src/eidr_core/lookup/__init__.py`. Public names: 6 functions, 2 classes, 1 constant (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** Registry lookups against the mirror that more than one tool needs: where an EIDR ID's alias chain ends and why it stops there, the current status of records, every record that claims a source ID as identity, and the seasons registered under a series. Reconciliation plan component C1, ruled in eidr-core-ops `PHASE2-3-INTERFACES-2026-10-15.md`. Extracted from eidr-imdb's `live_statuses` and the portfolio's three alias followers (eidr-wikidata's `resolve_alias_chain` and `pair_validator`, BMRtoAltID's), and checked against them before release on the live mirror: all 50,902 aliases, 2,000 valid records, the tombstone and a missing ID gave the same targets, with the reason for each stop added. The tombstone, cycles, dangling aliases and the depth cap all show up in `AliasResult.outcome`, and only `"live"` is usable.
+
+**Use it when.** 
+* You are about to point at, write to or propose an EIDR ID you read from a source or a stored pull: `resolve_aliases`, then use only `usable` results.
+* A batch must name only valid records (the 2026-09-13 ruling): `live_status` at build time, not your stored copy.
+* You need every record that claims an IMDb, Wikidata or other source ID as identity: `claimants` / `claimants_of`. It never chooses one for you.
+* R9: before manufacturing a Season row, `seasons_under(series, number)`.
+
+**Do not use it when.** 
+* You are auditing Alt IDs for an AltIDTool file: that is `altid_audit`, which runs its own batched lookups.
+* You need a record's metadata: the mirror's record builders (eidr-wikidata, BMR-Review) or the registry, not this module.
+* Never take the first claimant as the answer: the list is sorted, not ranked.
+
+**Used by.**
+<!-- dict-usedby:eidr_core.lookup -->
+No consumer imports it directly (scan of 2026-10-15).
+<!-- /dict-usedby -->
+
+### `claimants`
+
+<!-- dict:eidr_core.lookup.claimants -->
+```python
+def claimants(alt_type: str, value: str, *, conn, domain: str | None = None, alt_id_table: str = "content_alternate_ids_self") -> list[Claimant]
+```
+
+Defined in `src/eidr_core/lookup/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `alt_type` | `str` | required | The Alt ID Type (`IMDB`, `Proprietary`, ...). |
+| `value` | `str` | required | The source ID. |
+| `conn` | - | required (keyword-only) | A DB-API connection to the mirror. |
+| `domain` | `str \| None` | `None` (keyword-only) | The domain for a Proprietary Kind; None or `""` for a named type (blank matches only blank). |
+| `alt_id_table` | `str` | `"content_alternate_ids_self"` (keyword-only) | `content_alternate_ids_self` (default) or `content_alternate_ids`; anything else raises ValueError. |
+
+**Returns** `list[Claimant]` -- every identity claimant, sorted by EIDR ID; `[]` when none.
+<!-- /dict -->
+
+**Does.** Returns every record that carries the value as an identity Alt ID (relation blank or IsSameAs), with its live status and alias resolution. It never chooses one: a caller that cannot point at a single parent points at the in-sheet row instead.
+
+### `claimants_of`
+
+<!-- dict:eidr_core.lookup.claimants_of -->
+```python
+def claimants_of(kinds: Sequence[tuple[str, str, str]], *, conn, alt_id_table: str = "content_alternate_ids_self", max_depth: int = 10) -> dict[tuple[str, str, str], list[Claimant]]
+```
+
+Defined in `src/eidr_core/lookup/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `kinds` | `Sequence[tuple[str, str, str]]` | required | `(alt_type, domain, value)` keys; a blank domain matches only blank. |
+| `conn` | - | required (keyword-only) | A DB-API connection to the mirror. |
+| `alt_id_table` | `str` | `"content_alternate_ids_self"` (keyword-only) | As for `claimants`. |
+| `max_depth` | `int` | `10` (keyword-only) | Alias hops to follow for each claimant. |
+
+**Returns** `dict[tuple[str, str, str], list[Claimant]]` -- `{key: [Claimant, ...]}` for every key asked, `[]` for an unclaimed one.
+<!-- /dict -->
+
+**Does.** The batched form of `claimants`: one identity query, one status query and one alias walk for the whole batch. The relation predicate is the mirror's partial index verbatim.
+
+### `live_status`
+
+<!-- dict:eidr_core.lookup.live_status -->
+```python
+def live_status(ids: Iterable[str], *, conn) -> dict[str, str | None]
+```
+
+Defined in `src/eidr_core/lookup/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `ids` | `Iterable[str]` | required | EIDR IDs. |
+| `conn` | - | required (keyword-only) | A DB-API connection to the mirror. |
+
+**Returns** `dict[str, str | None]` -- `{eidr_id: status}` for the IDs the mirror holds (`None` for a NULL status); an unknown ID is absent.
+<!-- /dict -->
+
+**Does.** Reads the mirror's current status in one query. Use it at batch-build time, because a stored pull goes stale at about one merge every two days (eidr-imdb, 2026-09-21).
+
+### `resolve_alias`
+
+<!-- dict:eidr_core.lookup.resolve_alias -->
+```python
+def resolve_alias(eidr_id: str, *, conn, max_depth: int = 10) -> AliasResult
+```
+
+Defined in `src/eidr_core/lookup/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `eidr_id` | `str` | required | An EIDR ID. |
+| `conn` | - | required (keyword-only) | A DB-API connection to the mirror. |
+| `max_depth` | `int` | `10` (keyword-only) | Hops to follow before reporting `exceeded`. |
+
+**Returns** `AliasResult` -- where the chain stops and why.
+<!-- /dict -->
+
+**Does.** `resolve_aliases` for one ID.
+
+### `resolve_aliases`
+
+<!-- dict:eidr_core.lookup.resolve_aliases -->
+```python
+def resolve_aliases(ids: Iterable[str], *, conn, max_depth: int = 10) -> dict[str, AliasResult]
+```
+
+Defined in `src/eidr_core/lookup/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `ids` | `Iterable[str]` | required | EIDR IDs; blanks are skipped, duplicates asked once. |
+| `conn` | - | required (keyword-only) | A DB-API connection to the mirror. |
+| `max_depth` | `int` | `10` (keyword-only) | Hops to follow before reporting `exceeded`. |
+
+**Returns** `dict[str, AliasResult]` -- `{eidr_id: AliasResult}` for every ID asked.
+<!-- /dict -->
+
+**Does.** Follows each chain breadth-first, with one query per level rather than one per ID, and says why each one stopped: `live`, `tombstoned` (it reached `ids.TOMBSTONE_ID`, so the record was deleted), `cycle`, `missing` (an ID on the chain has no record; the mirror holds 8 dangling aliases) or `exceeded`.
+
+### `seasons_under`
+
+<!-- dict:eidr_core.lookup.seasons_under -->
+```python
+def seasons_under(series_id: str, season_number: int, *, conn) -> list[str]
+```
+
+Defined in `src/eidr_core/lookup/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `series_id` | `str` | required | The Series record's EIDR ID. |
+| `season_number` | `int` | required | The season number (`seasons.sequence_number`). |
+| `conn` | - | required (keyword-only) | A DB-API connection to the mirror. |
+
+**Returns** `list[str]` -- the valid Season records with that number under the series, sorted; `[]` for none.
+<!-- /dict -->
+
+**Does.** R9's lookup-first step. It returns a list because the registry can hold two valid seasons with the same number under one series (measured: it does). Aliased seasons are left out.
+
+### `AliasResult` (class)
+
+<!-- dict:eidr_core.lookup.AliasResult -->
+```python
+class AliasResult(NamedTuple)
+```
+
+Defined in `src/eidr_core/lookup/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `target` | `str` | required | Where the chain stopped, whatever the outcome. |
+| `chain` | `tuple[str, ...]` | required | The IDs followed, from the one asked about to `target`. |
+| `outcome` | `str` | required | One of `OUTCOMES`. |
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `usable` | `def usable() -> bool` (property) | True only for `live`. |
+<!-- /dict -->
+
+**Does.** Where an EIDR ID points, the IDs on the way, and why the chain stopped there.
+
+### `Claimant` (class)
+
+<!-- dict:eidr_core.lookup.Claimant -->
+```python
+class Claimant(NamedTuple)
+```
+
+Defined in `src/eidr_core/lookup/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `eidr_id` | `str` | required | The claiming record. |
+| `status` | `str \| None` | required | Its mirror status now (`valid`, `alias`, or None). |
+| `alias` | `AliasResult` | required | Its alias resolution. |
+<!-- /dict -->
+
+**Does.** A record carrying a source ID as an identity Alt ID.
+
+### `OUTCOMES` (constant)
+
+<!-- dict:eidr_core.lookup.OUTCOMES -->
+Defined in `src/eidr_core/lookup/__init__.py`.
+
+**Value** `OUTCOMES = ("live", "tombstoned", "cycle", "missing", "exceeded")` -- why an alias chain stopped: only `live` names a usable record.
 <!-- /dict -->
 
 ## Specs and data files

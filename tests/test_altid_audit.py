@@ -195,3 +195,32 @@ def test_a_deleted_record_is_never_written_to():
             assert [f.error_class for f in r.findings] == ["ASSERTED_ID_DELETED"]
             assert r.additions == () and r.collateral == (A, B) and not r.clean
             assert r.effective_id == TOMBSTONE_ID
+
+
+def test_a_blank_domain_is_sent_as_the_mirrors_empty_domain():
+    # The mirror stores a named type's blank domain as '' and never NULL.
+    # Sending NULL (before 0.57.0) matched no IMDB or ISAN row at all, so
+    # their conflicts were silently never found.
+    seen = []
+
+    class Cur:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def execute(self, sql, params):
+            seen.append((sql, params))
+
+        def fetchall(self):
+            return []
+
+    class Conn:
+        def cursor(self):
+            return Cur()
+
+    MirrorClient(Conn()).lookup_alt_ids([("IMDB", "", "tt1"), ("Proprietary", "a.com", "1")])
+    sql, params = seen[0]
+    assert params[1] == ["", "a.com"]
+    assert "COALESCE(a.domain, '') = k.d" in sql

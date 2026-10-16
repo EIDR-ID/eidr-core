@@ -168,7 +168,7 @@ class AltId(NamedTuple):
     def kind(self) -> tuple[str, str]:
         """The duplicate-identity key: Kind ``(Type, Domain)``.
 
-        Register R8 (closed): a null Domain matches only null, never by
+        Register R8 (closed): a blank Domain matches only blank, never by
         resolved URL, so the IMDB type and the imdb.com domain stay two Kinds.
         """
         return (self.alt_type, self.domain)
@@ -394,9 +394,16 @@ class MirrorClient:
         if not kinds:
             return out
         types = [k[0] for k in kinds]
-        # A blank domain is the mirror's NULL domain, and under R8 a null
-        # Domain matches only null, which IS NOT DISTINCT FROM gives.
-        domains: list[str | None] = [k[1] or None for k in kinds]
+        # R8: a blank Domain matches only a blank one. The mirror stores a
+        # named type's blank domain as '' and never as NULL (measured
+        # 2026-10-15: 4,830,585 rows '', none NULL), so a blank is sent as ''.
+        # Until 0.57.0 it was sent as NULL and matched under IS NOT DISTINCT
+        # FROM, which matched NO named-type row at all: every IMDB and ISAN
+        # identity lookup came back empty, so their conflicts were never
+        # found (a 20,000-key batch: 0 rows, against 20,080 with ''). COALESCE
+        # keeps a NULL domain matching blank if the mirror ever stores one;
+        # the planner drives the join from the alt_id index either way.
+        domains: list[str] = [k[1] or "" for k in kinds]
         values = [k[2] for k in kinds]
         # The relation predicate is the mirror's partial index
         # idx_cais_type_domain_relnorm_altid VERBATIM, so the lookup stays
@@ -411,7 +418,7 @@ class MirrorClient:
             f"JOIN {self._table} a "  # noqa: S608
             "  ON a.id_type = k.t "
             " AND a.alt_id = k.v "
-            " AND a.domain IS NOT DISTINCT FROM k.d "
+            " AND COALESCE(a.domain, '') = k.d "
             "WHERE a.relation IS NULL OR a.relation = %s",
             (types, domains, values, IS_SAME_AS),
         )

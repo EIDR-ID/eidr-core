@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.55.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.56.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,25 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.56.0 (2026-10-15)
+
+* **`bmr_map.row_from_blocks` / `row_from_record` write only the tab's own
+  language family.** Original Language on the Abstraction templates,
+  Version Language on Edit and Manifestation, none on Clip, as `Language
+  Mode` already did since 0.51.0. Before, an Edit built from `full` carried
+  its inherited Original Language into a column the Edit tab does not have,
+  and `write_sheet` dropped and reported it (BMR-Review: 272 values on 271
+  audit Edit rows, one warning per sheet). Sheets come out the same; the
+  warnings go. `PRODUCED_BASES` moves `Original Language` and `Version
+  Language` to the templates that carry them. A caller reading the returned
+  dict for the other family no longer finds it.
+* **New keyword `system_titles="keep"|"drop"`** on both. `"drop"` withholds a
+  system-generated main title from `Title` (and its class and language)
+  without promoting the next title: for a sheet that may be registered,
+  where the title would otherwise become user-supplied and stop being
+  regenerated (BMR-Review's T20 finding; 122 of its 681 records carry one).
+  Default `"keep"`, today's behaviour. Additive.
 
 ### 0.55.0 (2026-10-15)
 
@@ -3265,7 +3284,7 @@ Scan of 2026-10-15; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `fault`
 * **De-Dupe UI**: `ALPHABET`, `check_character`, `is_valid_eidr_id`
 * **eidr-dq**: `find_content_ids`
-* **eidr-wikidata**: `EIDR_CONTENT_ID_RE`, `fault`, `is_valid_eidr_id`
+* **eidr-wikidata**: `EIDR_CONTENT_ID_RE`, `fault`, `is_valid_eidr_id`, `TOMBSTONE_ID`
 * **python-sdk**: (vendors the module, pin `d65267a`)
 * **XML_to_JSON**: `is_valid_eidr_id`
 <!-- /dict-usedby -->
@@ -4912,6 +4931,7 @@ Source `src/eidr_core/bmr_map/__init__.py`. Public names: 8 functions, 3 constan
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_map -->
 Scan of 2026-10-15; regenerated at each release from the consumer trees.
+* **BMR-Review**: `record_from_xml`, `row_from_record`
 * **XML_to_JSON**: `NEVER_PRODUCED`, `PRODUCED_BASES`, `record_from_row`, `row_from_record`
 <!-- /dict-usedby -->
 
@@ -4994,7 +5014,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 
 <!-- dict:eidr_core.bmr_map.row_from_blocks -->
 ```python
-def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template: str, *, administrators: Mapping[str, Any] | None = None) -> dict[str, str | None]
+def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template: str, *, administrators: Mapping[str, Any] | None = None, system_titles: str = "keep") -> dict[str, str | None]
 ```
 
 Defined in `src/eidr_core/bmr_map/__init__.py`.
@@ -5005,6 +5025,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 | `extra` | `Mapping[str, Any]` | required | The selected `ExtraObjectMetadata`. |
 | `template` | `str` | required | One of `SUPPORTED_TEMPLATES`; anything else raises `ValueError`. |
 | `administrators` | `Mapping[str, Any] \| None` | `None` (keyword-only) | Registrant and Metadata Authority. Omitted: `base["Administrators"]`, so a sheet-built record never silently loses them. |
+| `system_titles` | `str` | `"keep"` (keyword-only) | `"drop"` leaves `Title`, `Title Class` and `Title Language` empty when the main title is system-generated, without promoting the next title; for a sheet that may be registered (a sheet cannot mark a title system-generated, so registering it would block regeneration). `"keep"` writes it. Anything else raises ValueError. |
 
 **Returns** `dict[str, str | None]` -- one row, `{column header: text or None}`, numbered families as `"<base> N"`; never `Unique Row ID`.
 <!-- /dict -->
@@ -5015,7 +5036,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 
 <!-- dict:eidr_core.bmr_map.row_from_record -->
 ```python
-def row_from_record(record: Mapping[str, Any], template: str, *, source: str = "self", administrators: Mapping[str, Any] | None = None) -> dict[str, str | None]
+def row_from_record(record: Mapping[str, Any], template: str, *, source: str = "self", administrators: Mapping[str, Any] | None = None, system_titles: str = "keep") -> dict[str, str | None]
 ```
 
 Defined in `src/eidr_core/bmr_map/__init__.py`.
@@ -5026,6 +5047,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 | `template` | `str` | required | One of `SUPPORTED_TEMPLATES`. |
 | `source` | `str` | `"self"` (keyword-only) | `"self"` (SelfDefinedMetadata only) or `"full"` (FullMetadata, falling back to Self). |
 | `administrators` | `Mapping[str, Any] \| None` | `None` (keyword-only) | Overrides where Registrant and Metadata Authority come from; omitted, `administrators_of` decides. |
+| `system_titles` | `str` | `"keep"` (keyword-only) | `"drop"` leaves `Title`, `Title Class` and `Title Language` empty when the main title is system-generated, without promoting the next title; for a sheet that may be registered (a sheet cannot mark a title system-generated, so registering it would block regeneration). `"keep"` writes it. Anything else raises ValueError. |
 
 **Returns** `dict[str, str | None]` -- the row, as `row_from_blocks` returns it.
 <!-- /dict -->
@@ -5064,7 +5086,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 <!-- dict:eidr_core.bmr_map.PRODUCED_BASES -->
 Defined in `src/eidr_core/bmr_map/__init__.py`.
 
-**Value** `PRODUCED_BASES: dict[str, frozenset[str]] = { "non_episodic": _COMMON \| _ISAN \| _MODE, "episodic": _COMMON \| _ISAN \| _EPISODIC \| _M...` -- per supported template, every header base the mapper can write (derived from a record that takes every branch and pinned by a test, together with the rule that every stock template column is here or in `NEVER_PRODUCED`). A produced base need not be a column of that template: Clip carries no Alternate Title, and `write_sheet` reports such a value as dropped.
+**Value** `PRODUCED_BASES: dict[str, frozenset[str]] = { "non_episodic": _COMMON \| _ISAN \| _MODE \| _ORIGINAL, "episodic": _COMMON \| _ISAN \| _E...` -- per supported template, every header base the mapper can write (derived from a record that takes every branch and pinned by a test, together with the rule that every stock template column is here or in `NEVER_PRODUCED`). A produced base need not be a column of that template: Clip carries no Alternate Title, and `write_sheet` reports such a value as dropped.
 <!-- /dict -->
 
 ### `SUPPORTED_TEMPLATES` (constant)

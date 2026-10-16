@@ -80,7 +80,6 @@ _COMMON = frozenset({
     "Structural Type", "Mode", "Referent Type",
     "Title", "Title Class", "Title Language",
     "Alternate Title", "Alt Title Class", "Alt Title Language",
-    "Original Language", "Version Language",
     "Associated Org", "Associated Org Role", "Associated Org Party ID",
     "Release Date", "Country of Origin", "Publication Status", "Approx Length",
     "Alt ID", "Domain", "Relation", "IMDb", "IMDb Relation",
@@ -100,13 +99,21 @@ _EPISODIC = frozenset({
     "Alternate No.", "Alt. No. Domain",
 })
 _MODE = frozenset({"Language Mode"})
+# Each tab carries ONE language family (0.56.0, BMR-Review's T20 finding):
+# Original Language on the Abstraction templates, Version Language on Edit
+# and Manifestation, none on Clip. Before 0.56.0 both were written whatever
+# the template, so every Edit built from `full` carried its inherited
+# Original Language into a column the tab does not have, and write_sheet
+# dropped and reported it (272 values on BMR-Review's 271 audit Edit rows).
+_ORIGINAL = frozenset({"Original Language"})
+_VERSION = frozenset({"Version Language"})
 PRODUCED_BASES: dict[str, frozenset[str]] = {
-    "non_episodic": _COMMON | _ISAN | _MODE,
-    "episodic": _COMMON | _ISAN | _EPISODIC | _MODE,
-    "edit": _COMMON | _ISAN | _MODE | frozenset({
+    "non_episodic": _COMMON | _ISAN | _MODE | _ORIGINAL,
+    "episodic": _COMMON | _ISAN | _EPISODIC | _MODE | _ORIGINAL,
+    "edit": _COMMON | _ISAN | _MODE | _VERSION | frozenset({
         "Parent EIDR/Row ID", "Edit Use", "Edit Class", "Made for Region",
         "Color Type", "In 3D", "Edit Details", "Edit Details Domain"}),
-    "manifestation": _COMMON | _ISAN | _MODE | frozenset({
+    "manifestation": _COMMON | _ISAN | _MODE | _VERSION | frozenset({
         "Parent EIDR/Row ID", "Made for Region", "Manif Class",
         "Operator's Notes", "Manif Details", "Manif Details Domain"}),
     "clip": _COMMON | frozenset({
@@ -248,6 +255,7 @@ def administrators_of(record: Mapping[str, Any], base: Mapping[str, Any]) -> dic
 
 def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template: str,
                     *, administrators: Mapping[str, Any] | None = None,
+                    system_titles: str = "keep",
                     ) -> dict[str, str | None]:
     """Map one record's selected blocks to one Template-22 row.
 
@@ -268,7 +276,13 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
       caps and reports).
     * Titles: ``ResourceName`` entry 0 is ``Title`` / ``Title Class`` /
       ``Title Language``; the rest are ``Alternate Title N`` and companions in
-      record order (no re-sort on this path).
+      record order (no re-sort on this path). ``system_titles="drop"``
+      (0.56.0) leaves ``Title`` / ``Title Class`` / ``Title Language`` empty
+      when that main title is the registry's own (``SystemGenerated`` true),
+      for a sheet that may be registered: a sheet cannot mark a title as
+      system-generated, so registering it would make the title user-supplied
+      and stop the registry regenerating it (inheritance rule 2). The next
+      title is NOT promoted into ``Title``. The default, ``"keep"``, writes it.
     * Metadata Authority: written ONLY to ``Metadata Authority Party ID N``,
       never to the display-name column.
     * Credits: ``Director N`` / ``Actor N`` from ``DisplayName``, then
@@ -281,10 +295,14 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
     * ``Language Mode N`` comes only from the template's own language family
       (Original Language on the Abstraction templates, Version Language on
       Edit and Manifestation, none on Clip); since 0.51.0, not from the reference.
+      Since 0.56.0 the languages themselves follow the same rule: the other
+      family has no column on the tab, so it is not produced.
 
     Values are text (``None`` for absent); keys a template does not carry are
     never produced (``PRODUCED_BASES``).
     """
+    if system_titles not in ("keep", "drop"):
+        raise ValueError(f"system_titles must be 'keep' or 'drop', not {system_titles!r}")
     group = _template_label(template)
     admins = dict(administrators) if administrators is not None else \
         dict(base.get("Administrators") or {})
@@ -298,6 +316,7 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
     if isinstance(titles, dict):
         titles = [titles]
     main: tuple[str | None, str | None, str | None] | None = None
+    main_generated = False
     alt_titles: list[tuple[str | None, str | None, str | None]] = []
     for t in titles:
         if not isinstance(t, dict):
@@ -310,8 +329,14 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
         # this is the reference's rule, kept because rows depend on it.
         if main is None or main[0] is None:
             main = entry
+            main_generated = str(t.get("SystemGenerated")).strip().lower() == "true"
         else:
             alt_titles.append(entry)
+    if system_titles == "drop" and main_generated:
+        # Withheld AFTER choosing the main title, so the next title (an
+        # alternate) is not promoted into Title (BMR-Review measured that
+        # trap on 2 of 681 records).
+        main = None
     if main is not None and main[0] is not None:
         row["Title"] = main[0]
     if main is not None and main[1] is not None:
@@ -361,15 +386,17 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
         if tl is not None:
             row[f"Alt Title Language {i}"] = tl
 
-    # "Language Mode N" is written only from the template's OWN language
-    # family (_LANGUAGE_FAMILY); the other family's modes have no column.
+    # Only the template's OWN language family is written, with its "Language
+    # Mode N" (_LANGUAGE_FAMILY); the other family has no column on the tab.
     own = _LANGUAGE_FAMILY.get(template)
     for family, key in (("Original Language", "OriginalLanguage"),
                         ("Version Language", "VersionLanguage")):
+        if family != own:
+            continue
         for i, v in enumerate(_as_list(base.get(key), (str, int, float)), start=1):
             if isinstance(v, dict):
                 row[f"{family} {i}"] = _text(v.get("Language")) or _text(v.get("value"))
-                if family == own and _text(v.get("_mode")):
+                if _text(v.get("_mode")):
                     row[f"Language Mode {i}"] = _text(v.get("_mode"))
             else:
                 row[f"{family} {i}"] = _text(v)
@@ -532,6 +559,7 @@ def _manifestation_tail(row: dict, mi: Any) -> None:
 
 def row_from_record(record: Mapping[str, Any], template: str, *, source: str = "self",
                     administrators: Mapping[str, Any] | None = None,
+                    system_titles: str = "keep",
                     ) -> dict[str, str | None]:
     """``row_from_blocks`` for a whole standard record, with the documented defaults.
 
@@ -539,11 +567,13 @@ def row_from_record(record: Mapping[str, Any], template: str, *, source: str = "
     ``administrators`` is given, takes them from ``administrators_of``. This
     is exactly what XML_to_JSON's ``--sheet-out`` did per record, minus the
     two things that stay with its caller: the ``Unique Row ID`` column and
-    the verbatim echo of an unconvertible row.
+    the verbatim echo of an unconvertible row. ``system_titles`` is as for
+    ``row_from_blocks``.
     """
     base, extra = select_blocks(record, source)
     admins = administrators if administrators is not None else administrators_of(record, base)
-    return row_from_blocks(base, extra, template, administrators=admins)
+    return row_from_blocks(base, extra, template, administrators=admins,
+                           system_titles=system_titles)
 
 
 # --------------------------------------------------------------------------

@@ -292,6 +292,58 @@ def test_language_mode_is_read_back_into_its_family(template, family, key):
     assert pairs == {("de", None), ("en", "Audio"), ("fr", "Visual")}
 
 
+# ── the languages follow the tab's family too (0.56.0; BMR-Review T20) ──────
+# An Edit built from `full` inherits its parent's Original Language; the Edit
+# tab has no such column, so writing it only made write_sheet drop and report
+# it (272 values on BMR-Review's 271 audit Edit rows).
+
+@pytest.mark.parametrize("template,kept,dropped", [
+    ("non_episodic", "Original Language 1", "Version Language 1"),
+    ("episodic", "Original Language 1", "Version Language 1"),
+    ("edit", "Version Language 1", "Original Language 1"),
+    ("manifestation", "Version Language 1", "Original Language 1")])
+def test_only_the_tabs_own_language_family_is_written(template, kept, dropped):
+    base = {"OriginalLanguage": ["en"], "VersionLanguage": ["fr"]}
+    row = M.row_from_blocks(base, {}, template)
+    assert kept in row and dropped not in row
+
+
+def test_clip_writes_no_language():
+    row = M.row_from_blocks({"OriginalLanguage": ["en"], "VersionLanguage": ["fr"]}, {}, "clip")
+    assert not any("Language" in h and h != "Title Language" for h in row)
+
+
+# ── a system-generated main title on a sheet that may be registered (0.56.0) ─
+# A sheet cannot mark a title as system-generated, so registering one makes it
+# user-supplied and stops regeneration (inheritance rule 2). "drop" withholds
+# it AFTER the main title is chosen, so an alternate is never promoted.
+
+def _titled():
+    return {"ResourceName": [
+        {"value": "Edit of X", "_titleClass": "release", "_lang": "en", "SystemGenerated": "true"},
+        {"value": "FKA X", "_titleClass": "FKA", "_lang": "en", "SystemGenerated": "false"}]}
+
+
+def test_system_titles_keep_is_the_default_and_writes_it():
+    row = M.row_from_blocks(_titled(), {}, "edit")
+    assert row["Title"] == "Edit of X" and row["Alternate Title 1"] == "FKA X"
+
+
+def test_system_titles_drop_withholds_it_without_promoting_the_next():
+    row = M.row_from_blocks(_titled(), {}, "edit", system_titles="drop")
+    assert "Title" not in row and "Title Class" not in row and "Title Language" not in row
+    assert row["Alternate Title 1"] == "FKA X"
+    record = {"SelfDefinedMetadata": {"BaseObjectData": _titled()}}
+    assert "Title" not in M.row_from_record(record, "edit", system_titles="drop")
+
+
+def test_system_titles_drop_keeps_a_user_supplied_title():
+    base = {"ResourceName": [{"value": "Real", "SystemGenerated": "false"}]}
+    assert M.row_from_blocks(base, {}, "edit", system_titles="drop")["Title"] == "Real"
+    with pytest.raises(ValueError):
+        M.row_from_blocks(base, {}, "edit", system_titles="yes")
+
+
 # ── registry XML -> standard record (0.52.0; BMR-Review T20) ────────────────
 # Differentially checked before release: for 363 registry records (60 each of
 # Basic, Series, Season, Episode, Edit, Manifestation, chosen for group 2+ of

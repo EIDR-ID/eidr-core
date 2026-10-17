@@ -75,3 +75,26 @@ def test_number_families_omits_empty_members():
     (["FR", "XX", "DE", "FR"], ["FR", "DE"])])
 def test_country_list_keeps_xx_only_alone(codes, want):
     assert country_list(codes) == want
+
+
+def test_registrant_is_the_member_party_else_the_eidr_catalog_party():
+    assert bmr_rows.registrant_party(bmr_rows.IMDB_PARTY) == "10.5237/27B2-6941"
+    assert bmr_rows.registrant_party() == "10.5237/FFDA-9947"
+    assert bmr_rows.registrant_party("  ") == bmr_rows.EIDR_CATALOG_PARTY
+
+
+def test_intertitles_are_language_material_and_zxx_is_only_for_none():
+    # Operator 2026-10-17: a silent work keeps its (intertitle) language,
+    # mode Visual; zxx only for actualities, stock footage and the like.
+    assert bmr_rows.original_languages(["en"], silent=True) == [("en", "Visual")]
+    assert bmr_rows.original_languages([], silent=True) == [("und", "Visual")]
+    assert bmr_rows.original_languages(["en"], silent=True, no_language_material=True) == [
+        ("zxx", "Visual")]
+    assert bmr_rows.original_languages(["fr", "fr", " ", "en"]) == [
+        ("fr", "Audio"), ("en", "Audio")]
+
+
+def test_title_language_is_und_only_when_there_is_a_title():
+    assert bmr_rows.title_language("Metropolis") == "und"
+    assert bmr_rows.title_language("Metropolis", "de") == "de"
+    assert bmr_rows.title_language("") == ""

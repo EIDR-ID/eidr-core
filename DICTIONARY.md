@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.61.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.62.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,20 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.62.0 (2026-10-17)
+
+* **`bmr_rows` defaults, per the operator's rulings of 2026-10-17:**
+  `registrant_party` with `IMDB_PARTY` (`10.5237/27B2-6941`, IMDb is an EIDR
+  member) and `EIDR_CATALOG_PARTY` (`10.5237/FFDA-9947`, for non-member
+  sources such as Wikidata), and no Metadata Authority on inbound rows;
+  `original_languages` (intertitles are language material, so a silent work
+  keeps its language with mode Visual; `zxx` only for material with no
+  narrative language, such as actualities and stock footage);
+  `title_language`. Additive.
+* **`chunk_rows` / `BMR_ROW_LIMIT`: the limit is a guideline** against the BMR
+  tool's memory errors, not a hard cutoff (5,000 for wide rows; about 25,000
+  for a default template). Docs only.
 
 ### 0.61.0 (2026-10-17)
 
@@ -551,8 +565,13 @@ edition's Changes entry.
 | [`eidr_core.bmr_rows.chunk_rows`](#chunk_rows) | function | Splits rows into files of at most `limit` rows. |
 | [`eidr_core.bmr_rows.join_notes`](#join_notes) | function | Joins the parts with `" \| "`, a `SWAPPED:` note moved first, because BMR-Review's control parses the opening of the cell. |
 | [`eidr_core.bmr_rows.number_families`](#number_families) | function | Expands each family list to `"<Member> <n>"` columns and omits empty members, so the writer neither writes empty strings nor counts them toward the width. |
+| [`eidr_core.bmr_rows.original_languages`](#original_languages) | function | Builds the Original Language family under the operator's 2026-10-17 ruling: the stated languages, de-duplicated, or `und` when none is known; mode Visual for a silent work, Audio otherwise; `zxx` only with `no_language_material`. |
+| [`eidr_core.bmr_rows.registrant_party`](#registrant_party) | function | Returns the member party, or `EIDR_CATALOG_PARTY` for a non-member source such as Wikidata (operator, 2026-10-17). |
 | [`eidr_core.bmr_rows.registry_ids_cell`](#registry_ids_cell) | function | De-duplicates, sorts and joins the IDs with `" \| "` (R1), so the cell does not change with query order. |
-| [`eidr_core.bmr_rows.BMR_ROW_LIMIT`](#bmr_row_limit-constant) | constant | the rows the BMR tool takes per file (plan section 1, step 2). |
+| [`eidr_core.bmr_rows.title_language`](#title_language) | function | Returns the stated language, `und` for a title without one, and nothing when there is no title. |
+| [`eidr_core.bmr_rows.BMR_ROW_LIMIT`](#bmr_row_limit-constant) | constant | rows per file: the safe guideline for wide rows against the BMR tool's memory errors (operator, 2026-10-17); a default-template sheet can go to about 25,000. |
+| [`eidr_core.bmr_rows.EIDR_CATALOG_PARTY`](#eidr_catalog_party-constant) | constant | the EIDR Catalog party, the Registrant for records from a source that is not an EIDR member. |
+| [`eidr_core.bmr_rows.IMDB_PARTY`](#imdb_party-constant) | constant | IMDb's Party ID (IMDb is an EIDR member), the Registrant for IMDb-sourced records. |
 | [`eidr_core.bmr_rows.NOTE_SEPARATOR`](#note_separator-constant) | constant | the one separator for Operator's Notes and the Registry EIDR ID(s) cell. |
 | [`eidr_core.bmr_rows.REGISTRY_IDS_COLUMN`](#registry_ids_column-constant) | constant | R1's column of the EIDR records that carry the source ID. |
 | [`eidr_core.bmr_rows.SOURCE_ASSERTED_COLUMN`](#source_asserted_column-constant) | constant | R1's column of the EIDR ID the source itself asserts (Wikidata P2704; empty for IMDb). |
@@ -6171,10 +6190,10 @@ Defined in `src/eidr_core/swap/__init__.py`.
 ## `eidr_core.bmr_rows`
 
 <!-- dict-module:eidr_core.bmr_rows -->
-Source `src/eidr_core/bmr_rows/__init__.py`. Public names: 4 functions, 5 constants (declared by `__all__`).
+Source `src/eidr_core/bmr_rows/__init__.py`. Public names: 7 functions, 7 constants (declared by `__all__`).
 <!-- /dict-module -->
 
-**Purpose.** Helpers that the tools which build inbound BMR sheets (eidr-imdb, eidr-wikidata) each re-implemented: the two unconfirmed-ID columns of ruling R1, repeating families as numbered columns, the 5,000-row files the BMR tool takes with each Series tree kept whole, and one separator for Operator's Notes. Reconciliation plan component C2, ruled in eidr-core-ops `PHASE2-3-INTERFACES-2026-10-15.md`. Routing stays `bmr_io.template_for_creation_type`, writing stays `bmr_io.write_sheet`, and Country of Origin is `codes.country_list`.
+**Purpose.** Helpers that the tools which build inbound BMR sheets (eidr-imdb, eidr-wikidata) each re-implemented: the two unconfirmed-ID columns of ruling R1, repeating families as numbered columns, files of about 5,000 rows (a guideline against the BMR tool's memory errors) with each Series tree kept whole, and one separator for Operator's Notes. Reconciliation plan component C2, ruled in eidr-core-ops `PHASE2-3-INTERFACES-2026-10-15.md`. Routing stays `bmr_io.template_for_creation_type`, writing stays `bmr_io.write_sheet`, and Country of Origin is `codes.country_list`.
 
 **Use it when.** 
 * You split a sheet's rows into files for the BMR tool: `chunk_rows` with `starts_tree` for episodic rows.
@@ -6271,7 +6290,7 @@ Defined in `src/eidr_core/bmr_rows/__init__.py`.
 <!-- dict:eidr_core.bmr_rows.BMR_ROW_LIMIT -->
 Defined in `src/eidr_core/bmr_rows/__init__.py`.
 
-**Value** `BMR_ROW_LIMIT = 5_000` -- the rows the BMR tool takes per file (plan section 1, step 2).
+**Value** `BMR_ROW_LIMIT = 5_000` -- rows per file: the safe guideline for wide rows against the BMR tool's memory errors (operator, 2026-10-17); a default-template sheet can go to about 25,000. Not a hard cutoff.
 <!-- /dict -->
 
 ### `NOTE_SEPARATOR` (constant)
@@ -6304,6 +6323,79 @@ Defined in `src/eidr_core/bmr_rows/__init__.py`.
 Defined in `src/eidr_core/bmr_rows/__init__.py`.
 
 **Value** `UNCONFIRMED_ID_COLUMNS = (SOURCE_ASSERTED_COLUMN, REGISTRY_IDS_COLUMN)` -- both R1 columns, in order, for `write_sheet`'s `extra_columns`.
+<!-- /dict -->
+
+### `original_languages`
+
+<!-- dict:eidr_core.bmr_rows.original_languages -->
+```python
+def original_languages(languages: Iterable[str] | None, *, silent: bool = False, no_language_material: bool = False) -> list[tuple[str, str]]
+```
+
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `languages` | `Iterable[str] \| None` | required | The work's languages as the source states them. |
+| `silent` | `bool` | `False` (keyword-only) | True for a silent work: every language gets mode Visual (intertitles are language material). |
+| `no_language_material` | `bool` | `False` (keyword-only) | True only for material with no narrative language at all (actualities, stock footage): gives `zxx`. |
+
+**Returns** `list[tuple[str, str]]` -- `(Original Language, Language Mode)` pairs.
+<!-- /dict -->
+
+**Does.** Builds the Original Language family under the operator's 2026-10-17 ruling: the stated languages, de-duplicated, or `und` when none is known; mode Visual for a silent work, Audio otherwise; `zxx` only with `no_language_material`. eidr-wikidata wrote `zxx` for every silent work, which the ruling corrects.
+
+### `registrant_party`
+
+<!-- dict:eidr_core.bmr_rows.registrant_party -->
+```python
+def registrant_party(member_party: str | None = None) -> str
+```
+
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `member_party` | `str \| None` | `None` | The source's own Party ID when the source is an EIDR member (`IMDB_PARTY` for IMDb). |
+
+**Returns** `str` -- the Registrant Party ID.
+<!-- /dict -->
+
+**Does.** Returns the member party, or `EIDR_CATALOG_PARTY` for a non-member source such as Wikidata (operator, 2026-10-17). Inbound rows carry no Metadata Authority.
+
+### `title_language`
+
+<!-- dict:eidr_core.bmr_rows.title_language -->
+```python
+def title_language(title: str | None, language: str | None = None) -> str
+```
+
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `title` | `str \| None` | required | The row's title. |
+| `language` | `str \| None` | `None` | Its stated language, if any. |
+
+**Returns** `str` -- the Title Language value.
+<!-- /dict -->
+
+**Does.** Returns the stated language, `und` for a title without one, and nothing when there is no title.
+
+### `EIDR_CATALOG_PARTY` (constant)
+
+<!-- dict:eidr_core.bmr_rows.EIDR_CATALOG_PARTY -->
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+**Value** `EIDR_CATALOG_PARTY = "10.5237/FFDA-9947"` -- the EIDR Catalog party, the Registrant for records from a source that is not an EIDR member.
+<!-- /dict -->
+
+### `IMDB_PARTY` (constant)
+
+<!-- dict:eidr_core.bmr_rows.IMDB_PARTY -->
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+**Value** `IMDB_PARTY = "10.5237/27B2-6941"` -- IMDb's Party ID (IMDb is an EIDR member), the Registrant for IMDb-sourced records.
 <!-- /dict -->
 
 ## Specs and data files

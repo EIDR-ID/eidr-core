@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.60.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.61.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,17 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.61.0 (2026-10-17)
+
+* **`external.RequestPacer(shared_scope=..., scope_dir=...)`**: pacers in
+  different processes with the same scope name share one pace (the slots,
+  the spacing, the slow pause, `back_off`). For Wikidata's AC9, which counts
+  all of EIDR's programs as one client (eidr-metadata-sources' request of
+  2026-10-17): eidr-wikidata's Action API client and BMR-Review's verifier
+  adopt it with one scope name, for example `"wikimedia-action-api"`. OS file
+  locks (msvcrt / flock), standard library only; a dead holder releases its
+  slot. Default `None` is today's in-process pacer, unchanged. Additive.
 
 ### 0.60.0 (2026-10-17)
 
@@ -1776,6 +1787,7 @@ Source `src/eidr_core/codes/__init__.py`. Public names: 2 functions, 2 constants
 **Used by.**
 <!-- dict-usedby:eidr_core.codes -->
 Scan of 2026-10-17; regenerated at each release from the consumer trees.
+* **eidr-imdb**: `country_list`
 * **eidr-wikidata**: `normalize_country_code`
 <!-- /dict-usedby -->
 
@@ -3171,14 +3183,14 @@ Defined in `src/eidr_core/external/failover.py`.
 
 | Method | Signature | Purpose |
 |---|---|---|
-| `__init__` | `def __init__(min_interval: float = WIKIMEDIA_MIN_INTERVAL, *, slow_threshold: float = WIKIMEDIA_SLOW_REQUEST, slow_pause: float = WIKIMEDIA_SLOW_PAUSE, max_concurrent: int = 1, clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep) -> None` | `min_interval`: seconds between request starts (0.3, Wikimedia's 200 a minute); `slow_threshold` / `slow_pause`: after a request longer than 1.0 s, wait 5.0 s; `max_concurrent`: requests in flight at once (1); `clock` / `sleep`: injectable for tests. `max_concurrent` below 1 raises `ValueError`. |
+| `__init__` | `def __init__(min_interval: float = WIKIMEDIA_MIN_INTERVAL, *, slow_threshold: float = WIKIMEDIA_SLOW_REQUEST, slow_pause: float = WIKIMEDIA_SLOW_PAUSE, max_concurrent: int = 1, clock: Callable[[], float] = time.monotonic, sleep: Callable[[float], None] = time.sleep, shared_scope: str \| None = None, scope_dir: str \| os.PathLike[str] \| None = None) -> None` | `min_interval`: seconds between request starts (0.3, Wikimedia's 200 a minute); `slow_threshold` / `slow_pause`: after a request longer than 1.0 s, wait 5.0 s; `max_concurrent`: requests in flight at once (1); `clock` / `sleep`: injectable for tests; `shared_scope` (0.61.0): a name (1-64 of `[A-Za-z0-9._-]`) that makes every pacer on the MACHINE with that name share the slots, the spacing, the slow pause and `back_off`, through OS file locks in `scope_dir` (default: the system temp directory); shared mode keeps time on the wall clock. `max_concurrent` below 1, or a bad scope name, raises `ValueError`. |
 | `wait` | `def wait() -> None` | Blocks until the next request may start and claims that start; thread-safe. |
 | `done` | `def done(duration: float) -> None` | Records a finished request; `duration` in seconds. Over `slow_threshold`, the next request waits `slow_pause`. |
 | `back_off` | `def back_off(seconds: float) -> None` | Makes the next request wait at least `seconds` from now (a Retry-After, a `maxlag` answer); never shortens a wait. |
 | `request` | `def request() -> Iterator[None]` | Context manager around ONE request: holds a concurrency slot, waits for the pace, runs the body, and records its duration even when the body raises. |
 <!-- /dict -->
 
-**Does.** Paces requests: one at a time by default, 0.3 s apart, and 5 s after any request slower than 1 s (Wikimedia's rules for an unauthenticated client). It holds its own state, and the caller decides its scope: one per client, or one shared by every client in the process when the rule is process-wide. No instance exists at import. Added in 0.47.0 for eidr-wikidata's Action API client and BMR-Review's Wikidata verifier, which each carried the same pacer.
+**Does.** Paces requests: one at a time by default, 0.3 s apart, and 5 s after any request slower than 1 s (Wikimedia's rules for an unauthenticated client). It holds its own state, and the caller decides its scope: one per client, or one shared by every client in the process when the rule is process-wide, or, with `shared_scope` (0.61.0), one pace for every process on the machine, for a rule that counts all of EIDR's programs as one client (Wikidata's AC9: eidr-wikidata's and BMR-Review's Action API clients). A process that dies holding a slot releases it, because the OS drops its file lock. No instance exists at import. Added in 0.47.0 for eidr-wikidata's Action API client and BMR-Review's Wikidata verifier, which each carried the same pacer.
 
 **Notes.** Use it inside the `attempt` you pass to `call_with_failover`; on a 429 or `maxlag` answer also call `back_off(retry_after_seconds(exc))`, so the NEXT call waits as well as the retry.
 

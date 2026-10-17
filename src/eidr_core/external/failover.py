@@ -111,12 +111,17 @@ per-source clients keep their single homes (R13: one home per source).
 from __future__ import annotations
 
 import email.utils
+import json
 import logging
+import os
 import random
+import re
+import sys
+import tempfile
 import threading
 import time
 from collections.abc import Callable, Iterable, Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from datetime import datetime, timezone
 from typing import Any
 
@@ -581,6 +586,54 @@ WIKIMEDIA_SLOW_REQUEST = 1.0    # "if your request takes more than 1 second to s
 WIKIMEDIA_SLOW_PAUSE = 5.0      # "...please wait 5 seconds"
 
 
+class _FileLock:
+    """An exclusive lock on one byte of a file, held by an open handle.
+
+    The operating system drops it when the holder exits, so a process that
+    dies mid-request never leaves the scope locked: msvcrt on Windows, flock
+    elsewhere. Standard library only.
+    """
+
+    def __init__(self, path: str) -> None:
+        self._path = path
+        self._fd: int | None = None
+
+    def try_acquire(self) -> bool:
+        fd = os.open(self._path, os.O_RDWR | os.O_CREAT, 0o644)
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+                msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            os.close(fd)
+            return False
+        self._fd = fd
+        return True
+
+    def release(self) -> None:
+        fd, self._fd = self._fd, None
+        if fd is None:
+            return
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+                os.lseek(fd, 0, os.SEEK_SET)
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
+
+
+_SCOPE_NAME = re.compile(r"[A-Za-z0-9._-]{1,64}")
+# How often a process waiting on another process's lock looks again.
+_SCOPE_POLL = 0.05
+
+
 class RequestPacer:
     """Paces requests: at most ``max_concurrent`` at a time, at least
     ``min_interval`` seconds apart, and ``slow_pause`` seconds after any
@@ -591,6 +644,18 @@ class RequestPacer:
     every client in the process when the rule is process-wide (Wikimedia's
     concurrency rule is). No instance is created at import (lesson 23: a
     library holds no hidden process-wide state). Thread-safe.
+
+    ``shared_scope`` (0.61.0) widens the scope to every PROCESS on the
+    machine: all pacers given the same scope name share the concurrency
+    slots, the spacing, the slow-request pause and ``back_off``. For a rule
+    that counts all of EIDR's programs as one client (Wikidata's AC9,
+    eidr-metadata-sources 2026-10-17: eidr-wikidata and BMR-Review both call
+    the Action API, and two processes otherwise put two requests in flight).
+    The state is a small file per scope under ``scope_dir`` (default: the
+    system temp directory), guarded by operating-system file locks, which
+    are released when a holder exits. Shared mode keeps time on the wall
+    clock, the only clock processes share; with the default ``clock`` it
+    uses ``time.time``.
 
     Use it around the request itself, for example inside the ``attempt`` you
     hand to ``call_with_failover``::
@@ -609,7 +674,9 @@ class RequestPacer:
                  slow_pause: float = WIKIMEDIA_SLOW_PAUSE,
                  max_concurrent: int = 1,
                  clock: Callable[[], float] = time.monotonic,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] = time.sleep,
+                 shared_scope: str | None = None,
+                 scope_dir: str | os.PathLike[str] | None = None) -> None:
         if max_concurrent < 1:
             raise ValueError("max_concurrent must be at least 1")
         self.min_interval = max(0.0, float(min_interval))
@@ -618,16 +685,78 @@ class RequestPacer:
         self._slot = threading.BoundedSemaphore(max_concurrent)
         self._lock = threading.Lock()
         self._next = 0.0
-        self._clock = clock
         self._sleep = sleep
+        self.shared_scope = shared_scope
+        if shared_scope is None:
+            self._clock = clock
+            return
+        if not _SCOPE_NAME.fullmatch(shared_scope):
+            raise ValueError(f"shared_scope must be 1-64 of [A-Za-z0-9._-]: {shared_scope!r}")
+        # Monotonic clocks are per process; the shared state needs one clock.
+        self._clock = time.time if clock is time.monotonic else clock
+        folder = os.fspath(scope_dir) if scope_dir is not None else os.path.join(
+            tempfile.gettempdir(), "eidr-core-pacer")
+        os.makedirs(folder, exist_ok=True)
+        base = os.path.join(folder, shared_scope)
+        self._state_path = base + ".state"
+        self._mutex = _FileLock(base + ".lock")
+        self._slot_paths = [f"{base}.slot{i}" for i in range(max_concurrent)]
+
+    # -- the shared state (shared_scope only) --------------------------------
+
+    def _with_mutex(self, body: Callable[[float], float]) -> None:
+        """Run ``body(next)`` under the scope's file lock; store what it returns."""
+        while not self._mutex.try_acquire():
+            self._sleep(_SCOPE_POLL)
+        try:
+            try:
+                with open(self._state_path, encoding="utf-8") as fh:
+                    nxt = float(json.load(fh).get("next", 0.0))
+            except (OSError, ValueError, AttributeError):
+                nxt = 0.0       # first use, or a torn write: no wait owed
+            nxt = body(nxt)
+            tmp = f"{self._state_path}.{os.getpid()}.tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump({"next": nxt}, fh)
+            os.replace(tmp, self._state_path)
+        finally:
+            self._mutex.release()
+
+    @contextmanager
+    def _shared_slot(self) -> Iterator[None]:
+        """Hold one of the scope's ``max_concurrent`` slots, machine-wide."""
+        held: _FileLock | None = None
+        while held is None:
+            for path in self._slot_paths:
+                lock = _FileLock(path)
+                if lock.try_acquire():
+                    held = lock
+                    break
+            else:
+                self._sleep(_SCOPE_POLL)
+        try:
+            yield
+        finally:
+            held.release()
+
+    # -- the API ------------------------------------------------------------
 
     def wait(self) -> None:
         """Block until the next request may start, and claim that start."""
         with self._lock:
-            delay = self._next - self._clock()
-            if delay > 0:
-                self._sleep(delay)
-            self._next = self._clock() + self.min_interval
+            if self.shared_scope is None:
+                delay = self._next - self._clock()
+                if delay > 0:
+                    self._sleep(delay)
+                self._next = self._clock() + self.min_interval
+                return
+
+            def claim(nxt: float) -> float:
+                delay = nxt - self._clock()
+                if delay > 0:
+                    self._sleep(delay)
+                return self._clock() + self.min_interval
+            self._with_mutex(claim)
 
     def done(self, duration: float) -> None:
         """Record how long the request took: a slow one pauses the next."""
@@ -637,19 +766,27 @@ class RequestPacer:
     def back_off(self, seconds: float) -> None:
         """Make the next request wait at least ``seconds`` from now (a
         Retry-After, a ``maxlag`` answer). Never shortens a wait."""
+        until = max(0.0, float(seconds))
         with self._lock:
-            self._next = max(self._next, self._clock() + max(0.0, float(seconds)))
+            if self.shared_scope is None:
+                self._next = max(self._next, self._clock() + until)
+                return
+            self._with_mutex(lambda nxt: max(nxt, self._clock() + until))
 
     @contextmanager
     def request(self) -> Iterator[None]:
         """Hold a concurrency slot, wait for the pace, run the body, and
         record its duration -- also when the body raises, since a slow
-        failure loaded the server as much as a slow success."""
+        failure loaded the server as much as a slow success. With
+        ``shared_scope`` the slot is held machine-wide."""
         with self._slot:
-            self.wait()
-            started = self._clock()
-            try:
-                yield
-            finally:
-                self.done(self._clock() - started)
+            outer: AbstractContextManager[None] = (
+                nullcontext() if self.shared_scope is None else self._shared_slot())
+            with outer:
+                self.wait()
+                started = self._clock()
+                try:
+                    yield
+                finally:
+                    self.done(self._clock() - started)
 

@@ -39,8 +39,14 @@ from __future__ import annotations
 # not the stdlib and third-party modules this file imports.
 __all__ = [
     "OBSOLETE_ALPHA2_TO_ALPHA4",
+    "UNKNOWN_COUNTRY",
+    "country_list",
     "normalize_country_code",
 ]
+
+# The code for "country unknown". Only valid ALONE: it cannot be combined
+# with a real code (the portfolio's convention, register R1).
+UNKNOWN_COUNTRY = "XX"
 
 # Former ISO 3166-1 alpha-2 codes of dissolved/renamed countries → alpha-4.
 OBSOLETE_ALPHA2_TO_ALPHA4: dict[str, str] = {
@@ -65,3 +71,22 @@ def normalize_country_code(code: str) -> str:
     if not c:
         return ""
     return OBSOLETE_ALPHA2_TO_ALPHA4.get(c, c)
+
+
+def country_list(codes) -> list[str]:
+    """The Country of Origin values for one row, in the EIDR convention.
+
+    Each code is normalised (``normalize_country_code``), blanks and repeats
+    are dropped in order, and ``XX`` is kept only when it is the ONLY code:
+    beside a real country it is dropped (register R1). No codes at all gives
+    ``["XX"]``, the plan's S6 default, so every row states the field.
+    Extracted 2026-10-17 (C2) from eidr-wikidata ``CountryValidator.
+    validate_list``'s XX rule; eidr-imdb wrote ``XX`` beside real codes.
+    """
+    out: list[str] = []
+    for code in codes or ():
+        c = normalize_country_code(code)
+        if c and c not in out:
+            out.append(c)
+    real = [c for c in out if c != UNKNOWN_COUNTRY]
+    return real or [UNKNOWN_COUNTRY]

@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.59.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.60.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,17 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.60.0 (2026-10-17)
+
+* **New module `eidr_core.bmr_rows` (reconciliation C2, first part):** the R1
+  column names (`SOURCE_ASSERTED_COLUMN`, `REGISTRY_IDS_COLUMN`) and
+  `registry_ids_cell`; `number_families` (from eidr-imdb); `chunk_rows`, the
+  BMR files of at most 5,000 rows with Series trees whole (from eidr-wikidata,
+  with the ruled change that the limit is a ceiling); `join_notes`. The rest
+  of C2 waits on three operator questions (in the interfaces doc). Additive.
+* **New: `codes.country_list`** (XX only alone, empty means XX) and
+  `codes.UNKNOWN_COUNTRY`. Additive.
 
 ### 0.59.0 (2026-10-16)
 
@@ -526,8 +537,19 @@ edition's Changes entry.
 | [`eidr_core.bmr_map.NEVER_PRODUCED`](#never_produced-constant) | constant | the template columns this module never writes, each for a stated reason: `Unique Row ID` (the caller's), `Assigned EIDR ID` and `Registration Errors & Notes` (the registry's and the reviewer's), `Metadata Authority` (the display name; only the Party ID column is written), `Operator's Notes` (written on Manifestation only). |
 | [`eidr_core.bmr_map.PRODUCED_BASES`](#produced_bases-constant) | constant | per supported template, every header base the mapper can write (derived from a record that takes every branch and pinned by a test, together with the rule that every stock template column is here or in `NEVER_PRODUCED`). |
 | [`eidr_core.bmr_map.SUPPORTED_TEMPLATES`](#supported_templates-constant) | constant | the template keys `row_from_blocks` writes; Compilation has a sheet but is refused. |
+| [`eidr_core.bmr_rows.chunk_rows`](#chunk_rows) | function | Splits rows into files of at most `limit` rows. |
+| [`eidr_core.bmr_rows.join_notes`](#join_notes) | function | Joins the parts with `" \| "`, a `SWAPPED:` note moved first, because BMR-Review's control parses the opening of the cell. |
+| [`eidr_core.bmr_rows.number_families`](#number_families) | function | Expands each family list to `"<Member> <n>"` columns and omits empty members, so the writer neither writes empty strings nor counts them toward the width. |
+| [`eidr_core.bmr_rows.registry_ids_cell`](#registry_ids_cell) | function | De-duplicates, sorts and joins the IDs with `" \| "` (R1), so the cell does not change with query order. |
+| [`eidr_core.bmr_rows.BMR_ROW_LIMIT`](#bmr_row_limit-constant) | constant | the rows the BMR tool takes per file (plan section 1, step 2). |
+| [`eidr_core.bmr_rows.NOTE_SEPARATOR`](#note_separator-constant) | constant | the one separator for Operator's Notes and the Registry EIDR ID(s) cell. |
+| [`eidr_core.bmr_rows.REGISTRY_IDS_COLUMN`](#registry_ids_column-constant) | constant | R1's column of the EIDR records that carry the source ID. |
+| [`eidr_core.bmr_rows.SOURCE_ASSERTED_COLUMN`](#source_asserted_column-constant) | constant | R1's column of the EIDR ID the source itself asserts (Wikidata P2704; empty for IMDb). |
+| [`eidr_core.bmr_rows.UNCONFIRMED_ID_COLUMNS`](#unconfirmed_id_columns-constant) | constant | both R1 columns, in order, for `write_sheet`'s `extra_columns`. |
+| [`eidr_core.codes.country_list`](#country_list) | function | Normalises each code (`normalize_country_code`), drops blanks and repeats in order, and keeps `XX` only when it is the only code (register R1); no codes gives `["XX"]`. |
 | [`eidr_core.codes.normalize_country_code`](#normalize_country_code) | function | Returns the EIDR form of one country code, rewriting a dissolved or renamed country's alpha-2 code to alpha-4. |
 | [`eidr_core.codes.OBSOLETE_ALPHA2_TO_ALPHA4`](#obsolete_alpha2_to_alpha4-constant) | constant | The crosswalk from former ISO 3166-1 alpha-2 codes of dissolved or renamed countries to their ISO 3166-3 alpha-4 codes: SU to SUHH, YU to YUCS, CS to CSHH (Czechoslovakia, not Serbia and Montenegro's CSXX), DD to DDDE, BU to BUMM. |
+| [`eidr_core.codes.UNKNOWN_COUNTRY`](#unknown_country-constant) | constant | the code for "country unknown"; only valid alone. |
 | [`eidr_core.compare.alt_source`](#alt_source) | function | Returns the namespace key under which an Alt ID's value is compared: its casefolded domain, else its casefolded type. |
 | [`eidr_core.compare.cmp_actors`](#cmp_actors) | function | Compares actors lists by greedy one-to-one name alignment; quality is matched strength over the smaller list's size. |
 | [`eidr_core.compare.cmp_alt_ids`](#cmp_alt_ids) | function | Compares third-party identifiers per namespace: a shared value is identity evidence; disagreeing values in a shared namespace are a conflict. |
@@ -745,7 +767,7 @@ Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 8 functions, 2 cl
 
 **Used by.**
 <!-- dict-usedby:eidr_core.altidtool_io -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `AltIdRow`, `emission_problem`, `format_line`, `multi_form_domains`
 * **eidr-dq**: `identity_relation_sql`
 * **eidr-imdb**: `AltIdRow`, `format_line`, `parse_line`, `write_lines`
@@ -973,7 +995,7 @@ Source `src/eidr_core/bmr_io/__init__.py`. Public names: 21 functions, 9 classes
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `families_for`, `header_map`, `index_rows`, `read_headers`, `resolve_parent`, `template_for_creation_type`, `write_sheet`
 * **BMRtoAltID**: `ASSIGNED_ID_COLUMN`, `check_sheet`, `DATA_START`, `family_layout`, `fill_column`, `HEADER_ROW`, `open_sheet`, `ROW_ID_COLUMN`, `SHEET_TO_TEMPLATE`, `subset_rows`, `TemplateMismatch`, `TEMPLATES`
 * **eidr-dq**: `pad_groups`, `RepeatPlan`
@@ -1707,7 +1729,7 @@ Source `src/eidr_core/bmr_io/subset.py`. Public names: 1 function (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io.subset -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `required_headers`
 <!-- /dict-usedby -->
 
@@ -1734,7 +1756,7 @@ Defined in `src/eidr_core/bmr_io/subset.py`.
 ## `eidr_core.codes`
 
 <!-- dict-module:eidr_core.codes -->
-Source `src/eidr_core/codes/__init__.py`. Public names: 1 function, 1 constant (declared by `__all__`).
+Source `src/eidr_core/codes/__init__.py`. Public names: 2 functions, 2 constants (declared by `__all__`).
 <!-- /dict-module -->
 
 **Purpose.** Country-code rules that every portfolio program must apply the same way. EIDR's convention is ISO 3166-1 alpha-2 for countries that exist, ISO 3166-3 alpha-4 for dissolved ones, UN M49 numbers for regions, and `XX` for unknown. So the alpha-2 code of a dissolved country (Wikidata P297 gives `SU` for the USSR) is always wrong for EIDR and is rewritten to alpha-4 (`SUHH`). The crosswalk used to be duplicated in eidr-wikidata and BMR-Review and is now single-homed here (register R1).
@@ -1753,7 +1775,7 @@ Source `src/eidr_core/codes/__init__.py`. Public names: 1 function, 1 constant (
 
 **Used by.**
 <!-- dict-usedby:eidr_core.codes -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **eidr-wikidata**: `normalize_country_code`
 <!-- /dict-usedby -->
 
@@ -1785,6 +1807,32 @@ Defined in `src/eidr_core/codes/__init__.py`.
 **Value** `OBSOLETE_ALPHA2_TO_ALPHA4: dict[str, str] = { "SU": "SUHH", # U.S.S.R., dissolved 1991 "YU": "YUCS", # Yugoslavia (SFR), dissolved ...` -- The crosswalk from former ISO 3166-1 alpha-2 codes of dissolved or renamed countries to their ISO 3166-3 alpha-4 codes: SU to SUHH, YU to YUCS, CS to CSHH (Czechoslovakia, not Serbia and Montenegro's CSXX), DD to DDDE, BU to BUMM. Keys and values are uppercase. Read it, never mutate it: `normalize_country_code` uses this dict, so a change applies to the whole process. New entries are added in eidr-core.
 <!-- /dict -->
 
+### `country_list`
+
+<!-- dict:eidr_core.codes.country_list -->
+```python
+def country_list(codes) -> list[str]
+```
+
+Defined in `src/eidr_core/codes/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `codes` | - | required | Country codes from a source, any case. |
+
+**Returns** `list[str]` -- the Country of Origin values.
+<!-- /dict -->
+
+**Does.** Normalises each code (`normalize_country_code`), drops blanks and repeats in order, and keeps `XX` only when it is the only code (register R1); no codes gives `["XX"]`. Identical to eidr-wikidata's `CountryValidator.validate_list` on its XX rule; eidr-imdb wrote XX beside real codes until 2026-10-17.
+
+### `UNKNOWN_COUNTRY` (constant)
+
+<!-- dict:eidr_core.codes.UNKNOWN_COUNTRY -->
+Defined in `src/eidr_core/codes/__init__.py`.
+
+**Value** `UNKNOWN_COUNTRY = "XX"` -- the code for "country unknown"; only valid alone.
+<!-- /dict -->
+
 ## `eidr_core.compare`
 
 <!-- dict-module:eidr_core.compare -->
@@ -1806,7 +1854,7 @@ Source `src/eidr_core/compare/__init__.py`. Public names: 20 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `cmp_alt_ids`, `COMPARATORS`, `FieldResult`, `set_params`
 * **De-Dupe UI**: `cmp_alt_ids`, `cmp_length`, `cmp_release_date`, `cmp_titles`, `fuzzy`
 <!-- /dict-usedby -->
@@ -2273,7 +2321,7 @@ Source `src/eidr_core/compare/nonlinear.py`. Public names: 3 functions (declared
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.nonlinear -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `accumulate`, `aggregate`, `corroborate`, (the module)
 * **De-Dupe UI**: `accumulate`
 <!-- /dict-usedby -->
@@ -2361,7 +2409,7 @@ Source `src/eidr_core/compare/spec.py`. Public names: 2 functions (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.spec -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_spec`, `spec_path`, (the module)
 <!-- /dict-usedby -->
 
@@ -2422,7 +2470,7 @@ Source `src/eidr_core/compare/states.py`. Public names: 4 functions (declared by
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.states -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `band`, `field_not_counted`, `field_states`, `ui_field_key`, (the module)
 <!-- /dict-usedby -->
 
@@ -2529,7 +2577,7 @@ Source `src/eidr_core/compare/titles.py`. Public names: 7 functions, 2 constants
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.titles -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `parse_part`, `parts_conflict`, `segments`, `select_titles`, `title_similarity`
 * **De-Dupe UI**: `COMBINATION_DIFFERS_QUALITY`, `parse_part`, `PART_AMBIGUOUS_QUALITY`, `parts_conflict`, `segments`, `title_similarity`
 * **LanguageTool**: `title_similarity`
@@ -2713,7 +2761,7 @@ Source `src/eidr_core/db_schemas/__init__.py`. Public names: 4 functions, 1 cons
 
 **Used by.**
 <!-- dict-usedby:eidr_core.db_schemas -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `assert_tables`, `contract_version`, `DATABASES`, `load_manifest`, `table_columns`
 * **eidr-dq**: `assert_tables`, `contract_version`, `load_manifest`, `table_columns`
 * **eidr-imdb**: `assert_tables`, `load_manifest`
@@ -2838,7 +2886,7 @@ needs no extra.
 
 **Used by.**
 <!-- dict-usedby:eidr_core.dictionary -->
-No consumer imports it directly (scan of 2026-10-16).
+No consumer imports it directly (scan of 2026-10-17).
 <!-- /dict-usedby -->
 
 ### `changes`
@@ -2915,7 +2963,7 @@ Source `src/eidr_core/external/__init__.py`. Public names: 3 functions, 5 classe
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **eidr-dq**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `Entry`, `FactCache`, `FATAL`, `Key`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
 * **eidr-imdb**: `call_with_failover`, `endpoint_chain`, `FATAL`, `NEXT_ENDPOINT`, `OUTAGE`, `RETRY`
 * **eidr-wikidata**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `FactCache`, `FATAL`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
@@ -3155,7 +3203,7 @@ Source `src/eidr_core/external/failover.py`. Public names: 5 functions, 8 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external.failover -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `retry_after_seconds`
 * **eidr-imdb**: `DEFAULT_RATE_LIMIT_FLOOR`, `http_status`
 * **eidr-wikidata**: `http_status`, `is_bad_query_error`, `is_outage_error`, `retry_after_seconds`
@@ -3341,7 +3389,7 @@ Source `src/eidr_core/ids/__init__.py`. Public names: 8 functions, 11 constants 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ids -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `category`, `fault`, `find_content_ids`, `is_valid_eidr_id`
 * **BMRtoAltID**: `fault`
 * **De-Dupe UI**: `ALPHABET`, `check_character`, `is_valid_eidr_id`
@@ -3613,7 +3661,7 @@ Source `src/eidr_core/inheritance/__init__.py`. Public names: 6 functions, 1 cla
 
 **Used by.**
 <!-- dict-usedby:eidr_core.inheritance -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `build_full_record`, `provenance`, `RECORD_ATTRS`, `TitleConstructionError`, (the module)
 * **XML_to_JSON**: `build_full_base`, `INHERITABLE_FIELDS`, `is_absent`, `TitleConstructionError`
 <!-- /dict-usedby -->
@@ -3831,7 +3879,7 @@ Source `src/eidr_core/normalize/__init__.py`. Public names: 13 functions (declar
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `ascii_fold`, `cmp_key`, `days_between`, `nfkc`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **De-Dupe UI**: `ascii_fold`, `cmp_key`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **eidr-wikidata**: `norm_title`, `sanitize_field`
@@ -4103,7 +4151,7 @@ Source `src/eidr_core/normalize/aliases.py`. Public names: 2 functions, 1 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize.aliases -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `alias_name`, `alias_title`, `ORDINALS`
 <!-- /dict-usedby -->
 
@@ -4176,7 +4224,7 @@ Source `src/eidr_core/ordering/__init__.py`. Public names: 10 functions (declare
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ordering -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `altid_canonical_key`, `altid_collapsed_canonical_key`, `altid_display_key`, `altid_kind`, `is_shortdoi`, `title_bucket`, `title_sort_key`
 * **XML_to_JSON**: `altid_collapsed_canonical_key`, `title_sort_key`
 <!-- /dict-usedby -->
@@ -4399,7 +4447,7 @@ Source `src/eidr_core/registry/__init__.py`. Public names: 5 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.registry -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `get_registry_client`
 * **eidr-dq**: `build_registry_credentials`, `get_registry_client`
 * **eidr-wikidata**: `build_registry_credentials`, `CODE_SUCCESS`, `DEFAULT_REGISTRY`, `get_registry_client`, `OperationStatus`, `parse_operation_status`, `parse_operation_statuses`, `token_operation_status`
@@ -4579,7 +4627,7 @@ Source `src/eidr_core/secrets_loader/__init__.py`. Public names: 3 functions, 1 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.secrets_loader -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_local`
 * **BMRtoAltID**: `load_secrets`, `SecretsError`
 * **eidr-dq**: `load_secrets`, `SecretsError`
@@ -4693,7 +4741,7 @@ Source `src/eidr_core/vendor/__init__.py`. Public names: 3 functions, 3 classes,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.vendor -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **python-tools**: `check`, `load_manifest`, (the module)
 <!-- /dict-usedby -->
 
@@ -4856,7 +4904,7 @@ Source `src/eidr_core/verify/__init__.py`. Public names: 5 functions (declared b
 
 **Used by.**
 <!-- dict-usedby:eidr_core.verify -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **eidr-dq**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 * **eidr-wikidata**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 <!-- /dict-usedby -->
@@ -4992,7 +5040,7 @@ Source `src/eidr_core/bmr_map/__init__.py`. Public names: 8 functions, 3 constan
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_map -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMR-Review**: `record_from_xml`, `row_from_record`
 * **XML_to_JSON**: `NEVER_PRODUCED`, `PRODUCED_BASES`, `record_from_row`, `row_from_record`
 <!-- /dict-usedby -->
@@ -5197,7 +5245,7 @@ Source `src/eidr_core/verdicts/__init__.py`. Public names: 8 functions, 3 classe
 
 **Used by.**
 <!-- dict-usedby:eidr_core.verdicts -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `AssertedId`, `ASSESSMENT_COLUMN`, `clears_without_a_human`, `fill_map`, `HUMAN_REVIEW_COLUMN`, `NO_ID_SENTINELS`, `NO_MATCH`, `read_asserted_id`, `Resolution`, `resolve_row`, `resolve_sheet`, `ResolveStats`, `reviewer_relation`, `STATUSES`, `summarize`, `TERMINAL_ASSESSMENTS`, `trim`
 <!-- /dict-usedby -->
 
@@ -5496,7 +5544,7 @@ Source `src/eidr_core/altid_audit/__init__.py`. Public names: 6 functions, 7 cla
 
 **Used by.**
 <!-- dict-usedby:eidr_core.altid_audit -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `AliasResolution`, `ALT_ID_TABLES`, `AltId`, `audit_rows`, `AuditRow`, `DEFAULT_BATCH_ALT_IDS`, `Finding`, `is_audited`, `IS_SAME_AS`, `is_single_form`, `kind_key`, `MIRROR_NEEDS`, `MirrorClient`, `MirrorError`, `RowAudit`, `same_relation`
 <!-- /dict-usedby -->
 
@@ -5843,7 +5891,7 @@ Source `src/eidr_core/lookup/__init__.py`. Public names: 6 functions, 2 classes,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.lookup -->
-Scan of 2026-10-16; regenerated at each release from the consumer trees.
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
 * **eidr-imdb**: `live_status`
 <!-- /dict-usedby -->
 
@@ -6035,7 +6083,8 @@ Source `src/eidr_core/swap/__init__.py`. Public names: 3 functions, 1 constant (
 
 **Used by.**
 <!-- dict-usedby:eidr_core.swap -->
-No consumer imports it directly (scan of 2026-10-16).
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
+* **eidr-imdb**: `abstraction_ancestors`, `plan_swaps`, `SWAP_NOTE`
 <!-- /dict-usedby -->
 
 ### `abstraction_ancestors`
@@ -6105,6 +6154,144 @@ Defined in `src/eidr_core/swap/__init__.py`.
 Defined in `src/eidr_core/swap/__init__.py`.
 
 **Value** `SWAP_NOTE = "SWAPPED: asserted {asserted} ({structural_type}) -> " "Abstraction ancestor {ancestor}"` -- the fixed note form BMR-Review's "Swapped original" control parses.
+<!-- /dict -->
+
+## `eidr_core.bmr_rows`
+
+<!-- dict-module:eidr_core.bmr_rows -->
+Source `src/eidr_core/bmr_rows/__init__.py`. Public names: 4 functions, 5 constants (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** Helpers that the tools which build inbound BMR sheets (eidr-imdb, eidr-wikidata) each re-implemented: the two unconfirmed-ID columns of ruling R1, repeating families as numbered columns, the 5,000-row files the BMR tool takes with each Series tree kept whole, and one separator for Operator's Notes. Reconciliation plan component C2, ruled in eidr-core-ops `PHASE2-3-INTERFACES-2026-10-15.md`. Routing stays `bmr_io.template_for_creation_type`, writing stays `bmr_io.write_sheet`, and Country of Origin is `codes.country_list`.
+
+**Use it when.** 
+* You split a sheet's rows into files for the BMR tool: `chunk_rows` with `starts_tree` for episodic rows.
+* You write the R1 columns: `UNCONFIRMED_ID_COLUMNS` as `write_sheet`'s `extra_columns`, `registry_ids_cell` for the value.
+* You build Operator's Notes from several parts: `join_notes`.
+* Your rows hold families as lists: `number_families` before `write_sheet`.
+
+**Do not use it when.** 
+* You need the row defaults that wait on the operator (a silent work's language; Registrant and Metadata Authority on inbound sheets) or the episodic ordering: not here yet.
+* You want to pre-fill `Assigned EIDR ID`: ruling R2 says inbound sheets leave it empty.
+
+**Used by.**
+<!-- dict-usedby:eidr_core.bmr_rows -->
+No consumer imports it directly (scan of 2026-10-17).
+<!-- /dict-usedby -->
+
+### `chunk_rows`
+
+<!-- dict:eidr_core.bmr_rows.chunk_rows -->
+```python
+def chunk_rows(rows: Sequence[R], *, limit: int = BMR_ROW_LIMIT, starts_tree: Callable[[R], bool] | None = None) -> list[list[R]]
+```
+
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `rows` | `Sequence[R]` | required | Rows in tree order (a parent before its children). |
+| `limit` | `int` | `BMR_ROW_LIMIT` (keyword-only) | Most rows in one file. |
+| `starts_tree` | `Callable[[R], bool] \| None` | `None` (keyword-only) | True for a row that opens a tree (a Series); None cuts every `limit` rows. |
+
+**Returns** `list[list[R]]` -- the chunks, in order.
+<!-- /dict -->
+
+**Does.** Splits rows into files of at most `limit` rows. With `starts_tree`, trees are never split: a chunk closes BEFORE a tree that would take it over the limit, so only a chunk holding a single oversized tree can exceed it (check `len(chunk) > limit`). eidr-wikidata's own split closed only after reaching the limit, so its files overshot (5,143 rows on 2026-10-16); on that run's 17,340 episodic rows this gives 4,867, 4,897, 4,951 and 2,625.
+
+### `join_notes`
+
+<!-- dict:eidr_core.bmr_rows.join_notes -->
+```python
+def join_notes(*parts: str | None) -> str
+```
+
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `*parts` | `str \| None` | - | Note parts; blanks and None are skipped. |
+
+**Returns** `str` -- the Operator's Notes value.
+<!-- /dict -->
+
+**Does.** Joins the parts with `" | "`, a `SWAPPED:` note moved first, because BMR-Review's control parses the opening of the cell.
+
+### `number_families`
+
+<!-- dict:eidr_core.bmr_rows.number_families -->
+```python
+def number_families(row: Mapping[str, Any], family_members: Mapping[str, Sequence[str]]) -> dict[str, Any]
+```
+
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `row` | `Mapping[str, Any]` | required | A row whose family values are lists of tuples. |
+| `family_members` | `Mapping[str, Sequence[str]]` | required | `{row key: (member header, ...)}` for the family keys. |
+
+**Returns** `dict[str, Any]` -- the row as `{column: value}`.
+<!-- /dict -->
+
+**Does.** Expands each family list to `"<Member> <n>"` columns and omits empty members, so the writer neither writes empty strings nor counts them toward the width. Extracted from eidr-imdb `sheet.numbered`; identical on its rows.
+
+### `registry_ids_cell`
+
+<!-- dict:eidr_core.bmr_rows.registry_ids_cell -->
+```python
+def registry_ids_cell(eidr_ids: Iterable[str]) -> str
+```
+
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `eidr_ids` | `Iterable[str]` | required | The EIDR IDs of every record carrying the source ID (`lookup.claimants`). |
+
+**Returns** `str` -- the `Registry EIDR ID(s)` value.
+<!-- /dict -->
+
+**Does.** De-duplicates, sorts and joins the IDs with `" | "` (R1), so the cell does not change with query order.
+
+### `BMR_ROW_LIMIT` (constant)
+
+<!-- dict:eidr_core.bmr_rows.BMR_ROW_LIMIT -->
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+**Value** `BMR_ROW_LIMIT = 5_000` -- the rows the BMR tool takes per file (plan section 1, step 2).
+<!-- /dict -->
+
+### `NOTE_SEPARATOR` (constant)
+
+<!-- dict:eidr_core.bmr_rows.NOTE_SEPARATOR -->
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+**Value** `NOTE_SEPARATOR = " \| "` -- the one separator for Operator's Notes and the Registry EIDR ID(s) cell.
+<!-- /dict -->
+
+### `REGISTRY_IDS_COLUMN` (constant)
+
+<!-- dict:eidr_core.bmr_rows.REGISTRY_IDS_COLUMN -->
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+**Value** `REGISTRY_IDS_COLUMN = "Registry EIDR ID(s)"` -- R1's column of the EIDR records that carry the source ID.
+<!-- /dict -->
+
+### `SOURCE_ASSERTED_COLUMN` (constant)
+
+<!-- dict:eidr_core.bmr_rows.SOURCE_ASSERTED_COLUMN -->
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+**Value** `SOURCE_ASSERTED_COLUMN = "Source-Asserted EIDR ID"` -- R1's column of the EIDR ID the source itself asserts (Wikidata P2704; empty for IMDb).
+<!-- /dict -->
+
+### `UNCONFIRMED_ID_COLUMNS` (constant)
+
+<!-- dict:eidr_core.bmr_rows.UNCONFIRMED_ID_COLUMNS -->
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+**Value** `UNCONFIRMED_ID_COLUMNS = (SOURCE_ASSERTED_COLUMN, REGISTRY_IDS_COLUMN)` -- both R1 columns, in order, for `write_sheet`'s `extra_columns`.
 <!-- /dict -->
 
 ## Specs and data files

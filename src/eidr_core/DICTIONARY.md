@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.62.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.63.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,17 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.63.0 (2026-10-17)
+
+* **New module `eidr_core.external.wikimedia` (reconciliation C8, part 1):**
+  Wikimedia's Action API access rules once -- `user_agent` (AC1),
+  `action_api_pacer` on the machine-wide scope `ACTION_API_SCOPE` (AC2,
+  AC9), `action_api_json` (gzip, `maxlag`, `Retry-After` passed on to the
+  next request; AC3, AC4), `classify_action_api`, `MaxLag`, and the endpoint
+  constants (`WDQS_ENDPOINT` the one SPARQL default; QLever not cleared).
+  Extracted from eidr-wikidata's client, identical to it on every retry
+  path. For eidr-wikidata, BMR-Review and eidr-dq. Additive.
 
 ### 0.62.0 (2026-10-17)
 
@@ -656,6 +667,17 @@ edition's Changes entry.
 | [`eidr_core.external.failover.WIKIMEDIA_MIN_INTERVAL`](#wikimedia_min_interval-constant) | constant | Seconds between request starts under Wikimedia's 200-requests-a-minute limit; `RequestPacer`'s default `min_interval`. |
 | [`eidr_core.external.failover.WIKIMEDIA_SLOW_PAUSE`](#wikimedia_slow_pause-constant) | constant | Seconds to wait after a request that took longer than `WIKIMEDIA_SLOW_REQUEST` (Wikimedia: "please wait 5 seconds"); `RequestPacer`'s default `slow_pause`. |
 | [`eidr_core.external.failover.WIKIMEDIA_SLOW_REQUEST`](#wikimedia_slow_request-constant) | constant | A request slower than this many seconds counts as slow and triggers the pause; `RequestPacer`'s default `slow_threshold`. |
+| [`eidr_core.external.wikimedia.action_api_json`](#action_api_json) | function | Sends one request under the rules and retries what is transient (maxlag, 429, 5xx, network errors) through `call_with_failover`, which honours `Retry-After` and a maxlag interval; `pacer.back_off` makes the next request wait too, whichever program sends it. |
+| [`eidr_core.external.wikimedia.action_api_pacer`](#action_api_pacer) | function | Builds a `RequestPacer` on the machine-wide Action API scope: one request in flight across every EIDR program, 0.3 s apart, 5 s after a request slower than 1 s. |
+| [`eidr_core.external.wikimedia.classify_action_api`](#classify_action_api) | function | Retries maxlag, 429, 5xx, network errors and timeouts; stops on anything else (a 400 for a bad request). |
+| [`eidr_core.external.wikimedia.user_agent`](#user_agent) | function | Builds the User-Agent AC1 requires; raises ValueError without a program, a version, or a contact that is an email address or a full URL. |
+| [`eidr_core.external.wikimedia.MaxLag`](#maxlag-class) | class | A maxlag refusal raised as an error with `retry_after`, so the chassis waits it out instead of taking the refusal for data. |
+| [`eidr_core.external.wikimedia.ACTION_API`](#action_api-constant) | constant | the Wikidata Action API. |
+| [`eidr_core.external.wikimedia.ACTION_API_SCOPE`](#action_api_scope-constant) | constant | the pacer scope every EIDR Action API client shares (AC9). |
+| [`eidr_core.external.wikimedia.GZIP_HEADERS`](#gzip_headers-constant) | constant | the header that asks for gzip (AC4). |
+| [`eidr_core.external.wikimedia.MAXLAG_SECONDS`](#maxlag_seconds-constant) | constant | the `maxlag` value for non-interactive requests (AC4). |
+| [`eidr_core.external.wikimedia.MIN_429_WAIT_SECONDS`](#min_429_wait_seconds-constant) | constant | the wait after a 429 or 503 with no `Retry-After` (AC3). |
+| [`eidr_core.external.wikimedia.WDQS_ENDPOINT`](#wdqs_endpoint-constant) | constant | the Wikidata Query Service, the one default SPARQL endpoint (AC8; QLever is not cleared). |
 | [`eidr_core.ids.category`](#category) | function | Classifies a DOI into its EIDR ID family by prefix alone. |
 | [`eidr_core.ids.check_character`](#check_character) | function | Computes the ISO 7064 Mod 37,36 check character for an EIDR suffix payload. |
 | [`eidr_core.ids.fault`](#fault) | function | Returns the reason a Content ID is unsound, or `None` when it is sound. |
@@ -6207,7 +6229,8 @@ Source `src/eidr_core/bmr_rows/__init__.py`. Public names: 7 functions, 7 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_rows -->
-No consumer imports it directly (scan of 2026-10-17).
+Scan of 2026-10-17; regenerated at each release from the consumer trees.
+* **eidr-imdb**: `IMDB_PARTY`, `original_languages`, `registrant_party`, `title_language`, (the module)
 <!-- /dict-usedby -->
 
 ### `chunk_rows`
@@ -6396,6 +6419,174 @@ Defined in `src/eidr_core/bmr_rows/__init__.py`.
 Defined in `src/eidr_core/bmr_rows/__init__.py`.
 
 **Value** `IMDB_PARTY = "10.5237/27B2-6941"` -- IMDb's Party ID (IMDb is an EIDR member), the Registrant for IMDb-sourced records.
+<!-- /dict -->
+
+## `eidr_core.external.wikimedia`
+
+<!-- dict-module:eidr_core.external.wikimedia -->
+Source `src/eidr_core/external/wikimedia.py`. Public names: 4 functions, 1 class, 6 constants (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** Wikimedia's access rules for an unauthenticated Action API client, written once: a User-Agent with a contact (AC1), one request in flight across ALL of EIDR's programs at most 200 a minute with a 5 s pause after a slow one (AC2, AC9, through `RequestPacer`'s machine-wide scope), `Retry-After` honoured and passed on to the next request (AC3), gzip and `maxlag` (AC4). The first part of the shared Wikidata client (reconciliation C8), extracted from eidr-wikidata's Action API client and checked against it on every retry path; eidr-metadata-sources' integration package found the same rules in three programs. `WDQS_ENDPOINT` is the one SPARQL default: QLever is not cleared.
+
+**Use it when.** 
+* Your program calls the Wikidata Action API (`wbgetentities`, `query`): build one `user_agent` and one `action_api_pacer`, and send every request through `action_api_json`.
+* You need the endpoint names or the rule constants for a client of your own.
+
+**Do not use it when.** 
+* You query WDQS (SPARQL): use `call_with_failover` with `classify_sparql_error`; the WDQS limits (AC5) are per query, not this pacer's.
+* Never build a pacer of your own for the Action API, or a second User-Agent in the same program: AC9 counts EIDR as one client.
+
+**Used by.**
+<!-- dict-usedby:eidr_core.external.wikimedia -->
+No consumer imports it directly (scan of 2026-10-17).
+<!-- /dict-usedby -->
+
+### `action_api_json`
+
+<!-- dict:eidr_core.external.wikimedia.action_api_json -->
+```python
+def action_api_json(params: Mapping[str, Any], *, user_agent: str, pacer: RequestPacer, timeout: float = 30.0, attempts: int = 5, backoff: float = 1.0, endpoint: str = ACTION_API, opener: Callable[..., Any] = urllib.request.urlopen, op_label: str = "action-api") -> dict
+```
+
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `params` | `Mapping[str, Any]` | required | The API parameters (`action`, `ids`, `props`, ...); `format=json` and `maxlag` are added. |
+| `user_agent` | `str` | required (keyword-only) | From `user_agent`, one per program. |
+| `pacer` | `RequestPacer` | required (keyword-only) | From `action_api_pacer` (or any `RequestPacer`). |
+| `timeout` | `float` | `30.0` (keyword-only) | Seconds per request. |
+| `attempts` | `int` | `5` (keyword-only) | Tries before giving up. |
+| `backoff` | `float` | `1.0` (keyword-only) | Base of the chassis' exponential backoff. |
+| `endpoint` | `str` | `ACTION_API` (keyword-only) | The API URL; `ACTION_API` by default. |
+| `opener` | `Callable[..., Any]` | `urllib.request.urlopen` (keyword-only) | Injectable for tests; `urllib.request.urlopen` by default. |
+| `op_label` | `str` | `"action-api"` (keyword-only) | Label in the retry log lines. |
+
+**Returns** `dict` -- the decoded JSON answer.
+<!-- /dict -->
+
+**Does.** Sends one request under the rules and retries what is transient (maxlag, 429, 5xx, network errors) through `call_with_failover`, which honours `Retry-After` and a maxlag interval; `pacer.back_off` makes the next request wait too, whichever program sends it. Raises the last error when every try fails. Identical to eidr-wikidata's `_get_retry` on gzip, maxlag, 429 with and without `Retry-After`, 503, 400 and repeated 500s.
+
+### `action_api_pacer`
+
+<!-- dict:eidr_core.external.wikimedia.action_api_pacer -->
+```python
+def action_api_pacer(min_interval: float = 0.3, *, scope_dir: str | None = None) -> RequestPacer
+```
+
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `min_interval` | `float` | `0.3` | Seconds between request starts; never below 0.3 (200 a minute). |
+| `scope_dir` | `str \| None` | `None` (keyword-only) | Where the shared state lives; the system temp directory by default. |
+
+**Returns** `RequestPacer` -- a pacer on `ACTION_API_SCOPE`.
+<!-- /dict -->
+
+**Does.** Builds a `RequestPacer` on the machine-wide Action API scope: one request in flight across every EIDR program, 0.3 s apart, 5 s after a request slower than 1 s. Every pacer built here shares one state, so building several is harmless.
+
+### `classify_action_api`
+
+<!-- dict:eidr_core.external.wikimedia.classify_action_api -->
+```python
+def classify_action_api(exc: Exception) -> str
+```
+
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `exc` | `Exception` | required | The exception from one attempt. |
+
+**Returns** `str` -- `RETRY` or `FATAL`.
+<!-- /dict -->
+
+**Does.** Retries maxlag, 429, 5xx, network errors and timeouts; stops on anything else (a 400 for a bad request).
+
+### `user_agent`
+
+<!-- dict:eidr_core.external.wikimedia.user_agent -->
+```python
+def user_agent(program: str, version: str, contact: str) -> str
+```
+
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `program` | `str` | required | The program's name. |
+| `version` | `str` | required | Its version. |
+| `contact` | `str` | required | An email address or a full URL to reach EIDR. |
+
+**Returns** `str` -- `"<program>/<version> (<contact>)"`.
+<!-- /dict -->
+
+**Does.** Builds the User-Agent AC1 requires; raises ValueError without a program, a version, or a contact that is an email address or a full URL.
+
+### `MaxLag` (class)
+
+<!-- dict:eidr_core.external.wikimedia.MaxLag -->
+```python
+class MaxLag(Exception)
+```
+
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `__init__` | `def __init__(retry_after: float) -> None` | Holds the seconds to wait. |
+<!-- /dict -->
+
+**Does.** A maxlag refusal raised as an error with `retry_after`, so the chassis waits it out instead of taking the refusal for data.
+
+### `ACTION_API` (constant)
+
+<!-- dict:eidr_core.external.wikimedia.ACTION_API -->
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+**Value** `ACTION_API = "https://www.wikidata.org/w/api.php"` -- the Wikidata Action API.
+<!-- /dict -->
+
+### `ACTION_API_SCOPE` (constant)
+
+<!-- dict:eidr_core.external.wikimedia.ACTION_API_SCOPE -->
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+**Value** `ACTION_API_SCOPE = "wikimedia-action-api"` -- the pacer scope every EIDR Action API client shares (AC9).
+<!-- /dict -->
+
+### `GZIP_HEADERS` (constant)
+
+<!-- dict:eidr_core.external.wikimedia.GZIP_HEADERS -->
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+**Value** `GZIP_HEADERS = {"Accept-Encoding": "gzip"}` -- the header that asks for gzip (AC4).
+<!-- /dict -->
+
+### `MAXLAG_SECONDS` (constant)
+
+<!-- dict:eidr_core.external.wikimedia.MAXLAG_SECONDS -->
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+**Value** `MAXLAG_SECONDS = 5` -- the `maxlag` value for non-interactive requests (AC4).
+<!-- /dict -->
+
+### `MIN_429_WAIT_SECONDS` (constant)
+
+<!-- dict:eidr_core.external.wikimedia.MIN_429_WAIT_SECONDS -->
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+**Value** `MIN_429_WAIT_SECONDS = 5.0` -- the wait after a 429 or 503 with no `Retry-After` (AC3).
+<!-- /dict -->
+
+### `WDQS_ENDPOINT` (constant)
+
+<!-- dict:eidr_core.external.wikimedia.WDQS_ENDPOINT -->
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+**Value** `WDQS_ENDPOINT = "https://query.wikidata.org/sparql"` -- the Wikidata Query Service, the one default SPARQL endpoint (AC8; QLever is not cleared).
 <!-- /dict -->
 
 ## Specs and data files

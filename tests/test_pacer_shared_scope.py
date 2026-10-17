@@ -110,5 +110,10 @@ def test_two_processes_share_one_pace(tmp_path):
     spans.sort()
     assert len(spans) == 6
     starts = [s for s, _ in spans]
-    assert all(b - a >= 0.19 for a, b in zip(starts, starts[1:], strict=False)), starts
+    # The pacer spaces the CLAIMED starts 0.2 s apart; the body's own clock
+    # reading comes a little after its claim, by a scheduler-dependent amount
+    # (CI saw one gap of 0.179 s), so each measured gap gets slack and the
+    # whole run must still take at least five intervals.
+    assert all(b - a >= 0.12 for a, b in zip(starts, starts[1:], strict=False)), starts
+    assert starts[-1] - starts[0] >= 5 * 0.2 - 0.05, starts
     assert all(b[0] >= a[1] - 0.005 for a, b in zip(spans, spans[1:], strict=False))

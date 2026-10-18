@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.64.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.65.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,21 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.65.0 (2026-10-18)
+
+* **`external.wikimedia`: SPARQL and QLever.** `sparql_pacer` (one request
+  at a time, 1 s apart, machine-wide on `SPARQL_SCOPE` = `"wikidata-sparql"`,
+  eidr-wikidata's name and numbers), `QLEVER_WIKIDATA_ENDPOINTS` and
+  `SPARQL_CHAIN` (WDQS, then QLever only as a per-request fallback: OD-49,
+  conditions QAC1-QAC6). Additive.
+* **`action_api_json(opener=None)`:** the default `urllib.request.urlopen`
+  is now looked up at call time, so a test that patches it reaches the
+  request (eidr-wikidata's note). Compatible.
+* **New: `external.wikidata.external_ids` and `RETIRED_ID_REASONS`**: a
+  deprecated identifier is published as `Deprecated` only when it was
+  retired (operator OD-43); same decision as eidr-wikidata on 100 live
+  deprecated IMDb IDs. Additive.
 
 ### 0.64.0 (2026-10-18)
 
@@ -688,6 +703,7 @@ edition's Changes entry.
 | [`eidr_core.external.wikidata.bmr_facts`](#bmr_facts) | function | Reads the entity into BMR fields. |
 | [`eidr_core.external.wikidata.claims`](#claims) | function | Reads a property's statements under the package's rank rule; every other reader goes through it. |
 | [`eidr_core.external.wikidata.duration_minutes`](#duration_minutes) | function | Approx Length from P2047, in minutes, seconds or hours. |
+| [`eidr_core.external.wikidata.external_ids`](#external_ids) | function | Reads an external identifier under the OD-43 rule (operator, 2026-10-18): normal and preferred statements are identity; a deprecated statement becomes `Deprecated` only when its P2241 reason says the identifier was retired (no longer resolves, redirects), and is dropped otherwise. |
 | [`eidr_core.external.wikidata.item_ids`](#item_ids) | function | Reads the items a property names. |
 | [`eidr_core.external.wikidata.label`](#label) | function | Reads one label. |
 | [`eidr_core.external.wikidata.references`](#references) | function | Says where Wikidata got the value (stated in, imported from), so a caller can tell an IMDb-derived value from an independent one (OD-31). |
@@ -696,6 +712,7 @@ edition's Changes entry.
 | [`eidr_core.external.wikidata.ReleaseDate`](#releasedate-class) | class | A picked Release Date and how it was picked. |
 | [`eidr_core.external.wikidata.P_CAST_MEMBER`](#p_cast_member-constant) | constant | cast member. |
 | [`eidr_core.external.wikidata.P_COUNTRY_OF_ORIGIN`](#p_country_of_origin-constant) | constant | country of origin. |
+| [`eidr_core.external.wikidata.P_DEPRECATION_REASON`](#p_deprecation_reason-constant) | constant | reason for deprecated rank (the qualifier OD-43 reads). |
 | [`eidr_core.external.wikidata.P_DIRECTOR`](#p_director-constant) | constant | director. |
 | [`eidr_core.external.wikidata.P_DURATION`](#p_duration-constant) | constant | duration. |
 | [`eidr_core.external.wikidata.P_IMPORTED_FROM`](#p_imported_from-constant) | constant | imported from (a reference). |
@@ -708,9 +725,11 @@ edition's Changes entry.
 | [`eidr_core.external.wikidata.P_PUBLICATION_DATE`](#p_publication_date-constant) | constant | publication date. |
 | [`eidr_core.external.wikidata.P_START_TIME`](#p_start_time-constant) | constant | start time. |
 | [`eidr_core.external.wikidata.P_STATED_IN`](#p_stated_in-constant) | constant | stated in (a reference). |
+| [`eidr_core.external.wikidata.RETIRED_ID_REASONS`](#retired_id_reasons-constant) | constant | the P2241 reasons that mean the identifier was retired, chosen by eidr-wikidata from a survey of 26,561 statements (92% kept). |
 | [`eidr_core.external.wikimedia.action_api_json`](#action_api_json) | function | Sends one request under the rules and retries what is transient (maxlag, 429, 5xx, network errors) through `call_with_failover`, which honours `Retry-After` and a maxlag interval; `pacer.back_off` makes the next request wait too, whichever program sends it. |
 | [`eidr_core.external.wikimedia.action_api_pacer`](#action_api_pacer) | function | Builds a `RequestPacer` on the machine-wide Action API scope: one request in flight across every EIDR program, 0.3 s apart, 5 s after a request slower than 1 s. |
 | [`eidr_core.external.wikimedia.classify_action_api`](#classify_action_api) | function | Retries maxlag, 429, 5xx, network errors and timeouts; stops on anything else (a 400 for a bad request). |
+| [`eidr_core.external.wikimedia.sparql_pacer`](#sparql_pacer) | function | Builds a `RequestPacer` on the machine-wide SPARQL scope: one request in flight, at least 1 s between starts (QLever's QAC4), no slow pause. |
 | [`eidr_core.external.wikimedia.user_agent`](#user_agent) | function | Builds the User-Agent AC1 requires; raises ValueError without a program, a version, or a contact that is an email address or a full URL. |
 | [`eidr_core.external.wikimedia.MaxLag`](#maxlag-class) | class | A maxlag refusal raised as an error with `retry_after`, so the chassis waits it out instead of taking the refusal for data. |
 | [`eidr_core.external.wikimedia.ACTION_API`](#action_api-constant) | constant | the Wikidata Action API. |
@@ -718,6 +737,10 @@ edition's Changes entry.
 | [`eidr_core.external.wikimedia.GZIP_HEADERS`](#gzip_headers-constant) | constant | the header that asks for gzip (AC4). |
 | [`eidr_core.external.wikimedia.MAXLAG_SECONDS`](#maxlag_seconds-constant) | constant | the `maxlag` value for non-interactive requests (AC4). |
 | [`eidr_core.external.wikimedia.MIN_429_WAIT_SECONDS`](#min_429_wait_seconds-constant) | constant | the wait after a 429 or 503 with no `Retry-After` (AC3). |
+| [`eidr_core.external.wikimedia.QLEVER_WIKIDATA_ENDPOINTS`](#qlever_wikidata_endpoints-constant) | constant | QLever's Wikidata endpoint on both hosts (cleared as a fallback, OD-49; never another QLever dataset, QAC2). |
+| [`eidr_core.external.wikimedia.SPARQL_CHAIN`](#sparql_chain-constant) | constant | the SPARQL chain for `call_with_failover`: WDQS, then QLever only when WDQS fails for that request (QAC1). |
+| [`eidr_core.external.wikimedia.SPARQL_MIN_INTERVAL`](#sparql_min_interval-constant) | constant | seconds between SPARQL request starts, for every caller (QAC4). |
+| [`eidr_core.external.wikimedia.SPARQL_SCOPE`](#sparql_scope-constant) | constant | the machine-wide SPARQL pacer scope every EIDR program shares. |
 | [`eidr_core.external.wikimedia.WDQS_ENDPOINT`](#wdqs_endpoint-constant) | constant | the Wikidata Query Service, the one default SPARQL endpoint (AC8; QLever is not cleared). |
 | [`eidr_core.ids.category`](#category) | function | Classifies a DOI into its EIDR ID family by prefix alone. |
 | [`eidr_core.ids.check_character`](#check_character) | function | Computes the ISO 7064 Mod 37,36 check character for an EIDR suffix payload. |
@@ -6271,6 +6294,7 @@ Source `src/eidr_core/bmr_rows/__init__.py`. Public names: 8 functions, 9 consta
 <!-- dict-usedby:eidr_core.bmr_rows -->
 Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **eidr-imdb**: `IMDB_PARTY`, `original_languages`, `registrant_party`, `title_language`, (the module)
+* **eidr-wikidata**: `EIDR_CATALOG_PARTY`, `original_languages`, `registrant_party`
 <!-- /dict-usedby -->
 
 ### `chunk_rows`
@@ -6499,31 +6523,31 @@ Defined in `src/eidr_core/bmr_rows/__init__.py`.
 ## `eidr_core.external.wikimedia`
 
 <!-- dict-module:eidr_core.external.wikimedia -->
-Source `src/eidr_core/external/wikimedia.py`. Public names: 4 functions, 1 class, 6 constants (declared by `__all__`).
+Source `src/eidr_core/external/wikimedia.py`. Public names: 5 functions, 1 class, 10 constants (declared by `__all__`).
 <!-- /dict-module -->
 
-**Purpose.** Wikimedia's access rules for an unauthenticated Action API client, written once: a User-Agent with a contact (AC1), one request in flight across ALL of EIDR's programs at most 200 a minute with a 5 s pause after a slow one (AC2, AC9, through `RequestPacer`'s machine-wide scope), `Retry-After` honoured and passed on to the next request (AC3), gzip and `maxlag` (AC4). The first part of the shared Wikidata client (reconciliation C8), extracted from eidr-wikidata's Action API client and checked against it on every retry path; eidr-metadata-sources' integration package found the same rules in three programs. `WDQS_ENDPOINT` is the one SPARQL default: QLever is not cleared.
+**Purpose.** Wikimedia's access rules for an unauthenticated Action API client, written once: a User-Agent with a contact (AC1), one request in flight across ALL of EIDR's programs at most 200 a minute with a 5 s pause after a slow one (AC2, AC9, through `RequestPacer`'s machine-wide scope), `Retry-After` honoured and passed on to the next request (AC3), gzip and `maxlag` (AC4). The first part of the shared Wikidata client (reconciliation C8), extracted from eidr-wikidata's Action API client and checked against it on every retry path; eidr-metadata-sources' integration package found the same rules in three programs. SPARQL: WDQS first, QLever's Wikidata endpoint only as a fallback (cleared 2026-10-18, OD-49, conditions QAC1-QAC6), every SPARQL request paced 1 s apart machine-wide (`sparql_pacer`, `SPARQL_CHAIN`).
 
 **Use it when.** 
 * Your program calls the Wikidata Action API (`wbgetentities`, `query`): build one `user_agent` and one `action_api_pacer`, and send every request through `action_api_json`.
 * You need the endpoint names or the rule constants for a client of your own.
 
 **Do not use it when.** 
-* You query WDQS (SPARQL): use `call_with_failover` with `classify_sparql_error`; the WDQS limits (AC5) are per query, not this pacer's.
+* You query WDQS (SPARQL): `call_with_failover` over `SPARQL_CHAIN` with `classify_sparql_error`, each request inside `sparql_pacer().request()`.
 * Never build a pacer of your own for the Action API, or a second User-Agent in the same program: AC9 counts EIDR as one client.
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external.wikimedia -->
 Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `action_api_json`, `action_api_pacer`, `ACTION_API_SCOPE`, `user_agent`, (the module)
-* **eidr-wikidata**: `ACTION_API`, `action_api_json`, `action_api_pacer`
+* **eidr-wikidata**: `ACTION_API`, `action_api_json`, `action_api_pacer`, `ACTION_API_SCOPE`
 <!-- /dict-usedby -->
 
 ### `action_api_json`
 
 <!-- dict:eidr_core.external.wikimedia.action_api_json -->
 ```python
-def action_api_json(params: Mapping[str, Any], *, user_agent: str, pacer: RequestPacer, timeout: float = 30.0, attempts: int = 5, backoff: float = 1.0, endpoint: str = ACTION_API, opener: Callable[..., Any] = urllib.request.urlopen, op_label: str = "action-api") -> dict
+def action_api_json(params: Mapping[str, Any], *, user_agent: str, pacer: RequestPacer, timeout: float = 30.0, attempts: int = 5, backoff: float = 1.0, endpoint: str = ACTION_API, opener: Callable[..., Any] | None = None, op_label: str = "action-api") -> dict
 ```
 
 Defined in `src/eidr_core/external/wikimedia.py`.
@@ -6537,7 +6561,7 @@ Defined in `src/eidr_core/external/wikimedia.py`.
 | `attempts` | `int` | `5` (keyword-only) | Tries before giving up. |
 | `backoff` | `float` | `1.0` (keyword-only) | Base of the chassis' exponential backoff. |
 | `endpoint` | `str` | `ACTION_API` (keyword-only) | The API URL; `ACTION_API` by default. |
-| `opener` | `Callable[..., Any]` | `urllib.request.urlopen` (keyword-only) | Injectable for tests; `urllib.request.urlopen` by default. |
+| `opener` | `Callable[..., Any] \| None` | `None` (keyword-only) | Injectable for tests; when None, `urllib.request.urlopen` looked up at call time (0.65.0), so patching it in a test works. |
 | `op_label` | `str` | `"action-api"` (keyword-only) | Label in the retry log lines. |
 
 **Returns** `dict` -- the decoded JSON answer.
@@ -6666,10 +6690,60 @@ Defined in `src/eidr_core/external/wikimedia.py`.
 **Value** `WDQS_ENDPOINT = "https://query.wikidata.org/sparql"` -- the Wikidata Query Service, the one default SPARQL endpoint (AC8; QLever is not cleared).
 <!-- /dict -->
 
+### `sparql_pacer`
+
+<!-- dict:eidr_core.external.wikimedia.sparql_pacer -->
+```python
+def sparql_pacer(*, scope_dir: str | None = None) -> RequestPacer
+```
+
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `scope_dir` | `str \| None` | `None` (keyword-only) | Where the shared state lives; the system temp directory by default. |
+
+**Returns** `RequestPacer` -- a pacer on `SPARQL_SCOPE`.
+<!-- /dict -->
+
+**Does.** Builds a `RequestPacer` on the machine-wide SPARQL scope: one request in flight, at least 1 s between starts (QLever's QAC4), no slow pause. Extracted from eidr-wikidata `etiquette.sparql_pacer`, same scope name and numbers.
+
+### `QLEVER_WIKIDATA_ENDPOINTS` (constant)
+
+<!-- dict:eidr_core.external.wikimedia.QLEVER_WIKIDATA_ENDPOINTS -->
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+**Value** `QLEVER_WIKIDATA_ENDPOINTS = ("https://qlever.cs.uni-freiburg.de/api/wikidata", "https://qlever.dev/api/wikidata")` -- QLever's Wikidata endpoint on both hosts (cleared as a fallback, OD-49; never another QLever dataset, QAC2).
+<!-- /dict -->
+
+### `SPARQL_CHAIN` (constant)
+
+<!-- dict:eidr_core.external.wikimedia.SPARQL_CHAIN -->
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+**Value** `SPARQL_CHAIN = (WDQS_ENDPOINT, QLEVER_WIKIDATA_ENDPOINTS[0])` -- the SPARQL chain for `call_with_failover`: WDQS, then QLever only when WDQS fails for that request (QAC1). Never QLever first, never for bulk work.
+<!-- /dict -->
+
+### `SPARQL_MIN_INTERVAL` (constant)
+
+<!-- dict:eidr_core.external.wikimedia.SPARQL_MIN_INTERVAL -->
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+**Value** `SPARQL_MIN_INTERVAL = 1.0` -- seconds between SPARQL request starts, for every caller (QAC4).
+<!-- /dict -->
+
+### `SPARQL_SCOPE` (constant)
+
+<!-- dict:eidr_core.external.wikimedia.SPARQL_SCOPE -->
+Defined in `src/eidr_core/external/wikimedia.py`.
+
+**Value** `SPARQL_SCOPE = "wikidata-sparql"` -- the machine-wide SPARQL pacer scope every EIDR program shares.
+<!-- /dict -->
+
 ## `eidr_core.external.wikidata`
 
 <!-- dict-module:eidr_core.external.wikidata -->
-Source `src/eidr_core/external/wikidata.py`. Public names: 9 functions, 1 class, 14 constants (declared by `__all__`).
+Source `src/eidr_core/external/wikidata.py`. Public names: 10 functions, 1 class, 16 constants (declared by `__all__`).
 <!-- /dict-module -->
 
 **Purpose.** A Wikidata entity read into BMR template fields (Template-22 headers, operator 2026-10-18), with the rules eidr-metadata-sources' integration package sets: deprecated rank never used, preferred before normal, the Release Date tiers with `RD:Pro;` for estimates and the P580 exception for Series and Season, P2441 never an Alternate Title, and each statement's references readable for OD-31. The second part of the shared Wikidata client (C8), extracted from eidr-wikidata's readers; on 200 live entities it gave the same dates, lengths, titles, alternate titles and item lists, except two cast lists where it drops a deprecated cast member, as the rule says. Pure: no network.
@@ -6987,6 +7061,41 @@ Defined in `src/eidr_core/external/wikidata.py`.
 Defined in `src/eidr_core/external/wikidata.py`.
 
 **Value** `P_STATED_IN = "P248"` -- stated in (a reference).
+<!-- /dict -->
+
+### `external_ids`
+
+<!-- dict:eidr_core.external.wikidata.external_ids -->
+```python
+def external_ids(entity: Mapping[str, Any], prop: str) -> list[tuple[str, str]]
+```
+
+Defined in `src/eidr_core/external/wikidata.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `entity` | `Mapping[str, Any]` | required | A Wikidata entity as `wbgetentities` returns it. |
+| `prop` | `str` | required | An external-identifier property ID (`P345`, ...). |
+
+**Returns** `list[tuple[str, str]]` -- `(value, relation)` pairs; relation `""` or `"Deprecated"`.
+<!-- /dict -->
+
+**Does.** Reads an external identifier under the OD-43 rule (operator, 2026-10-18): normal and preferred statements are identity; a deprecated statement becomes `Deprecated` only when its P2241 reason says the identifier was retired (no longer resolves, redirects), and is dropped otherwise. Same decision as eidr-wikidata on 100 live deprecated IMDb IDs (84 kept).
+
+### `P_DEPRECATION_REASON` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_DEPRECATION_REASON -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_DEPRECATION_REASON = "P2241"` -- reason for deprecated rank (the qualifier OD-43 reads).
+<!-- /dict -->
+
+### `RETIRED_ID_REASONS` (constant)
+
+<!-- dict:eidr_core.external.wikidata.RETIRED_ID_REASONS -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `RETIRED_ID_REASONS: dict[str, str] = { "Q21441764": "withdrawn identifier value", "Q45403344": "redirect", "Q1236807": "URL ...` -- the P2241 reasons that mean the identifier was retired, chosen by eidr-wikidata from a survey of 26,561 statements (92% kept).
 <!-- /dict -->
 
 ## Specs and data files

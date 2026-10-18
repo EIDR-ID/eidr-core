@@ -108,3 +108,21 @@ def test_the_pacer_is_on_the_machine_wide_scope(tmp_path):
     assert p.shared_scope == W.ACTION_API_SCOPE == "wikimedia-action-api"
     assert p.min_interval == 0.3
     assert W.action_api_pacer(0.1, scope_dir=str(tmp_path)).min_interval == 0.3
+
+
+def test_the_sparql_pacer_and_chain_follow_qlevers_conditions(tmp_path):
+    p = W.sparql_pacer(scope_dir=str(tmp_path))
+    assert p.shared_scope == W.SPARQL_SCOPE == "wikidata-sparql"
+    assert p.min_interval == 1.0 and p.slow_pause == 0.0
+    # QAC1: QLever only after WDQS; QAC2: its Wikidata endpoint only.
+    assert W.SPARQL_CHAIN[0] == W.WDQS_ENDPOINT
+    assert all(u.endswith("/api/wikidata") for u in W.QLEVER_WIKIDATA_ENDPOINTS)
+
+
+def test_the_default_opener_is_looked_up_at_call_time(monkeypatch):
+    # eidr-wikidata (2026-10-18): an import-time default meant patching
+    # urllib.request.urlopen never reached the request.
+    op = Opener(Resp({"ok": 1}))
+    monkeypatch.setattr("urllib.request.urlopen", op)
+    assert W.action_api_json({"action": "query"}, user_agent=UA, pacer=Pacer()) == {"ok": 1}
+    assert len(op.requests) == 1

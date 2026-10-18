@@ -18,9 +18,14 @@ from eidr-wikidata's, which already ran on eidr-core's ``RequestPacer`` and
   waits too (``back_off``);
 * AC4, gzip, and ``maxlag`` with a lag refusal treated as a wait.
 
-AC8 for SPARQL: ``WDQS_ENDPOINT`` is the one default; QLever is not cleared
-(eidr-metadata-sources, ``qlever-wikidata`` UNREVIEWED), so nothing here
-names it. The entity mapping (C8 part 2) comes next.
+SPARQL (0.65.0): ``WDQS_ENDPOINT`` first; QLever's Wikidata endpoint was
+cleared on 2026-10-18 (eidr-metadata-sources OD-49) as a FALLBACK only, on
+conditions QAC1-QAC6: used only after WDQS fails for that request, never
+primary and never for scheduled or bulk work; the ``/api/wikidata`` endpoint
+only; Wikidata's triples only; one request at a time at least 1 s apart for
+every caller (``sparql_pacer`` on the machine-wide ``SPARQL_SCOPE``, the
+scope name eidr-wikidata chose); its values are Wikidata's. ``SPARQL_CHAIN``
+is that order. The entity mapping is ``external.wikidata``.
 """
 from __future__ import annotations
 
@@ -48,16 +53,31 @@ __all__ = [
     "GZIP_HEADERS",
     "MAXLAG_SECONDS",
     "MIN_429_WAIT_SECONDS",
+    "QLEVER_WIKIDATA_ENDPOINTS",
+    "SPARQL_CHAIN",
+    "SPARQL_MIN_INTERVAL",
+    "SPARQL_SCOPE",
     "WDQS_ENDPOINT",
     "MaxLag",
     "action_api_json",
     "action_api_pacer",
     "classify_action_api",
+    "sparql_pacer",
     "user_agent",
 ]
 
 ACTION_API = "https://www.wikidata.org/w/api.php"
 WDQS_ENDPOINT = "https://query.wikidata.org/sparql"
+# QLever's Wikidata endpoint on both hosts (OD-49 covers both; QAC2: never
+# another QLever dataset -- qlever.dev/imdb carries IMDb's data).
+QLEVER_WIKIDATA_ENDPOINTS = ("https://qlever.cs.uni-freiburg.de/api/wikidata",
+                             "https://qlever.dev/api/wikidata")
+# The SPARQL chain for call_with_failover: WDQS, then QLever only when WDQS
+# fails for that request (QAC1). Never put QLever first or use it for bulk.
+SPARQL_CHAIN = (WDQS_ENDPOINT, QLEVER_WIKIDATA_ENDPOINTS[0])
+# QAC4: one SPARQL request at a time, at least 1 s apart, for every caller.
+SPARQL_SCOPE = "wikidata-sparql"
+SPARQL_MIN_INTERVAL = 1.0
 
 # The machine-wide pacer scope every EIDR Action API client uses (AC9:
 # EIDR counts as one operator). One name, so eidr-wikidata and BMR-Review
@@ -91,6 +111,16 @@ def action_api_pacer(min_interval: float = 0.3, *,
     return RequestPacer(max(0.3, float(min_interval)), slow_threshold=1.0,
                         slow_pause=5.0, max_concurrent=1,
                         shared_scope=ACTION_API_SCOPE, scope_dir=scope_dir)
+
+
+def sparql_pacer(*, scope_dir: str | None = None) -> RequestPacer:
+    """A pacer on the machine-wide SPARQL scope: one request in flight, at
+    least 1 s between starts (QLever's QAC4; it keeps WDQS well inside AC5
+    too). No slow-request pause: that is an Action API rule, and a SPARQL
+    query legitimately runs for tens of seconds. Extracted from eidr-wikidata
+    ``etiquette.sparql_pacer``; same scope name and numbers."""
+    return RequestPacer(SPARQL_MIN_INTERVAL, slow_pause=0.0, max_concurrent=1,
+                        shared_scope=SPARQL_SCOPE, scope_dir=scope_dir)
 
 
 class MaxLag(Exception):
@@ -141,7 +171,7 @@ def _one_request(url: str, ua: str, timeout: float, pacer: RequestPacer,
 def action_api_json(params: Mapping[str, Any], *, user_agent: str, pacer: RequestPacer,
                     timeout: float = 30.0, attempts: int = 5, backoff: float = 1.0,
                     endpoint: str = ACTION_API,
-                    opener: Callable[..., Any] = urllib.request.urlopen,
+                    opener: Callable[..., Any] | None = None,
                     op_label: str = "action-api") -> dict:
     """One Action API request under the rules, with retries.
 
@@ -149,14 +179,18 @@ def action_api_json(params: Mapping[str, Any], *, user_agent: str, pacer: Reques
     ``call_with_failover``, which honours ``Retry-After`` (5 s floor without
     one) and a maxlag answer's interval; ``pacer.back_off`` makes the NEXT
     request wait as well, whichever program sends it. Raises the last error
-    when every attempt fails.
+    when every attempt fails. ``opener`` defaults to ``urllib.request.urlopen``
+    looked up at CALL time (0.65.0), so a test that patches
+    ``urllib.request.urlopen`` reaches it (eidr-wikidata noticed the
+    import-time default did not).
     """
+    open_url = opener if opener is not None else urllib.request.urlopen
     query = {**params, "format": "json", "maxlag": str(MAXLAG_SECONDS)}
     url = endpoint + "?" + urllib.parse.urlencode(query)
 
     def attempt(u: str) -> dict:
         try:
-            return _one_request(u, user_agent, timeout, pacer, opener)
+            return _one_request(u, user_agent, timeout, pacer, open_url)
         except Exception as exc:
             ra = retry_after_seconds(exc)
             if ra is None and http_status(exc) in (429, 503):

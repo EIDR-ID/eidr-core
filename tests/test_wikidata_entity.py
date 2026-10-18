@@ -99,3 +99,18 @@ def test_language_of_work_is_the_fallback_unless_original_language_is_no_value()
     nov = {"claims": {"P364": [{"rank": "normal", "mainsnak": {"snaktype": "novalue"}}],
                       "P407": [item("Q150")]}}
     assert WD.bmr_facts(nov, rel)["Original Language"] == []
+
+
+def test_a_deprecated_identifier_is_published_only_when_it_was_retired():
+    # Operator OD-43 (2026-10-18): Deprecated when it no longer resolves or
+    # redirects; one deprecated as wrong for the work, or with no reason, is
+    # dropped. Same decision as eidr-wikidata on 100 live deprecated P345s.
+    def ext(v, rank="normal", reason=None):
+        c = {"rank": rank, "mainsnak": {"datavalue": {"type": "external-id", "value": v}}}
+        if reason:
+            c["qualifiers"] = {"P2241": [{"datavalue": {"value": {"id": reason}}}]}
+        return c
+    e = {"claims": {"P345": [ext("tt1"), ext("tt2", "deprecated", "Q45403344"),
+                             ext("tt3", "deprecated", "Q28091153"), ext("tt4", "deprecated"),
+                             ext("tt1", "deprecated", "Q21441764")]}}
+    assert WD.external_ids(e, "P345") == [("tt1", ""), ("tt2", "Deprecated")]

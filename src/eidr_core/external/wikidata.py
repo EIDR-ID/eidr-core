@@ -28,7 +28,14 @@ integration package (2026-10-17) sets for the shared client:
   their examples (OD-47);
 * each statement's references (P248 stated in, P143 imported from) are
   readable (``references``), so a caller can tell a value Wikidata took from
-  IMDb from an independent one (OD-31).
+  IMDb from an independent one (OD-31);
+* a deprecated-rank external identifier is published as
+  ``Relation=Deprecated`` only when its P2241 reason says the identifier was
+  RETIRED (operator OD-43, 2026-10-18: "Deprecated identifiers (that no
+  longer resolve or that re-direct to a different ID) are published with
+  the Relation = Deprecated"); one deprecated as wrong for the work, or with
+  no reason, is dropped (``external_ids``, from eidr-wikidata 0.65.0's
+  source).
 
 Pure: no network. Fetch entities with ``external.wikimedia.action_api_json``
 (``wbgetentities``), then the related items (people, companies, language and
@@ -45,6 +52,7 @@ from eidr_core.codes import normalize_country_code
 __all__ = [
     "P_CAST_MEMBER",
     "P_COUNTRY_OF_ORIGIN",
+    "P_DEPRECATION_REASON",
     "P_DIRECTOR",
     "P_DURATION",
     "P_IMPORTED_FROM",
@@ -57,11 +65,13 @@ __all__ = [
     "P_PUBLICATION_DATE",
     "P_STATED_IN",
     "P_START_TIME",
+    "RETIRED_ID_REASONS",
     "ReleaseDate",
     "alternate_titles",
     "bmr_facts",
     "claims",
     "duration_minutes",
+    "external_ids",
     "item_ids",
     "label",
     "references",
@@ -83,6 +93,31 @@ P_CAST_MEMBER = "P161"
 P_PRODUCTION_COMPANY = "P272"
 P_STATED_IN = "P248"
 P_IMPORTED_FROM = "P143"
+P_DEPRECATION_REASON = "P2241"
+
+# P2241 ("reason for deprecated rank") values that mean the IDENTIFIER was
+# retired: the operator's definition of a deprecated Alt ID (OD-43). Chosen
+# by eidr-wikidata from P2241's one-of constraint and a survey of the 26,561
+# deprecated external-ID statements on EIDR-linked items (2026-10-18), of
+# which this set keeps 92%. Every other reason marks a statement wrong for
+# this work (incorrect identifier value, refers to a different subject,
+# reassigned, ...) or not a retirement (belongs to another region); those are
+# dropped. Duplicates (Q1263068) go to the exception reports, not here.
+RETIRED_ID_REASONS: dict[str, str] = {
+    "Q21441764": "withdrawn identifier value",
+    "Q45403344": "redirect",
+    "Q1236807": "URL redirection",
+    "Q123562959": "redirected to GRE portal",
+    "Q67125514": "deprecated identifier value (retained by its source)",
+    "Q54976355": "unrecognized identifier value (does not resolve)",
+    "Q129279898": "identifier applies to formatter URL no longer used",
+    "Q91778954": "formatter URL no longer available",
+    "Q1193907": "link rot",
+    "Q127789575": "website address has changed",
+    "Q111083433": "this wiki has been closed",
+    "Q23009439": "replacement",
+    "Q107356532": "obsolete",
+}
 _P_ISO639_1 = "P218"
 _P_WIKIMEDIA_LANG = "P424"
 _P_ISO3166_1 = "P297"
@@ -314,3 +349,30 @@ def bmr_facts(entity: Mapping[str, Any], related: Mapping[str, Any] | None = Non
         "Actor": names(P_CAST_MEMBER),
         "Associated Org": names(P_PRODUCTION_COMPANY),
     }
+
+
+def external_ids(entity: Mapping[str, Any], prop: str) -> list[tuple[str, str]]:
+    """``(value, relation)`` for an external-identifier property.
+
+    Normal and preferred statements give relation ``""`` (identity). A
+    deprecated-rank statement gives ``"Deprecated"`` only when one of its
+    P2241 reasons is in ``RETIRED_ID_REASONS`` (OD-43); otherwise it is
+    dropped. De-duplicated by value, the first (best-ranked) relation kept.
+    """
+    out: dict[str, str] = {}
+    for c in claims(entity, prop, include_deprecated=True):
+        dv = _value(c)
+        if not dv or dv.get("type") not in ("external-id", "string"):
+            continue
+        value = dv.get("value")
+        if not value or value in out:
+            continue
+        if c.get("rank") == "deprecated":
+            reasons = {_get(q, "datavalue", "value", "id")
+                       for q in (c.get("qualifiers") or {}).get(P_DEPRECATION_REASON) or []}
+            if not reasons & RETIRED_ID_REASONS.keys():
+                continue
+            out[value] = "Deprecated"
+        else:
+            out[value] = ""
+    return list(out.items())

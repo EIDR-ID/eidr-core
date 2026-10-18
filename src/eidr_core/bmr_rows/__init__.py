@@ -47,6 +47,8 @@ from typing import Any, TypeVar
 from eidr_core.swap import SWAP_NOTE
 
 __all__ = [
+    "BMR_MAX_ACTORS",
+    "BMR_MAX_DIRECTORS",
     "BMR_ROW_LIMIT",
     "EIDR_CATALOG_PARTY",
     "IMDB_PARTY",
@@ -54,6 +56,7 @@ __all__ = [
     "REGISTRY_IDS_COLUMN",
     "SOURCE_ASSERTED_COLUMN",
     "UNCONFIRMED_ID_COLUMNS",
+    "cap_credits",
     "chunk_rows",
     "join_notes",
     "number_families",
@@ -77,6 +80,14 @@ BMR_ROW_LIMIT = 5_000
 # Catalog party. eidr-imdb carried IMDb's ID as "EIDR_PARTY" and also wrote
 # it as Metadata Authority, which the same ruling drops.
 IMDB_PARTY = "10.5237/27B2-6941"
+
+# Credits on a BMR row (operator, 2026-10-18): "When populating data for BMR,
+# cut off after the first 4 actors (or 2 directors)" -- the EIDR API takes
+# at most 4 actors. Matching and voting use the FULL lists (a full cast
+# "dramatically increases the accuracy of a match"), and comparisons against
+# the mirror are not limited, so cut only when writing a row.
+BMR_MAX_ACTORS = 4
+BMR_MAX_DIRECTORS = 2
 EIDR_CATALOG_PARTY = "10.5237/FFDA-9947"
 
 NOTE_SEPARATOR = " | "
@@ -196,3 +207,13 @@ def title_language(title: str | None, language: str | None = None) -> str:
     if not (title or "").strip():
         return ""
     return (language or "").strip() or "und"
+
+
+def cap_credits(directors: Iterable[str] | None, actors: Iterable[str] | None
+                ) -> tuple[list[str], list[str]]:
+    """``(directors, actors)`` cut for a BMR row: the first 2 directors and
+    the first 4 actors, blanks dropped. Only for writing a row; a matcher
+    keeps the full lists (operator, 2026-10-18)."""
+    d = [x for x in (directors or ()) if x and str(x).strip()]
+    a = [x for x in (actors or ()) if x and str(x).strip()]
+    return d[:BMR_MAX_DIRECTORS], a[:BMR_MAX_ACTORS]

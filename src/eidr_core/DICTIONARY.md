@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.63.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.64.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,20 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.64.0 (2026-10-18)
+
+* **New module `eidr_core.external.wikidata` (C8, part 2):** a Wikidata
+  entity read into BMR template fields (`bmr_facts`, keyed by Template-22
+  header, operator 2026-10-18) under the integration package's rules:
+  deprecated rank never used, preferred first, the Release Date tiers with
+  `RD:Pro;` and the P580 exception, P2441 never an Alternate Title,
+  references readable. Full director and actor lists, for matching.
+  Extracted from eidr-wikidata; on 200 live entities identical except two
+  cast lists that drop a deprecated cast member. Additive.
+* **New: `bmr_rows.cap_credits`, `BMR_MAX_DIRECTORS` (2), `BMR_MAX_ACTORS`
+  (4)** -- for writing a BMR row only; matching uses the full lists
+  (operator, 2026-10-18). Additive.
 
 ### 0.63.0 (2026-10-17)
 
@@ -573,6 +587,7 @@ edition's Changes entry.
 | [`eidr_core.bmr_map.NEVER_PRODUCED`](#never_produced-constant) | constant | the template columns this module never writes, each for a stated reason: `Unique Row ID` (the caller's), `Assigned EIDR ID` and `Registration Errors & Notes` (the registry's and the reviewer's), `Metadata Authority` (the display name; only the Party ID column is written), `Operator's Notes` (written on Manifestation only). |
 | [`eidr_core.bmr_map.PRODUCED_BASES`](#produced_bases-constant) | constant | per supported template, every header base the mapper can write (derived from a record that takes every branch and pinned by a test, together with the rule that every stock template column is here or in `NEVER_PRODUCED`). |
 | [`eidr_core.bmr_map.SUPPORTED_TEMPLATES`](#supported_templates-constant) | constant | the template keys `row_from_blocks` writes; Compilation has a sheet but is refused. |
+| [`eidr_core.bmr_rows.cap_credits`](#cap_credits) | function | Cuts credits for a BMR row (operator, 2026-10-18; the EIDR API takes at most 4 actors). |
 | [`eidr_core.bmr_rows.chunk_rows`](#chunk_rows) | function | Splits rows into files of at most `limit` rows. |
 | [`eidr_core.bmr_rows.join_notes`](#join_notes) | function | Joins the parts with `" \| "`, a `SWAPPED:` note moved first, because BMR-Review's control parses the opening of the cell. |
 | [`eidr_core.bmr_rows.number_families`](#number_families) | function | Expands each family list to `"<Member> <n>"` columns and omits empty members, so the writer neither writes empty strings nor counts them toward the width. |
@@ -580,6 +595,8 @@ edition's Changes entry.
 | [`eidr_core.bmr_rows.registrant_party`](#registrant_party) | function | Returns the member party, or `EIDR_CATALOG_PARTY` for a non-member source such as Wikidata (operator, 2026-10-17). |
 | [`eidr_core.bmr_rows.registry_ids_cell`](#registry_ids_cell) | function | De-duplicates, sorts and joins the IDs with `" \| "` (R1), so the cell does not change with query order. |
 | [`eidr_core.bmr_rows.title_language`](#title_language) | function | Returns the stated language, `und` for a title without one, and nothing when there is no title. |
+| [`eidr_core.bmr_rows.BMR_MAX_ACTORS`](#bmr_max_actors-constant) | constant | actors on a BMR row (the EIDR API's limit). |
+| [`eidr_core.bmr_rows.BMR_MAX_DIRECTORS`](#bmr_max_directors-constant) | constant | directors on a BMR row. |
 | [`eidr_core.bmr_rows.BMR_ROW_LIMIT`](#bmr_row_limit-constant) | constant | rows per file: the safe guideline for wide rows against the BMR tool's memory errors (operator, 2026-10-17); a default-template sheet can go to about 25,000. |
 | [`eidr_core.bmr_rows.EIDR_CATALOG_PARTY`](#eidr_catalog_party-constant) | constant | the EIDR Catalog party, the Registrant for records from a source that is not an EIDR member. |
 | [`eidr_core.bmr_rows.IMDB_PARTY`](#imdb_party-constant) | constant | IMDb's Party ID (IMDb is an EIDR member), the Registrant for IMDb-sourced records. |
@@ -667,6 +684,30 @@ edition's Changes entry.
 | [`eidr_core.external.failover.WIKIMEDIA_MIN_INTERVAL`](#wikimedia_min_interval-constant) | constant | Seconds between request starts under Wikimedia's 200-requests-a-minute limit; `RequestPacer`'s default `min_interval`. |
 | [`eidr_core.external.failover.WIKIMEDIA_SLOW_PAUSE`](#wikimedia_slow_pause-constant) | constant | Seconds to wait after a request that took longer than `WIKIMEDIA_SLOW_REQUEST` (Wikimedia: "please wait 5 seconds"); `RequestPacer`'s default `slow_pause`. |
 | [`eidr_core.external.failover.WIKIMEDIA_SLOW_REQUEST`](#wikimedia_slow_request-constant) | constant | A request slower than this many seconds counts as slow and triggers the pause; `RequestPacer`'s default `slow_threshold`. |
+| [`eidr_core.external.wikidata.alternate_titles`](#alternate_titles) | function | Aliases then labels, de-duplicated with case and punctuation folded, the primary title excluded; never P2441. |
+| [`eidr_core.external.wikidata.bmr_facts`](#bmr_facts) | function | Reads the entity into BMR fields. |
+| [`eidr_core.external.wikidata.claims`](#claims) | function | Reads a property's statements under the package's rank rule; every other reader goes through it. |
+| [`eidr_core.external.wikidata.duration_minutes`](#duration_minutes) | function | Approx Length from P2047, in minutes, seconds or hours. |
+| [`eidr_core.external.wikidata.item_ids`](#item_ids) | function | Reads the items a property names. |
+| [`eidr_core.external.wikidata.label`](#label) | function | Reads one label. |
+| [`eidr_core.external.wikidata.references`](#references) | function | Says where Wikidata got the value (stated in, imported from), so a caller can tell an IMDb-derived value from an independent one (OD-31). |
+| [`eidr_core.external.wikidata.release_date`](#release_date) | function | Picks the Release Date: P577, then P580, then P571; within a property general statements before territory-specific ones, preferred before normal, deprecated never. |
+| [`eidr_core.external.wikidata.title`](#title) | function | P1476, else the English label; the language as two letters, `und` when none. |
+| [`eidr_core.external.wikidata.ReleaseDate`](#releasedate-class) | class | A picked Release Date and how it was picked. |
+| [`eidr_core.external.wikidata.P_CAST_MEMBER`](#p_cast_member-constant) | constant | cast member. |
+| [`eidr_core.external.wikidata.P_COUNTRY_OF_ORIGIN`](#p_country_of_origin-constant) | constant | country of origin. |
+| [`eidr_core.external.wikidata.P_DIRECTOR`](#p_director-constant) | constant | director. |
+| [`eidr_core.external.wikidata.P_DURATION`](#p_duration-constant) | constant | duration. |
+| [`eidr_core.external.wikidata.P_IMPORTED_FROM`](#p_imported_from-constant) | constant | imported from (a reference). |
+| [`eidr_core.external.wikidata.P_INCEPTION`](#p_inception-constant) | constant | inception. |
+| [`eidr_core.external.wikidata.P_LANGUAGE_OF_WORK`](#p_language_of_work-constant) | constant | language of work or name (the fallback for P364). |
+| [`eidr_core.external.wikidata.P_ORIGINAL_LANGUAGE`](#p_original_language-constant) | constant | original language. |
+| [`eidr_core.external.wikidata.P_ORIGINAL_TITLE`](#p_original_title-constant) | constant | title (monolingual). |
+| [`eidr_core.external.wikidata.P_PLACE_OF_PUB`](#p_place_of_pub-constant) | constant | place of publication (makes a date territory-specific). |
+| [`eidr_core.external.wikidata.P_PRODUCTION_COMPANY`](#p_production_company-constant) | constant | production company. |
+| [`eidr_core.external.wikidata.P_PUBLICATION_DATE`](#p_publication_date-constant) | constant | publication date. |
+| [`eidr_core.external.wikidata.P_START_TIME`](#p_start_time-constant) | constant | start time. |
+| [`eidr_core.external.wikidata.P_STATED_IN`](#p_stated_in-constant) | constant | stated in (a reference). |
 | [`eidr_core.external.wikimedia.action_api_json`](#action_api_json) | function | Sends one request under the rules and retries what is transient (maxlag, 429, 5xx, network errors) through `call_with_failover`, which honours `Retry-After` and a maxlag interval; `pacer.back_off` makes the next request wait too, whichever program sends it. |
 | [`eidr_core.external.wikimedia.action_api_pacer`](#action_api_pacer) | function | Builds a `RequestPacer` on the machine-wide Action API scope: one request in flight across every EIDR program, 0.3 s apart, 5 s after a request slower than 1 s. |
 | [`eidr_core.external.wikimedia.classify_action_api`](#classify_action_api) | function | Retries maxlag, 429, 5xx, network errors and timeouts; stops on anything else (a 400 for a bad request). |
@@ -819,7 +860,7 @@ Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 8 functions, 2 cl
 
 **Used by.**
 <!-- dict-usedby:eidr_core.altidtool_io -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `AltIdRow`, `emission_problem`, `format_line`, `multi_form_domains`
 * **eidr-dq**: `identity_relation_sql`
 * **eidr-imdb**: `AltIdRow`, `format_line`, `parse_line`, `write_lines`
@@ -1047,7 +1088,7 @@ Source `src/eidr_core/bmr_io/__init__.py`. Public names: 21 functions, 9 classes
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `families_for`, `header_map`, `index_rows`, `read_headers`, `resolve_parent`, `template_for_creation_type`, `write_sheet`
 * **BMRtoAltID**: `ASSIGNED_ID_COLUMN`, `check_sheet`, `DATA_START`, `family_layout`, `fill_column`, `HEADER_ROW`, `open_sheet`, `ROW_ID_COLUMN`, `SHEET_TO_TEMPLATE`, `subset_rows`, `TemplateMismatch`, `TEMPLATES`
 * **eidr-dq**: `pad_groups`, `RepeatPlan`
@@ -1781,7 +1822,7 @@ Source `src/eidr_core/bmr_io/subset.py`. Public names: 1 function (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io.subset -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `required_headers`
 <!-- /dict-usedby -->
 
@@ -1827,7 +1868,7 @@ Source `src/eidr_core/codes/__init__.py`. Public names: 2 functions, 2 constants
 
 **Used by.**
 <!-- dict-usedby:eidr_core.codes -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **eidr-imdb**: `country_list`
 * **eidr-wikidata**: `normalize_country_code`
 <!-- /dict-usedby -->
@@ -1907,7 +1948,7 @@ Source `src/eidr_core/compare/__init__.py`. Public names: 20 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `cmp_alt_ids`, `COMPARATORS`, `FieldResult`, `set_params`
 * **De-Dupe UI**: `cmp_alt_ids`, `cmp_length`, `cmp_release_date`, `cmp_titles`, `fuzzy`
 <!-- /dict-usedby -->
@@ -2374,7 +2415,7 @@ Source `src/eidr_core/compare/nonlinear.py`. Public names: 3 functions (declared
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.nonlinear -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `accumulate`, `aggregate`, `corroborate`, (the module)
 * **De-Dupe UI**: `accumulate`
 <!-- /dict-usedby -->
@@ -2462,7 +2503,7 @@ Source `src/eidr_core/compare/spec.py`. Public names: 2 functions (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.spec -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_spec`, `spec_path`, (the module)
 <!-- /dict-usedby -->
 
@@ -2523,7 +2564,7 @@ Source `src/eidr_core/compare/states.py`. Public names: 4 functions (declared by
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.states -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `band`, `field_not_counted`, `field_states`, `ui_field_key`, (the module)
 <!-- /dict-usedby -->
 
@@ -2630,7 +2671,7 @@ Source `src/eidr_core/compare/titles.py`. Public names: 7 functions, 2 constants
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.titles -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `parse_part`, `parts_conflict`, `segments`, `select_titles`, `title_similarity`
 * **De-Dupe UI**: `COMBINATION_DIFFERS_QUALITY`, `parse_part`, `PART_AMBIGUOUS_QUALITY`, `parts_conflict`, `segments`, `title_similarity`
 * **LanguageTool**: `title_similarity`
@@ -2814,7 +2855,7 @@ Source `src/eidr_core/db_schemas/__init__.py`. Public names: 4 functions, 1 cons
 
 **Used by.**
 <!-- dict-usedby:eidr_core.db_schemas -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `assert_tables`, `contract_version`, `DATABASES`, `load_manifest`, `table_columns`
 * **eidr-dq**: `assert_tables`, `contract_version`, `load_manifest`, `table_columns`
 * **eidr-imdb**: `assert_tables`, `load_manifest`
@@ -2939,7 +2980,7 @@ needs no extra.
 
 **Used by.**
 <!-- dict-usedby:eidr_core.dictionary -->
-No consumer imports it directly (scan of 2026-10-17).
+No consumer imports it directly (scan of 2026-10-18).
 <!-- /dict-usedby -->
 
 ### `changes`
@@ -3016,10 +3057,10 @@ Source `src/eidr_core/external/__init__.py`. Public names: 3 functions, 5 classe
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **eidr-dq**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `Entry`, `FactCache`, `FATAL`, `Key`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
 * **eidr-imdb**: `call_with_failover`, `endpoint_chain`, `FATAL`, `NEXT_ENDPOINT`, `OUTAGE`, `RETRY`
-* **eidr-wikidata**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `FactCache`, `FATAL`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
+* **eidr-wikidata**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `FactCache`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
 <!-- /dict-usedby -->
 
 ### `call_with_failover`
@@ -3256,10 +3297,9 @@ Source `src/eidr_core/external/failover.py`. Public names: 5 functions, 8 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external.failover -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
-* **BMR-Review**: `retry_after_seconds`
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **eidr-imdb**: `DEFAULT_RATE_LIMIT_FLOOR`, `http_status`
-* **eidr-wikidata**: `http_status`, `is_bad_query_error`, `is_outage_error`, `retry_after_seconds`
+* **eidr-wikidata**: `is_bad_query_error`, `is_outage_error`
 <!-- /dict-usedby -->
 
 ### `cooldown_remaining`
@@ -3442,7 +3482,7 @@ Source `src/eidr_core/ids/__init__.py`. Public names: 8 functions, 11 constants 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ids -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `category`, `fault`, `find_content_ids`, `is_valid_eidr_id`
 * **BMRtoAltID**: `fault`
 * **De-Dupe UI**: `ALPHABET`, `check_character`, `is_valid_eidr_id`
@@ -3714,7 +3754,7 @@ Source `src/eidr_core/inheritance/__init__.py`. Public names: 6 functions, 1 cla
 
 **Used by.**
 <!-- dict-usedby:eidr_core.inheritance -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `build_full_record`, `provenance`, `RECORD_ATTRS`, `TitleConstructionError`, (the module)
 * **XML_to_JSON**: `build_full_base`, `INHERITABLE_FIELDS`, `is_absent`, `TitleConstructionError`
 <!-- /dict-usedby -->
@@ -3932,7 +3972,7 @@ Source `src/eidr_core/normalize/__init__.py`. Public names: 13 functions (declar
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `ascii_fold`, `cmp_key`, `days_between`, `nfkc`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **De-Dupe UI**: `ascii_fold`, `cmp_key`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **eidr-wikidata**: `norm_title`, `sanitize_field`
@@ -4204,7 +4244,7 @@ Source `src/eidr_core/normalize/aliases.py`. Public names: 2 functions, 1 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize.aliases -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `alias_name`, `alias_title`, `ORDINALS`
 <!-- /dict-usedby -->
 
@@ -4277,7 +4317,7 @@ Source `src/eidr_core/ordering/__init__.py`. Public names: 10 functions (declare
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ordering -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `altid_canonical_key`, `altid_collapsed_canonical_key`, `altid_display_key`, `altid_kind`, `is_shortdoi`, `title_bucket`, `title_sort_key`
 * **XML_to_JSON**: `altid_collapsed_canonical_key`, `title_sort_key`
 <!-- /dict-usedby -->
@@ -4500,7 +4540,7 @@ Source `src/eidr_core/registry/__init__.py`. Public names: 5 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.registry -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `get_registry_client`
 * **eidr-dq**: `build_registry_credentials`, `get_registry_client`
 * **eidr-wikidata**: `build_registry_credentials`, `CODE_SUCCESS`, `DEFAULT_REGISTRY`, `get_registry_client`, `OperationStatus`, `parse_operation_status`, `parse_operation_statuses`, `token_operation_status`
@@ -4680,7 +4720,7 @@ Source `src/eidr_core/secrets_loader/__init__.py`. Public names: 3 functions, 1 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.secrets_loader -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_local`
 * **BMRtoAltID**: `load_secrets`, `SecretsError`
 * **eidr-dq**: `load_secrets`, `SecretsError`
@@ -4794,7 +4834,7 @@ Source `src/eidr_core/vendor/__init__.py`. Public names: 3 functions, 3 classes,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.vendor -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **python-tools**: `check`, `load_manifest`, (the module)
 <!-- /dict-usedby -->
 
@@ -4957,7 +4997,7 @@ Source `src/eidr_core/verify/__init__.py`. Public names: 5 functions (declared b
 
 **Used by.**
 <!-- dict-usedby:eidr_core.verify -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **eidr-dq**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 * **eidr-wikidata**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 <!-- /dict-usedby -->
@@ -5093,7 +5133,7 @@ Source `src/eidr_core/bmr_map/__init__.py`. Public names: 8 functions, 3 constan
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_map -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `record_from_xml`, `row_from_record`
 * **XML_to_JSON**: `NEVER_PRODUCED`, `PRODUCED_BASES`, `record_from_row`, `row_from_record`
 <!-- /dict-usedby -->
@@ -5298,7 +5338,7 @@ Source `src/eidr_core/verdicts/__init__.py`. Public names: 8 functions, 3 classe
 
 **Used by.**
 <!-- dict-usedby:eidr_core.verdicts -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `AssertedId`, `ASSESSMENT_COLUMN`, `clears_without_a_human`, `fill_map`, `HUMAN_REVIEW_COLUMN`, `NO_ID_SENTINELS`, `NO_MATCH`, `read_asserted_id`, `Resolution`, `resolve_row`, `resolve_sheet`, `ResolveStats`, `reviewer_relation`, `STATUSES`, `summarize`, `TERMINAL_ASSESSMENTS`, `trim`
 <!-- /dict-usedby -->
 
@@ -5597,7 +5637,7 @@ Source `src/eidr_core/altid_audit/__init__.py`. Public names: 6 functions, 7 cla
 
 **Used by.**
 <!-- dict-usedby:eidr_core.altid_audit -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `AliasResolution`, `ALT_ID_TABLES`, `AltId`, `audit_rows`, `AuditRow`, `DEFAULT_BATCH_ALT_IDS`, `Finding`, `is_audited`, `IS_SAME_AS`, `is_single_form`, `kind_key`, `MIRROR_NEEDS`, `MirrorClient`, `MirrorError`, `RowAudit`, `same_relation`
 <!-- /dict-usedby -->
 
@@ -5944,7 +5984,7 @@ Source `src/eidr_core/lookup/__init__.py`. Public names: 6 functions, 2 classes,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.lookup -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **eidr-imdb**: `live_status`
 <!-- /dict-usedby -->
 
@@ -6136,7 +6176,7 @@ Source `src/eidr_core/swap/__init__.py`. Public names: 3 functions, 1 constant (
 
 **Used by.**
 <!-- dict-usedby:eidr_core.swap -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **eidr-imdb**: `abstraction_ancestors`, `plan_swaps`, `SWAP_NOTE`
 <!-- /dict-usedby -->
 
@@ -6212,7 +6252,7 @@ Defined in `src/eidr_core/swap/__init__.py`.
 ## `eidr_core.bmr_rows`
 
 <!-- dict-module:eidr_core.bmr_rows -->
-Source `src/eidr_core/bmr_rows/__init__.py`. Public names: 7 functions, 7 constants (declared by `__all__`).
+Source `src/eidr_core/bmr_rows/__init__.py`. Public names: 8 functions, 9 constants (declared by `__all__`).
 <!-- /dict-module -->
 
 **Purpose.** Helpers that the tools which build inbound BMR sheets (eidr-imdb, eidr-wikidata) each re-implemented: the two unconfirmed-ID columns of ruling R1, repeating families as numbered columns, files of about 5,000 rows (a guideline against the BMR tool's memory errors) with each Series tree kept whole, and one separator for Operator's Notes. Reconciliation plan component C2, ruled in eidr-core-ops `PHASE2-3-INTERFACES-2026-10-15.md`. Routing stays `bmr_io.template_for_creation_type`, writing stays `bmr_io.write_sheet`, and Country of Origin is `codes.country_list`.
@@ -6229,7 +6269,7 @@ Source `src/eidr_core/bmr_rows/__init__.py`. Public names: 7 functions, 7 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_rows -->
-Scan of 2026-10-17; regenerated at each release from the consumer trees.
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **eidr-imdb**: `IMDB_PARTY`, `original_languages`, `registrant_party`, `title_language`, (the module)
 <!-- /dict-usedby -->
 
@@ -6421,6 +6461,41 @@ Defined in `src/eidr_core/bmr_rows/__init__.py`.
 **Value** `IMDB_PARTY = "10.5237/27B2-6941"` -- IMDb's Party ID (IMDb is an EIDR member), the Registrant for IMDb-sourced records.
 <!-- /dict -->
 
+### `cap_credits`
+
+<!-- dict:eidr_core.bmr_rows.cap_credits -->
+```python
+def cap_credits(directors: Iterable[str] | None, actors: Iterable[str] | None) -> tuple[list[str], list[str]]
+```
+
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `directors` | `Iterable[str] \| None` | required | All directors. |
+| `actors` | `Iterable[str] \| None` | required | All actors. |
+
+**Returns** `tuple[list[str], list[str]]` -- the first 2 directors and the first 4 actors.
+<!-- /dict -->
+
+**Does.** Cuts credits for a BMR row (operator, 2026-10-18; the EIDR API takes at most 4 actors). Only for writing a row: matching and voting use the full lists.
+
+### `BMR_MAX_ACTORS` (constant)
+
+<!-- dict:eidr_core.bmr_rows.BMR_MAX_ACTORS -->
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+**Value** `BMR_MAX_ACTORS = 4` -- actors on a BMR row (the EIDR API's limit).
+<!-- /dict -->
+
+### `BMR_MAX_DIRECTORS` (constant)
+
+<!-- dict:eidr_core.bmr_rows.BMR_MAX_DIRECTORS -->
+Defined in `src/eidr_core/bmr_rows/__init__.py`.
+
+**Value** `BMR_MAX_DIRECTORS = 2` -- directors on a BMR row.
+<!-- /dict -->
+
 ## `eidr_core.external.wikimedia`
 
 <!-- dict-module:eidr_core.external.wikimedia -->
@@ -6439,7 +6514,9 @@ Source `src/eidr_core/external/wikimedia.py`. Public names: 4 functions, 1 class
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external.wikimedia -->
-No consumer imports it directly (scan of 2026-10-17).
+Scan of 2026-10-18; regenerated at each release from the consumer trees.
+* **BMR-Review**: `action_api_json`, `action_api_pacer`, `ACTION_API_SCOPE`, `user_agent`, (the module)
+* **eidr-wikidata**: `ACTION_API`, `action_api_json`, `action_api_pacer`
 <!-- /dict-usedby -->
 
 ### `action_api_json`
@@ -6587,6 +6664,329 @@ Defined in `src/eidr_core/external/wikimedia.py`.
 Defined in `src/eidr_core/external/wikimedia.py`.
 
 **Value** `WDQS_ENDPOINT = "https://query.wikidata.org/sparql"` -- the Wikidata Query Service, the one default SPARQL endpoint (AC8; QLever is not cleared).
+<!-- /dict -->
+
+## `eidr_core.external.wikidata`
+
+<!-- dict-module:eidr_core.external.wikidata -->
+Source `src/eidr_core/external/wikidata.py`. Public names: 9 functions, 1 class, 14 constants (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** A Wikidata entity read into BMR template fields (Template-22 headers, operator 2026-10-18), with the rules eidr-metadata-sources' integration package sets: deprecated rank never used, preferred before normal, the Release Date tiers with `RD:Pro;` for estimates and the P580 exception for Series and Season, P2441 never an Alternate Title, and each statement's references readable for OD-31. The second part of the shared Wikidata client (C8), extracted from eidr-wikidata's readers; on 200 live entities it gave the same dates, lengths, titles, alternate titles and item lists, except two cast lists where it drops a deprecated cast member, as the rule says. Pure: no network.
+
+**Use it when.** 
+* You fetched entities (`external.wikimedia.action_api_json`, `wbgetentities`) and want their BMR fields: `bmr_facts`, with the related people, company, language and country items as `related`.
+* You match or vote against the mirror: use the FULL `Director` and `Actor` lists (operator, 2026-10-18).
+* You need one rule on its own: `release_date`, `duration_minutes`, `title`, `alternate_titles`, `item_ids`, `references`.
+
+**Do not use it when.** 
+* You are writing a BMR row: cut the credits first with `bmr_rows.cap_credits` (2 directors, 4 actors; the EIDR API takes at most 4 actors).
+* You need Wikidata's own classification of the work (P31 to Referent Type, the franchise and episodic rules): that is still eidr-wikidata's, the next part of C8.
+* Never read a statement's value without `claims`: it is where deprecated rank is dropped.
+
+**Used by.**
+<!-- dict-usedby:eidr_core.external.wikidata -->
+No consumer imports it directly (scan of 2026-10-18).
+<!-- /dict-usedby -->
+
+### `alternate_titles`
+
+<!-- dict:eidr_core.external.wikidata.alternate_titles -->
+```python
+def alternate_titles(entity: Mapping[str, Any], primary: str = "") -> list[tuple[str, str]]
+```
+
+Defined in `src/eidr_core/external/wikidata.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `entity` | `Mapping[str, Any]` | required | A Wikidata entity as `wbgetentities` returns it. |
+| `primary` | `str` | `""` | The primary title, to drop from the list. |
+
+**Returns** `list[tuple[str, str]]` -- `(Alternate Title, Alt Title Language)` pairs.
+<!-- /dict -->
+
+**Does.** Aliases then labels, de-duplicated with case and punctuation folded, the primary title excluded; never P2441. Whether labels and aliases are release titles at all is with the operator (OD-47, examples requested).
+
+### `bmr_facts`
+
+<!-- dict:eidr_core.external.wikidata.bmr_facts -->
+```python
+def bmr_facts(entity: Mapping[str, Any], related: Mapping[str, Any] | None = None, *, referent_type: str = "") -> dict[str, Any]
+```
+
+Defined in `src/eidr_core/external/wikidata.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `entity` | `Mapping[str, Any]` | required | A Wikidata entity as `wbgetentities` returns it. |
+| `related` | `Mapping[str, Any] \| None` | `None` | The fetched entities its statements point at (people, companies, language and country items), by QID. |
+| `referent_type` | `str` | `""` (keyword-only) | The row's Referent Type, which decides the P580 exception. |
+
+**Returns** `dict[str, Any]` -- `{Template-22 header: value}`: Title, Title Language, Alternate Title, Release Date, Registrant Extra (`RD:Pro;` for an estimate), Approx Length, Original Language, Country of Origin, Director, Actor, Associated Org.
+<!-- /dict -->
+
+**Does.** Reads the entity into BMR fields. Every director and actor is returned, for matching; cut them for a row with `bmr_rows.cap_credits`. Language codes are the items' ISO 639-1 (else Wikimedia) codes, unvalidated; countries are normalised (SU to SUHH). P407 is the language fallback unless P364 says "no value".
+
+### `claims`
+
+<!-- dict:eidr_core.external.wikidata.claims -->
+```python
+def claims(entity: Mapping[str, Any], prop: str, *, include_deprecated: bool = False) -> list[dict]
+```
+
+Defined in `src/eidr_core/external/wikidata.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `entity` | `Mapping[str, Any]` | required | A Wikidata entity as `wbgetentities` returns it. |
+| `prop` | `str` | required | A property ID. |
+| `include_deprecated` | `bool` | `False` (keyword-only) | True keeps deprecated statements (never for a value). |
+
+**Returns** `list[dict]` -- the statements, deprecated dropped, preferred first.
+<!-- /dict -->
+
+**Does.** Reads a property's statements under the package's rank rule; every other reader goes through it.
+
+### `duration_minutes`
+
+<!-- dict:eidr_core.external.wikidata.duration_minutes -->
+```python
+def duration_minutes(entity: Mapping[str, Any]) -> int | None
+```
+
+Defined in `src/eidr_core/external/wikidata.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `entity` | `Mapping[str, Any]` | required | A Wikidata entity as `wbgetentities` returns it. |
+
+**Returns** `int | None` -- minutes, or None.
+<!-- /dict -->
+
+**Does.** Approx Length from P2047, in minutes, seconds or hours.
+
+### `item_ids`
+
+<!-- dict:eidr_core.external.wikidata.item_ids -->
+```python
+def item_ids(entity: Mapping[str, Any], prop: str) -> list[str]
+```
+
+Defined in `src/eidr_core/external/wikidata.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `entity` | `Mapping[str, Any]` | required | A Wikidata entity as `wbgetentities` returns it. |
+| `prop` | `str` | required | A property ID. |
+
+**Returns** `list[str]` -- the QIDs, by rank, de-duplicated.
+<!-- /dict -->
+
+**Does.** Reads the items a property names.
+
+### `label`
+
+<!-- dict:eidr_core.external.wikidata.label -->
+```python
+def label(entity: Mapping[str, Any] | None, lang: str = "en") -> str
+```
+
+Defined in `src/eidr_core/external/wikidata.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `entity` | `Mapping[str, Any] \| None` | required | An entity, or None. |
+| `lang` | `str` | `"en"` | A language code. |
+
+**Returns** `str` -- the label, or "".
+<!-- /dict -->
+
+**Does.** Reads one label.
+
+### `references`
+
+<!-- dict:eidr_core.external.wikidata.references -->
+```python
+def references(claim: Mapping[str, Any]) -> list[tuple[str, str]]
+```
+
+Defined in `src/eidr_core/external/wikidata.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `claim` | `Mapping[str, Any]` | required | One statement. |
+
+**Returns** `list[tuple[str, str]]` -- `(P248 or P143, item)` pairs.
+<!-- /dict -->
+
+**Does.** Says where Wikidata got the value (stated in, imported from), so a caller can tell an IMDb-derived value from an independent one (OD-31).
+
+### `release_date`
+
+<!-- dict:eidr_core.external.wikidata.release_date -->
+```python
+def release_date(entity: Mapping[str, Any], referent_type: str = "") -> ReleaseDate
+```
+
+Defined in `src/eidr_core/external/wikidata.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `entity` | `Mapping[str, Any]` | required | A Wikidata entity as `wbgetentities` returns it. |
+| `referent_type` | `str` | `""` | The row's Referent Type. |
+
+**Returns** `ReleaseDate` -- date, estimate flag and source.
+<!-- /dict -->
+
+**Does.** Picks the Release Date: P577, then P580, then P571; within a property general statements before territory-specific ones, preferred before normal, deprecated never. Territory-specific dates, P571 and P580 (except on a Series or Season) are estimates (`RD:Pro;`).
+
+### `title`
+
+<!-- dict:eidr_core.external.wikidata.title -->
+```python
+def title(entity: Mapping[str, Any]) -> tuple[str, str]
+```
+
+Defined in `src/eidr_core/external/wikidata.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `entity` | `Mapping[str, Any]` | required | A Wikidata entity as `wbgetentities` returns it. |
+
+**Returns** `tuple[str, str]` -- `(Title, Title Language)`.
+<!-- /dict -->
+
+**Does.** P1476, else the English label; the language as two letters, `und` when none.
+
+### `ReleaseDate` (class)
+
+<!-- dict:eidr_core.external.wikidata.ReleaseDate -->
+```python
+class ReleaseDate(NamedTuple)
+```
+
+Defined in `src/eidr_core/external/wikidata.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `date` | `str` | required | YYYY or YYYY-MM-DD; "" for none. |
+| `estimate` | `bool` | required | True when the date must carry `RD:Pro;`. |
+| `source` | `str` | required | The property, with `+P291` for a territory-specific date. |
+<!-- /dict -->
+
+**Does.** A picked Release Date and how it was picked.
+
+### `P_CAST_MEMBER` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_CAST_MEMBER -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_CAST_MEMBER = "P161"` -- cast member.
+<!-- /dict -->
+
+### `P_COUNTRY_OF_ORIGIN` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_COUNTRY_OF_ORIGIN -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_COUNTRY_OF_ORIGIN = "P495"` -- country of origin.
+<!-- /dict -->
+
+### `P_DIRECTOR` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_DIRECTOR -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_DIRECTOR = "P57"` -- director.
+<!-- /dict -->
+
+### `P_DURATION` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_DURATION -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_DURATION = "P2047"` -- duration.
+<!-- /dict -->
+
+### `P_IMPORTED_FROM` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_IMPORTED_FROM -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_IMPORTED_FROM = "P143"` -- imported from (a reference).
+<!-- /dict -->
+
+### `P_INCEPTION` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_INCEPTION -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_INCEPTION = "P571"` -- inception.
+<!-- /dict -->
+
+### `P_LANGUAGE_OF_WORK` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_LANGUAGE_OF_WORK -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_LANGUAGE_OF_WORK = "P407"` -- language of work or name (the fallback for P364).
+<!-- /dict -->
+
+### `P_ORIGINAL_LANGUAGE` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_ORIGINAL_LANGUAGE -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_ORIGINAL_LANGUAGE = "P364"` -- original language.
+<!-- /dict -->
+
+### `P_ORIGINAL_TITLE` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_ORIGINAL_TITLE -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_ORIGINAL_TITLE = "P1476"` -- title (monolingual).
+<!-- /dict -->
+
+### `P_PLACE_OF_PUB` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_PLACE_OF_PUB -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_PLACE_OF_PUB = "P291"` -- place of publication (makes a date territory-specific).
+<!-- /dict -->
+
+### `P_PRODUCTION_COMPANY` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_PRODUCTION_COMPANY -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_PRODUCTION_COMPANY = "P272"` -- production company.
+<!-- /dict -->
+
+### `P_PUBLICATION_DATE` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_PUBLICATION_DATE -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_PUBLICATION_DATE = "P577"` -- publication date.
+<!-- /dict -->
+
+### `P_START_TIME` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_START_TIME -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_START_TIME = "P580"` -- start time.
+<!-- /dict -->
+
+### `P_STATED_IN` (constant)
+
+<!-- dict:eidr_core.external.wikidata.P_STATED_IN -->
+Defined in `src/eidr_core/external/wikidata.py`.
+
+**Value** `P_STATED_IN = "P248"` -- stated in (a reference).
 <!-- /dict -->
 
 ## Specs and data files

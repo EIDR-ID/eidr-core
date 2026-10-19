@@ -70,8 +70,8 @@ READER HALF (added 2026-08-06, register R3 tail):
 * ``RepeatPlan`` — union-max repeat-group counts across records, with
   per-family minimums (folded in from eidr-dq ``flatten.py``, which
   hardcoded Director>=2 / Actor>=4 inside ``finalize``). The same
-  union-max model backs combine's chunk merging and the writer's
-  ``_max_counts``.
+  union-max model backs combine's chunk merging. (The writer's
+  ``max_counts`` computes its own counts; it does not use ``RepeatPlan``.)
 * ``pad_groups(items, count, width)`` — flatten one family's per-record
   values to exactly ``count`` groups of ``width`` cells, padding with
   ``fill``. Replaces the ~18 hand-written pad loops in flatten.py.
@@ -310,14 +310,19 @@ def fix_shared_strings(xlsx_path: str) -> None:
             total = 0
 
             if "xl/sharedStrings.xml" in names:
+                # An unreadable table is an ERROR, never "start afresh": cells
+                # already marked t="s" index into it, so rebuilding it from the
+                # inline strings alone would point them at the wrong strings, a
+                # silent corruption (dictionary audit, 2026-10-02; 0.67.0).
                 try:
                     root = ET.fromstring(z_in.read("xl/sharedStrings.xml"))
-                    ns = root.tag.split("}")[0].strip("{")
-                    for ssi in root.findall(f"{{{ns}}}si"):
-                        s = "".join(t.text or "" for t in ssi.findall(f".//{{{ns}}}t"))
-                        si[s] = len(sl); sl.append(s)
-                except Exception:
-                    sl, si = [], {}
+                except ET.ParseError as exc:
+                    raise ValueError(f"{xlsx_path}: xl/sharedStrings.xml does not parse "
+                                     f"({exc}); refusing to rebuild it") from exc
+                ns = root.tag.split("}")[0].strip("{")
+                for ssi in root.findall(f"{{{ns}}}si"):
+                    s = "".join(t.text or "" for t in ssi.findall(f".//{{{ns}}}t"))
+                    si[s] = len(sl); sl.append(s)
 
             def _add(s: str) -> int:
                 if s in si:
@@ -376,6 +381,21 @@ def fix_shared_strings(xlsx_path: str) -> None:
                     b'<Override PartName="/xl/sharedStrings.xml" '
                     b'ContentType="application/vnd.openxmlformats-officedocument'
                     b'.spreadsheetml.sharedStrings+xml"/></Types>')
+            # The workbook must also RELATE the part (0.67.0). It used to get
+            # only the content-type override: openpyxl reads such a file, but
+            # the package is incomplete for a strict reader (18 of 462
+            # workbooks under D:\BMR lacked the part on 2026-10-02, mostly
+            # BMR-Review outputs that fill_column round-trips).
+            rels_name = "xl/_rels/workbook.xml.rels"
+            rels = z_in.read(rels_name) if rels_name in names else None
+            if rels is not None and b"sharedStrings.xml" not in rels:
+                ids = {int(m) for m in re.findall(rb'Id="rId(\d+)"', rels)}
+                rid = f"rId{max(ids, default=0) + 1}".encode()
+                rels = rels.replace(
+                    b"</Relationships>",
+                    b'<Relationship Id="' + rid + b'" Type="http://schemas.openxmlformats.org/'
+                    b'officeDocument/2006/relationships/sharedStrings" '
+                    b'Target="sharedStrings.xml"/></Relationships>')
 
             with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as z_out:
                 for info in z_in.infolist():
@@ -386,6 +406,8 @@ def fix_shared_strings(xlsx_path: str) -> None:
                         z_out.writestr(info, new_ss)
                     elif nm == "[Content_Types].xml":
                         z_out.writestr(info, ct)
+                    elif nm == rels_name and rels is not None:
+                        z_out.writestr(info, rels)
                     else:
                         z_out.writestr(info, z_in.read(nm))
                 if "xl/sharedStrings.xml" not in names:
@@ -777,9 +799,13 @@ def parent_chain(row: Mapping[str, Any],
 
     An Episode may point at a Season row which points at a Series row, and
     none of them need have an EIDR ID yet, so a consumer building a child's
-    full record may have to build the whole chain. Stops at the first ref
-    that leaves the sheet (an EIDR ID, or an unresolved reference) -- that
-    one is included, since it is where the caller picks up.
+    full record may have to build the whole chain. The walk continues
+    through every parent that is a row of this sheet -- also one whose row
+    already carries an Assigned EIDR ID -- and stops at the first ref that
+    has no row here (``ref.row is None``: an EIDR ID outside the sheet, or
+    an unresolved reference). That last ref is included, since it is where
+    the caller picks up. On a cycle, the ref that closes it is included
+    before the walk stops.
 
     A sheet is hand-edited, so a cycle is a real possibility rather than a
     theoretical one; it terminates the walk instead of hanging. *max_depth*

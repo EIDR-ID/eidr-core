@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.66.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.67.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,21 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.67.0 (2026-10-18)
+
+* **`bmr_io` fixes from the 2026-10-02 dictionary audit:**
+  `fix_shared_strings` raises `ValueError` on an existing shared-strings
+  table that does not parse, instead of rebuilding it and mis-pointing
+  existing cells, and relates a part it creates from the workbook;
+  `write_sheet` removes `out_path` on any failure after the copy (it left a
+  template copy that read as a finished sheet); `fill_column` accepts digit
+  -string row keys (it raised `KeyError` after the copy). Docstrings
+  corrected: `fill_column` is not byte-for-byte (formula cached values),
+  `WriteReport.capped`, `Template.headers` conformance, `parent_chain`'s
+  walk, the module's `RepeatPlan` note. Checked on BMR-Review's three
+  `_assessed` workbooks with no shared-strings part: filled, part and
+  relationship present, read back.
 
 ### 0.66.0 (2026-10-18)
 
@@ -1255,14 +1270,14 @@ Defined in `src/eidr_core/bmr_io/subset.py`.
 | `dst_xlsx` | `str` | required | Output path. Overwritten by the copy; deleted if the call fails after copying (a refusal before the copy, such as an unknown tab name or a missing source, leaves an existing file alone). Must differ from `src_xlsx` (`shutil.SameFileError` otherwise). |
 | `sheet_name` | `str` | required | Data tab name from `SHEET_TO_TEMPLATE`; selects the template for the conformance check. |
 | `column` | `str` | required | Exact row-3 header of the column to fill, e.g. `"Assigned EIDR ID"`. A name not on the sheet raises `ValueError`. |
-| `values` | `Mapping[int, object]` | required | `{absolute sheet row number: value}`, using the row numbers `open_sheet` yields. Values are written as given; `None` clears the cell. Use `int` keys. |
+| `values` | `Mapping[int, object]` | required | `{absolute sheet row number: value}`, using the row numbers `open_sheet` yields. Values are written as given; `None` clears the cell. `int` keys, or digit strings. |
 
 **Returns** `FillReport` -- rows filled, requested row numbers that are not data rows, and the conformance findings.
 <!-- /dict -->
 
 **Does.** Copies a BMR workbook and writes values into one column of one sheet, keyed by absolute sheet row number. Every row is kept and no other column is changed; this is not a subset. Raises `TemplateMismatch` (unknown tab name, tab missing, required column missing), `FileNotFoundError` (missing source) or `ValueError` (unknown column); any failure after the copy deletes `dst_xlsx`. Row numbers below `DATA_START` or past the sheet's last row are listed in `rows_absent` and not written.
 
-**Notes.** The workbook is re-saved by openpyxl and `transplant` swaps in every worksheet of that save, so formula cells keep their formula text but lose their cached values until Excel re-saves the file (a `data_only=True` reader sees `None`). Keys of `values` are converted with `int()` for sorting but looked up as given, so a digit-string key such as `"5"` raises `KeyError` once it falls on a data row (a non-numeric string raises `ValueError`); pass `int` keys.
+**Notes.** The workbook is re-saved by openpyxl and `transplant` swaps in every worksheet of that save, so formula cells keep their formula text but lose their cached values until Excel re-saves the file (a `data_only=True` reader sees `None`). Keys of `values` are converted with `int()` once (since 0.67.0), so a digit-string key such as `"5"` works; a non-numeric string raises `ValueError`.
 
 ### `fix_shared_strings`
 
@@ -1282,7 +1297,7 @@ Defined in `src/eidr_core/bmr_io/__init__.py`.
 
 **Does.** Converts inline-string cells in every worksheet of an `.xlsx` to shared-string references, rewriting the file in place. The EPPlus-based BMR tool needs shared strings. Existing shared strings keep their indices but are re-emitted as plain text (rich-text runs are flattened), and the `[Content_Types].xml` entry for the shared-strings part is added if missing. Writes to a temp file in the same directory, then replaces the original.
 
-**Notes.** If an existing `xl/sharedStrings.xml` fails to parse, the error is swallowed and the table is rebuilt from the inline strings alone, which leaves pre-existing shared-string cells pointing at the wrong entries. When the file has no `xl/sharedStrings.xml` (an openpyxl save writes none; 18 of the 462 readable workbooks under `D:\BMR` had none on 2026-10-02), the part it creates gets a `[Content_Types].xml` entry but no relationship in `xl/_rels/workbook.xml.rels`. `write_sheet`, `subset_rows` and `fill_column` already call this; call it yourself only after your own openpyxl save plus `transplant`.
+**Notes.** If an existing `xl/sharedStrings.xml` fails to parse, it raises `ValueError` and leaves the file untouched (since 0.67.0; it used to rebuild the table from the inline strings, pointing existing shared-string cells at the wrong entries). When the file has no `xl/sharedStrings.xml` (an openpyxl save writes none), the part it creates gets both a `[Content_Types].xml` entry and a relationship in `xl/_rels/workbook.xml.rels` (since 0.67.0; it used to get no relationship). `write_sheet`, `subset_rows` and `fill_column` already call this; call it yourself only after your own openpyxl save plus `transplant`.
 
 ### `header_map`
 
@@ -1587,7 +1602,7 @@ Defined in `src/eidr_core/bmr_io/writer.py`.
 
 **Does.** Writes mapped rows onto a copy of one Template-22 sheet, expanding column families, and reports what it could not place. The sequence: copy the template, expand each family to the highest group any row uses (up to its cap), append `extra_columns`, clear every row from `DATA_START` down, write each value by header name, save, `transplant` into the copy, then `fix_shared_strings`. `None` and `""` values leave the cell blank. Needs openpyxl (the `bmr` extra).
 
-**Notes.** A refusal after the copy (missing tab, duplicate extra column, `strict=True`) leaves `out_path` behind as an unmodified copy of the template; unlike `subset_rows`, it does not delete it. Caps limit expansion only: a value in a group the template already ships is written even when that group is above your cap (it shows in `capped`, not in `dropped`). Decide what each row says, and which template it goes to, in your own mapper.
+**Notes.** Any failure after the copy (missing tab, duplicate extra column, `strict=True`) removes `out_path` (since 0.67.0), as `subset_rows` and `fill_column` do; it used to leave an unmodified template copy that read as a finished sheet. Caps limit expansion only: a value in a group the template already ships is written even when that group is above your cap (it shows in `capped`, not in `dropped`). Decide what each row says, and which template it goes to, in your own mapper.
 
 ### `Family` (class)
 

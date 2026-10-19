@@ -59,6 +59,7 @@ Two silences this module refuses to keep, because both consumers kept them:
 """
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import re
@@ -172,10 +173,11 @@ class Template(NamedTuple):
     sheet: str
     families: tuple[Family, ...]
     # The data sheet's header row as SHIPPED (row 3), read from the
-    # templates on 2026-09-11. This is what "Template-22 conformance"
-    # means for a sheet: every one of these names present, by exact text.
-    # Extra columns and expanded families are conforming; a missing name
-    # is not. Empty only for a caller-built Template.
+    # templates on 2026-09-11. Conformance (subset._inspect, the two-tier
+    # rule of 2026-09-11) requires the REQUIRED headers by exact text; an
+    # optional header may be missing and is reported, not refused. Extra
+    # columns and expanded families are conforming. Empty only for a
+    # caller-built Template.
     headers: tuple[str, ...] = ()
 
 
@@ -446,9 +448,11 @@ class WriteReport:
 
     ``expanded`` — families that grew, with the group count now on the
     sheet. ``capped`` — families whose rows asked for MORE groups than the
-    effective cap, with the number asked for (the trimmed values also
-    appear in ``dropped``). ``dropped`` — column name → count of non-empty
-    values that had no column to land in.
+    effective cap, with the number asked for. The values beyond the cap
+    appear in ``dropped`` only when they have no column to land in: a cap
+    below the template's shipped group count still writes into the shipped
+    columns, and those values appear only here. ``dropped`` — column name →
+    count of non-empty values that had no column to land in.
     """
     path: str
     rows: int
@@ -521,77 +525,86 @@ def write_sheet(template_path: str, sheet_name: str,
     rows = list(rows)
 
     shutil.copyfile(template_path, out_path)
-    wb = openpyxl.load_workbook(out_path, data_only=False)
-    if sheet_name not in wb.sheetnames:
-        raise ValueError(f"template {template_path} has no sheet {sheet_name!r}")
-    ws = wb[sheet_name]
-
-    headers = read_headers(ws)
-    counts = max_counts(rows, families)
-    report = WriteReport(path=out_path, rows=len(rows))
-    for fam in families:
-        want = counts.get(fam.primary, 0)
-        cap = effective.get(fam.primary)
-        if cap is not None and want > cap:
-            report.capped[fam.primary] = want
-            want = cap
-        if want > count_family(headers, fam.primary):
-            expand_family(ws, fam.primary, list(fam.anchor_members),
-                          list(fam.insert_members), want, headers)
-            report.expanded[fam.primary] = count_family(headers, fam.primary)
-    # Re-read rather than trust the shifted dict: it is the authority on
-    # what the sheet now says, and the two consumers disagreed on which to
-    # trust. Same result when expand_family is correct; the honest one
-    # when it is not.
-    headers = read_headers(ws)
-
-    if extra_columns:
-        next_col = (max(headers) if headers else 0) + 2
-        for name in extra_columns:
-            if name in headers.values():
-                raise ValueError(f"extra column {name!r} already exists on "
-                                 f"sheet {sheet_name!r}")
-            ws.cell(HEADER_ROW, next_col).value = name
-            headers[next_col] = name
-            next_col += 1
-    name_to_col = {h: c for c, h in headers.items()}
-
-    # Templates ship empty, but a template someone saved a trial row into
-    # must not leak that row under the data.
-    if ws.max_row >= DATA_START:
-        for r in range(DATA_START, ws.max_row + 1):
-            for c in range(1, ws.max_column + 1):
-                ws.cell(r, c).value = None
-
-    for row_idx, row in enumerate(rows, DATA_START):
-        for name, value in row.items():
-            # An empty value is not a value: a blank cell, never an empty
-            # string, so a reader that distinguishes the two sees what
-            # the mapper meant.
-            if value is None or value == "":
-                continue
-            col = name_to_col.get(name)
-            if col is None:
-                report.dropped[name] = report.dropped.get(name, 0) + 1
-                continue
-            ws.cell(row_idx, col).value = value
-    if report.dropped and strict:
-        raise ValueError(f"{len(report.dropped)} column(s) have no home on "
-                         f"sheet {sheet_name!r}: {sorted(report.dropped)}")
-
-    out_dir = os.path.dirname(os.path.abspath(out_path)) or "."
-    fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=out_dir)
-    os.close(fd)
+    # Any failure from here on removes out_path (0.67.0): a missing tab, a
+    # duplicate extra column or strict=True used to leave an UNMODIFIED
+    # template copy at out_path, which a downstream tool can take for a
+    # finished sheet. subset_rows and fill_column already cleaned up.
     try:
-        wb.save(tmp)
-        transplant(template_xlsx=out_path, edited_xlsx=tmp)
-        fix_shared_strings(out_path)
-    finally:
+        wb = openpyxl.load_workbook(out_path, data_only=False)
+        if sheet_name not in wb.sheetnames:
+            raise ValueError(f"template {template_path} has no sheet {sheet_name!r}")
+        ws = wb[sheet_name]
+
+        headers = read_headers(ws)
+        counts = max_counts(rows, families)
+        report = WriteReport(path=out_path, rows=len(rows))
+        for fam in families:
+            want = counts.get(fam.primary, 0)
+            cap = effective.get(fam.primary)
+            if cap is not None and want > cap:
+                report.capped[fam.primary] = want
+                want = cap
+            if want > count_family(headers, fam.primary):
+                expand_family(ws, fam.primary, list(fam.anchor_members),
+                              list(fam.insert_members), want, headers)
+                report.expanded[fam.primary] = count_family(headers, fam.primary)
+        # Re-read rather than trust the shifted dict: it is the authority on
+        # what the sheet now says, and the two consumers disagreed on which to
+        # trust. Same result when expand_family is correct; the honest one
+        # when it is not.
+        headers = read_headers(ws)
+
+        if extra_columns:
+            next_col = (max(headers) if headers else 0) + 2
+            for name in extra_columns:
+                if name in headers.values():
+                    raise ValueError(f"extra column {name!r} already exists on "
+                                     f"sheet {sheet_name!r}")
+                ws.cell(HEADER_ROW, next_col).value = name
+                headers[next_col] = name
+                next_col += 1
+        name_to_col = {h: c for c, h in headers.items()}
+
+        # Templates ship empty, but a template someone saved a trial row into
+        # must not leak that row under the data.
+        if ws.max_row >= DATA_START:
+            for r in range(DATA_START, ws.max_row + 1):
+                for c in range(1, ws.max_column + 1):
+                    ws.cell(r, c).value = None
+
+        for row_idx, row in enumerate(rows, DATA_START):
+            for name, value in row.items():
+                # An empty value is not a value: a blank cell, never an empty
+                # string, so a reader that distinguishes the two sees what
+                # the mapper meant.
+                if value is None or value == "":
+                    continue
+                col = name_to_col.get(name)
+                if col is None:
+                    report.dropped[name] = report.dropped.get(name, 0) + 1
+                    continue
+                ws.cell(row_idx, col).value = value
+        if report.dropped and strict:
+            raise ValueError(f"{len(report.dropped)} column(s) have no home on "
+                             f"sheet {sheet_name!r}: {sorted(report.dropped)}")
+
+        out_dir = os.path.dirname(os.path.abspath(out_path)) or "."
+        fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=out_dir)
+        os.close(fd)
         try:
-            if os.path.exists(tmp):
-                os.remove(tmp)
-        except OSError:
-            pass
+            wb.save(tmp)
+            transplant(template_xlsx=out_path, edited_xlsx=tmp)
+            fix_shared_strings(out_path)
+        finally:
+            try:
+                if os.path.exists(tmp):
+                    os.remove(tmp)
+            except OSError:
+                pass
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.remove(out_path)
+        raise
     log.info("write_sheet: %d row(s) -> %s [%s]%s", len(rows), out_path, sheet_name,
              f" dropped={sorted(report.dropped)}" if report.dropped else "")
     return report

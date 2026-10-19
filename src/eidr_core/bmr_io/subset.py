@@ -278,8 +278,11 @@ def fill_column(src_xlsx: str, dst_xlsx: str, sheet_name: str, column: str,
     (BMRtoAltID T5, 2026-09-12): a reviewed sheet comes back and the
     confirmed IDs go into ``Assigned EIDR ID`` so the existing modes can run
     on it. Same conformance rules as ``check_sheet`` (one ``_inspect``), same
-    transplant so formatting and every other cell survive byte-for-byte,
-    same refusal to leave a half-written file. Every data row is kept: this
+    transplant so formatting and every other cell survive, same refusal to
+    leave a half-written file. Not byte-for-byte: the workbook is re-saved
+    by openpyxl, so formula cells lose their cached values on every
+    worksheet (the module docstring explains). Keys may be ints or numeric
+    strings. Every data row is kept: this
     is not a subset. A ``column`` that is not on the header row is a
     ``ValueError`` (the caller named a column the sheet does not have -- a
     programming error, not a template mismatch).
@@ -304,11 +307,14 @@ def fill_column(src_xlsx: str, dst_xlsx: str, sheet_name: str, column: str,
                             extra_columns=checked.extra_columns,
                             missing_optional=checked.missing_optional)
         max_row = ws.max_row
-        for r in sorted(int(k) for k in values):
+        # Keys converted ONCE: sorting on int(k) but reading values[r] raised
+        # KeyError for a key such as "5" after the copy (audit, 2026-10-02).
+        by_row = {int(k): v for k, v in values.items()}
+        for r in sorted(by_row):
             if r < DATA_START or r > max_row:
                 report.rows_absent.append(r)
                 continue
-            ws.cell(r, col).value = values[r]
+            ws.cell(r, col).value = by_row[r]
             report.rows_filled += 1
 
         out_dir = os.path.dirname(os.path.abspath(dst_xlsx)) or "."

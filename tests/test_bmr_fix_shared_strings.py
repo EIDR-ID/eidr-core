@@ -66,3 +66,55 @@ def test_the_xml_decoder_is_xmls_not_htmls():
     assert _xml_unescape("SIC &#150; x") == "SIC \x96 x"
     assert _xml_unescape("&#x96;&amp;&lt;&gt;&quot;&apos;") == "\x96&<>\"'"
     assert _xml_unescape("&nbsp; &eacute;") == "&nbsp; &eacute;"  # not XML entities
+
+
+def _inline_book(tmp_path, *, drop_rel=False, corrupt=None):
+    """A workbook whose one cell is an inline string; optionally with its
+    shared-strings part, relationship and override removed, or the part
+    replaced by bytes that do not parse."""
+    import re
+    import zipfile
+    path = tmp_path / "base.xlsx"
+    wb = openpyxl.Workbook()
+    wb.active["A1"] = "x"
+    wb.save(path)
+    sheet = ('<?xml version="1.0" encoding="UTF-8"?>'
+             '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+             f'<sheetData><row r="1">{_inline_cell("A1", "hello")}</row></sheetData></worksheet>')
+    src = tmp_path / "src.xlsx"
+    with zipfile.ZipFile(path) as zin, zipfile.ZipFile(src, "w") as zout:
+        for info in zin.infolist():
+            data = zin.read(info.filename)
+            if info.filename == "xl/worksheets/sheet1.xml":
+                data = sheet.encode()
+            elif info.filename == "xl/sharedStrings.xml":
+                if corrupt is not None:
+                    data = corrupt
+                elif drop_rel:
+                    continue
+            elif drop_rel and info.filename == "xl/_rels/workbook.xml.rels":
+                data = re.sub(rb'<Relationship [^>]*sharedStrings[^>]*/>', b"", data)
+            elif drop_rel and info.filename == "[Content_Types].xml":
+                data = re.sub(rb'<Override [^>]*sharedStrings[^>]*/>', b"", data)
+            zout.writestr(info, data)
+        if corrupt is not None and "xl/sharedStrings.xml" not in zin.namelist():
+            zout.writestr("xl/sharedStrings.xml", corrupt)
+    return src
+
+
+def test_an_unreadable_shared_strings_table_is_refused_not_rebuilt(tmp_path):
+    # Rebuilding it would point existing t="s" cells at the wrong strings.
+    src = _inline_book(tmp_path, corrupt=b"<sst><si><t>broken")
+    with pytest.raises(ValueError, match="does not parse"):
+        fix_shared_strings(str(src))
+
+
+def test_a_new_shared_strings_part_is_related_from_the_workbook(tmp_path):
+    import zipfile
+    src = _inline_book(tmp_path, drop_rel=True)
+    fix_shared_strings(str(src))
+    with zipfile.ZipFile(src) as z:
+        assert "xl/sharedStrings.xml" in z.namelist()
+        assert b"sharedStrings.xml" in z.read("xl/_rels/workbook.xml.rels")
+        assert b"sharedStrings.xml" in z.read("[Content_Types].xml")
+    assert openpyxl.load_workbook(src).active["A1"].value == "hello"

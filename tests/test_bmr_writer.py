@@ -319,3 +319,14 @@ def test_alternate_no_is_an_episodic_family_and_unbounded():
     # Not on the Stand-Alone sheet, so not a family there: nothing to expand.
     assert "Alternate No." not in {f.primary for f in families_for("non_episodic")}
 
+
+
+def test_a_failed_write_leaves_no_template_copy_behind(template, tmp_path):
+    # A plain template copy at out_path reads as a finished, empty sheet.
+    out = tmp_path / "out.xlsx"
+    with pytest.raises(ValueError):
+        write_sheet(template, SHEET, [_row(**{"No Such Column": "v"})], str(out), strict=True)
+    assert not out.exists()
+    with pytest.raises(ValueError):
+        write_sheet(template, SHEET, [_row()], str(out), extra_columns=["Title"])
+    assert not out.exists()

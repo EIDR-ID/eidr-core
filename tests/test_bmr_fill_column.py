@@ -61,3 +61,12 @@ def test_conformance_is_check_sheets_own(source, tmp_path):  # noqa: F811 (share
         fill_column(str(source), str(tmp_path / "out.xlsx"), SHEET, "Assigned EIDR ID", {})
     assert str(pre.value) == str(fill.value)
     assert not (tmp_path / "out.xlsx").exists()
+
+
+def test_string_row_keys_work(source, tmp_path):  # noqa: F811 (shared fixture)
+    # Keys were sorted as ints but read back as given, so "5" raised KeyError.
+    rep = fill_column(str(source), str(tmp_path / "out.xlsx"), SHEET, "Assigned EIDR ID",
+                      {str(DATA_START): "10.5240/AAAA-0000-0000-0000-0000-X"})
+    assert rep.rows_filled == 1
+    assert _cells(tmp_path / "out.xlsx")[(DATA_START, _col("Assigned EIDR ID"))] == (
+        "10.5240/AAAA-0000-0000-0000-0000-X")

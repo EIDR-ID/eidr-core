@@ -1,4 +1,4 @@
-# Normalized EIDR Record — field model & canonical ordering (SPEC v1)
+# Normalized EIDR Record — field model & canonical ordering (SPEC v1.1)
 
 **Status: ✅ RATIFIED with amendments by the operator, 2026-07-29** (register
 Phase 2.1). The amendments are folded in below: §3 field-model corrections
@@ -138,6 +138,14 @@ membership:**
 3. **AlternateResourceNames that are Internal** (0..n) — last, alphabetical,
    casefold.
 
+The ResourceName is identified structurally (`md:ResourceName`), never by
+Title Class. For placement, Title Class is ignored except Internal (operator
+ruling 2026-10-19: "Ignore title classes, except for Internal and
+transliterated"): an AlternateResourceName of class Release, Resource or any
+other non-Internal class is an ordinary bucket-2 alternate. `transliterated`
+(EIDR's own transliterations) has no ordering treatment defined; it orders as
+an ordinary alternate. (v1.1)
+
 In the display, SystemGenerated and Internal titles are visually marked to
 indicate their limited impact on de-duplication.
 
@@ -213,3 +221,14 @@ The ratified title-scoring semantics differ from the CURRENT engine
    and is not revived.
 
 Both gaps are closed; this section is kept as the record of how.
+
+## 8. Change history
+
+* **v1.1 — 2026-10-19.** §4.1: Title Class does not place a title, except
+  Internal (operator ruling 2026-10-19: "Ignore title classes, except for
+  Internal and transliterated"; from the 2026-10-02 dictionary audit). The
+  reference implementation `eidr_core.ordering` had put any title of class
+  Release or Resource in the ResourceName bucket; eidr-core 0.69.0 makes
+  placement structural only. `title-display-order.md` moves to v1.1 with
+  the same rule and an extended worked example.
+* **v1 — 2026-07-29.** Ratified with amendments by the operator.

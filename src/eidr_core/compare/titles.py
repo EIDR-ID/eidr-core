@@ -332,12 +332,32 @@ def parts_ambiguous(a_titles, b_titles):
     return False
 
 
+def _numbered_parts_conflict(a_raws, b_raws):
+    """True for a same-base pair with DIFFERENT part numbers only -- the half
+    of :func:`parts_conflict` that holds for episodes too.
+
+    Private: ``compare.cmp_titles`` uses it for an Episode/Season pair, where
+    the other half (numbered vs bare base) is AMBIGUOUS, not a conflict
+    (operator ruling 2026-10-19, "That's ambiguous"; 0.69.0).
+    """
+    pa = [parse_part(x) for x in a_raws]
+    pb = [parse_part(x) for x in b_raws]
+    return any(x and y and x[1] != y[1] and _fuzzy(x[0], y[0]) >= 0.85
+               for x in pa for y in pb)
+
+
 def parts_conflict(a_raws, b_raws):
     """True when the titles carry a distinguishing part signal: a same-base
     pair with DIFFERENT part numbers ('Show Teil 1' vs 'Show Teil 2', 'Rocky'
     2 vs 3), or one title numbered while the other side carries the bare base
     with no number ('Rocky 2' vs 'Rocky') -- numbered sequels tend to be very
-    similar otherwise."""
+    similar otherwise.
+
+    Episode-UNAWARE, deliberately: the numbered-vs-bare half is right for
+    films and wrong for episodes, where it is ambiguous (operator ruling
+    2026-10-19). ``compare.cmp_titles`` applies that distinction for an
+    Episode/Season pair; this function keeps its film meaning because
+    BMR-Review's verify step calls it directly."""
     pa = [parse_part(x) for x in a_raws]
     pb = [parse_part(x) for x in b_raws]
     na = [norm_title(x) for x in a_raws if x]

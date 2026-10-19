@@ -102,6 +102,10 @@ EIDR_CONTENT_ID_RE = re.compile(r"^10\.5240/" + CONTENT_ID_SUFFIX + r"$", re.I)
 # JavaScript port, so the pattern is a cross-language fact. (De-Dupe UI has
 # no JavaScript code of its own -- corrected by the dictionary audit
 # 2026-10-02; 0.68.0.) Word-boundaried so `10.5240/...-Kx` is not a match.
+# The '/' in the lookbehind is deliberate too: an ID inside a doi.org URL or
+# a path is NOT found. The only DOI IDs the portfolio cares about are EIDR
+# IDs and ShortDOI, both already handled where they occur, so URL forms need
+# no discovery (operator ruling 2026-10-19; 0.69.0).
 CONTENT_ID_SEARCH_RE = re.compile(
     r"(?<![0-9A-Z/])10\.5240/" + CONTENT_ID_SUFFIX + r"(?![0-9A-Z-])", re.I
 )
@@ -247,6 +251,12 @@ def find_content_ids(text: str | None, *, valid_only: bool = True) -> list[str]:
     should not hand a scorer a candidate that does not exist. Pass
     ``valid_only=False`` to see everything ID-shaped, e.g. to REPORT the
     malformed ones with ``fault()``.
+
+    An ID preceded by ``/`` is deliberately NOT matched, so one inside a
+    doi.org URL (``https://doi.org/10.5240/...``) or a path is not found.
+    The only DOI IDs the portfolio needs are EIDR IDs and ShortDOI, both
+    handled where they occur, so URL forms need no discovery (operator
+    ruling 2026-10-19; 0.69.0). Strip the URL prefix first if you must.
     """
     if not text:
         return []

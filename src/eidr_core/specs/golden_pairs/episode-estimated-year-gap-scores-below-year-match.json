@@ -1,0 +1,89 @@
+{
+  "id": "episode-estimated-year-gap-scores-below-year-match",
+  "added": "2026-10-19",
+  "why": "An estimated date (RD:Pro) may widen how far apart two dates can be and still agree; it may never make a MISMATCH score above a MATCH (operator ruling 2026-10-19, \"Fix this\"; compare-spec 2.21.0, eidr-core 0.69.0). Two sibling Episodes, identical except year-only release dates one year apart (2019 / 2020) with the submitted date flagged estimated. Until 2.21.0 the year path MULTIPLIED the gap-1 credit by DATE_ESTIMATED_LENIENCY (0.57 x 2, capped at 1.0), so this pair scored release_date 1.00 while the same pair with an exact year match scores the Episode gap-0 credit, 0.80 -- the inversion DATE_PROFILES exist to prevent. Now the GAP is divided by the leniency and the table read at 0.5 by interpolation: 0.685. `field_quality_max` 0.79 is the lesson: strictly below the 2.21.0 Episode year-match credit (0.80), so it also refuses a port that rounds the halved gap down to 0 and hands out the match credit itself; if a retune moves that credit, re-derive the bound from it. `field_quality_min` 0.57 is the companion property from the same ruling -- an estimated pair never scores below the same gap unflagged -- and it keeps the max from passing vacuously on a field that left the denominator. Mutation-tested: restoring the credit multiplication fails this pair (1.00 > 0.79) and only this pair; eidr-core 0.68.1 (spec 2.20.0) fails it the same way. SCOPE: the year-level path only. The full-date band and fall-through paths ignored the leniency entirely before 2.21.0 (no inversion there, only a wrong ' est'), and the ' est' detail is not in the invariant vocabulary, so neither is pinned here. No Alt ID, so nothing but the date separates the two scores.",
+  "submitted": {
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-0030-0000-B",
+    "distribution_number": "4",
+    "titles": [
+      {
+        "text": "The Lighthouse Keeper",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2019",
+    "date_estimated": true,
+    "length_minutes": "47",
+    "directors": [
+      "Maren Holt"
+    ],
+    "countries": [
+      "GB"
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/FEED-0000-0000-0030-0001-9",
+    "creation_type": "Episode",
+    "parent_id": "10.5240/FEED-0000-0000-0030-0000-B",
+    "distribution_number": "4",
+    "titles": [
+      {
+        "text": "The Lighthouse Keeper",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2020",
+    "length_minutes": "47",
+    "directors": [
+      "Maren Holt"
+    ],
+    "countries": [
+      "GB"
+    ]
+  },
+  "invariants": {
+    "field_quality_max": {
+      "release_date": 0.79
+    },
+    "field_quality_min": {
+      "release_date": 0.57
+    }
+  },
+  "expected": {
+    "spec_version": "2.21.0",
+    "confidence": 83.7,
+    "verdict": "Accept",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 0.685,
+      "distribution_number": 1.0,
+      "length": 1.0,
+      "house_sequence": null,
+      "time_slot": null,
+      "director": 1.0,
+      "actor": null,
+      "assoc_org": null,
+      "original_language": null,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "mismatch",
+      "episode_distribution_number": "identical",
+      "duration": "identical",
+      "episode_house_sequence": "neutral",
+      "episode_time_slot": "neutral",
+      "director": "identical",
+      "actor": "neutral",
+      "associated_org": "neutral",
+      "original_language": "neutral",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

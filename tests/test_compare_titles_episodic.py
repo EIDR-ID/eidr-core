@@ -119,3 +119,61 @@ def test_a_film_one_sided_part_number_is_still_a_match():
     """parts_ambiguous is episode-only; 247 of the 324 measured film
     regressions had no delimiter at all and came from this rule."""
     assert q("The Trial Part 1", "The Trial", False) == 1.0
+
+
+# --- the meta flags cmp_titles reports (operator ruling 2026-10-19; 0.69.0) --
+#
+# The similarity above already said "ambiguous" (0.70) for an episode with a
+# part number on one side only, but cmp_titles reported part_conflict=True
+# and part_ambiguous=False for that same pair: parts_conflict counts
+# numbered-vs-bare-base as a conflict, and part_ambiguous was computed only
+# without a conflict. BMR-Review's scorer branches on these flags, so the
+# wrong one was a silent wrong answer. Operator: "That's ambiguous".
+
+def _ep_rec(text, creation_type="Episode"):
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        creation_type=creation_type,
+        titles=[SimpleNamespace(text=text, title_class=None,
+                                system_generated=False)])
+
+
+@pytest.fixture
+def _spec_params():
+    from types import SimpleNamespace
+
+    from eidr_core.compare import set_params
+    from eidr_core.compare.spec import load_spec
+    set_params(SimpleNamespace(**load_spec()))
+
+
+@pytest.mark.parametrize("a,b", [
+    ("The Trial Part 2", "The Trial"),
+    ("The Trial", "The Trial Part 2"),       # either side may carry the number
+])
+def test_an_episode_one_sided_part_is_ambiguous_not_a_conflict(_spec_params, a, b):
+    from eidr_core.compare import cmp_titles
+    r = cmp_titles(_ep_rec(a), _ep_rec(b))
+    assert r.meta["part_ambiguous"] is True
+    assert r.meta["part_conflict"] is False
+    assert "part-ambiguous" in r.detail
+
+
+def test_an_episode_with_different_part_numbers_still_conflicts(_spec_params):
+    """Only the one-sided half moved; Part 2 vs Part 3 is still two works."""
+    from eidr_core.compare import cmp_titles
+    r = cmp_titles(_ep_rec("The Trial Part 2"), _ep_rec("The Trial Part 3"))
+    assert r.meta["part_conflict"] is True
+    assert r.meta["part_ambiguous"] is False
+    assert r.meta["part_base_match"] == pytest.approx(1.0)
+
+
+def test_a_film_one_sided_part_is_still_a_conflict(_spec_params):
+    """'Rocky 2' vs 'Rocky' is a sequel: the ruling is episode-only, and
+    BMR-Review's verify step calls parts_conflict directly with that meaning."""
+    from eidr_core.compare import cmp_titles
+    from eidr_core.compare.titles import parts_conflict
+    r = cmp_titles(_ep_rec("Rocky 2", "Basic"), _ep_rec("Rocky", "Basic"))
+    assert r.meta["part_conflict"] is True
+    assert r.meta["part_ambiguous"] is False
+    assert parts_conflict(["The Trial Part 2"], ["The Trial"]) is True

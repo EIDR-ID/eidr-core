@@ -6,6 +6,7 @@ treatment later (full transliteration, multilingual article lists, a real number
 thesaurus). The goal is to neutralise harmless cross-source variation BEFORE
 fuzzy comparison, not to be exhaustive.
 """
+import math
 import re
 import unicodedata
 from datetime import date
@@ -46,6 +47,14 @@ _ARTICLES = {
     "el", "los", "las", "una",   # es
     "der", "die", "das", "ein", "eine",           # de
     "il", "lo", "gli", "i",      # it
+}
+
+# Words that may follow the Italian plural article "i" without ending in -i
+# themselves: the cardinal numbers and "piu" (ascii-folded "più"). See
+# _is_leading_article for why "i" needs a follower test at all.
+_IT_I_FOLLOWERS = {
+    "due", "tre", "quattro", "cinque", "sette", "otto", "nove", "cento",
+    "mille", "piu",
 }
 
 _ROMAN = {
@@ -125,7 +134,7 @@ def _num_token(tok: str) -> str:
     return tok
 
 
-def _tokens_around_ampersands(s: str, alias) -> tuple[list[str], bool]:
+def _tokens_around_ampersands(s: str, alias) -> tuple[list[str], bool, list[str]]:
     """Tokenise ``s`` with ``&``/``+`` read as "and", folding numerals and
     aliasing words -- EXCEPT the single letters that sit beside an
     ampersand, and a name that is one letter long.
@@ -141,14 +150,18 @@ def _tokens_around_ampersands(s: str, alias) -> tuple[list[str], bool]:
     before, so ``Juan y Maria`` still reads "john and mary" and
     ``Simon & Schuster`` still reads "simon and schuster".
 
-    Returns the tokens and whether the FIRST token is such an initial, so
-    ``norm_title`` does not strip the ``A`` of ``A&E`` as an article.
+    Returns the tokens, whether the FIRST token is such an initial (so
+    ``norm_title`` does not strip the ``A`` of ``A&E`` as an article), and
+    the same tokens BEFORE numeral and alias folding, position for position,
+    so ``norm_title`` can test the first word as it was written (operator
+    ruling 2026-10-19; 0.69.0).
     """
     bare = s.strip()
     if len(bare) == 1 and bare.isalpha():
-        return [bare], True                             # a one-letter name
+        return [bare], True, [bare]                     # a one-letter name
     parts = re.split(r"[&+]", s)
     out: list[str] = []
+    raw: list[str] = []
     first_initial = False
     for i, part in enumerate(parts):
         words = re.sub(r"[^\w\s]", " ", part, flags=re.UNICODE).split()
@@ -160,18 +173,73 @@ def _tokens_around_ampersands(s: str, alias) -> tuple[list[str], bool]:
                 out.append(w)                          # an initial: verbatim
             else:
                 out.append(alias(_num_token(w)))
+            raw.append(w)
         if i < len(parts) - 1:
             out.append("and")
-    return out, first_initial
+            raw.append("and")
+    return out, first_initial, raw
+
+
+def _is_leading_article(raw: list[str], s: str) -> bool:
+    """Is the first word of a title, AS WRITTEN, a leading article?
+
+    Tested on the raw word, before numeral and alias folding (operator
+    ruling 2026-10-19; 0.69.0). Folding ran first until then, so two
+    entries of ``_ARTICLES`` could never match: Italian ``i`` became the
+    numeral ``1`` and ``lo`` became ``low`` (word_alias.csv row 270), and
+    'I promessi sposi' normalised to '1 promessi sposi' while 'Promessi
+    sposi' stayed 'promessi sposi'. No other article is changed by folding,
+    and no folded word lands on an article, so for every other entry the
+    order makes no difference.
+
+    ``i`` gets one extra test, because it is also the English pronoun and
+    the Roman numeral one. Stripping it everywhere would make 'I Spy' and
+    'Spy' (two different films) normalise identically and empty half of
+    'I Am Sam'. ``norm_title`` has no language to consult, so the test is
+    the Italian grammar itself: the masculine plural article is followed by
+    a plural, which ends in -i ('I promessi sposi', 'I soliti ignoti', 'I
+    Pagliacci'), or by a cardinal number or "più" ('I due Foscari', 'I tre
+    moschettieri'), and never by punctuation ('I, Robot', "I'm"). English
+    titles almost never meet that: 'I Love Lucy', 'I, Robot' and 'I Spy'
+    keep folding to '1 love lucy', '1 robot' and '1 spy' exactly as before.
+    Measured on the mirror's 5.0M content_titles (2026-10-19): of 31018
+    titles that start with 'I', 2244 now lose it -- 1751 tagged Italian,
+    164 Greek (the transliterated feminine article, so stripping it is
+    right too), 145 Corsican (mostly opera titles), 72 English, nearly all
+    of them Italian or Greek titles under the wrong tag. The rule misses
+    about 1 in 40 Italian-tagged ones (loanwords: 'I babysitter'). Known
+    false positives outside Italian and Greek: 'I Heidi Take Thee
+    Spencer...', 'I Rossellini, D Arquette, Cake' (an initial), and a few
+    romanised Chinese and Korean titles ('I Shi Chu Nu Zuo').
+    """
+    first = raw[0]
+    if first != "i":
+        return first in _ARTICLES
+    if re.match(r"\s*i\s*[^\w\s]", s):
+        return False                    # 'I, Robot', "I'm", 'I.' -- never an article
+    nxt = raw[1]
+    return (len(nxt) > 1 and nxt.isalpha() and nxt.endswith("i")) or nxt in _IT_I_FOLLOWERS
 
 
 def norm_title(s: str, strip_articles: bool = True) -> str:
+    """Normalise a title for comparison: NFKC, ASCII fold, casefold, ``&``/``+``
+    read as "and", Roman and spelled numerals folded to digits, word aliases
+    applied, and (``strip_articles``) one leading article dropped.
+
+    The article test looks at the first word as written, before folding, so
+    Italian ``lo`` and ``i`` are stripped ('Lo Hobbit' -> 'hobbit', 'I
+    promessi sposi' -> 'promessi sposi'); a leading ``i`` counts as an
+    article only when an Italian plural follows it, so English 'I Love
+    Lucy' stays '1 love lucy' (operator ruling 2026-10-19; 0.69.0; the rule
+    is in _is_leading_article). A one-word title is never stripped, nor a
+    first letter that is an initial beside an ampersand ('A&E')."""
     if not s:
         return ""
     s = ascii_fold(nfkc(s)).casefold()
     s = re.sub(r"[\u2018\u2019\u201c\u201d]", "'", s)
-    toks, first_initial = _tokens_around_ampersands(s, alias_title)
-    if strip_articles and len(toks) > 1 and toks[0] in _ARTICLES and not first_initial:
+    toks, first_initial, raw = _tokens_around_ampersands(s, alias_title)
+    if (strip_articles and len(toks) > 1 and not first_initial
+            and _is_leading_article(raw, s)):
         toks = toks[1:]
     return " ".join(toks).strip()
 
@@ -185,7 +253,7 @@ def norm_name(s: str) -> str:
         last, first = [p.strip() for p in s.split(",", 1)]
         if first:
             s = f"{first} {last}"
-    toks, _ = _tokens_around_ampersands(s.casefold(), alias_name)
+    toks, _, _ = _tokens_around_ampersands(s.casefold(), alias_name)
     return " ".join(toks).strip()
 
 
@@ -213,9 +281,20 @@ def norm_country(s: str) -> str:
 
 def norm_lang(s: str) -> str:
     """Language code: keep only the primary subtag (left of the first hyphen).
-    'en-US' -> 'en', 'zh-Hans' -> 'zh'. Wildcards/unknown -> ''."""
-    c = norm_code(s)
-    return c.split("-", 1)[0] if c else ""
+    'en-US' -> 'en', 'zh-Hans' -> 'zh'. Wildcards/unknown -> ''.
+
+    The wildcard test is norm_code's (xx, und, zz, none, null) and runs on
+    the primary subtag, so 'und-Latn' and 'xx-YY' are dropped exactly as
+    'und' and 'xx' are. ``zxx`` (no linguistic content) and ``mul``
+    (multiple languages) are real codes here, not wildcards."""
+    if not s:
+        return ""
+    # Trim to the primary subtag FIRST, then apply the wildcard test
+    # (operator ruling 2026-10-19; 0.69.0). The test used to run on the
+    # whole tag, so only a bare 'und' was dropped: 'und-Latn' came back as
+    # 'und' and 'xx-YY' as 'xx' -- an "unknown" language that then compared
+    # equal to another unknown instead of being treated as absent.
+    return norm_code(nfkc(s).strip().split("-", 1)[0])
 
 
 def parse_registrant_extra(raw):
@@ -280,35 +359,132 @@ def days_between(a_ymd, b_ymd):
 
 
 # --- duration --------------------------------------------------------------
+# Every pattern below is matched WHOLE (fullmatch). The 0.68 pattern was
+# matched from the start only and took whole numbers only, so a valid
+# 'PT1H18M30.5S' stopped at '30' and silently returned 78.0, and 'PT24.4S'
+# matched nothing at all (operator ruling 2026-10-19; 0.69.0: anything that
+# is not a whole valid form returns None, never a partial parse).
+_DUR_NUM = r"\d+(?:[.,]\d+)?"          # ISO decimal sign is comma or dot
+# ISO 8601 designator format: PnYnMnWnDTnHnMnS, every component optional but
+# at least one present, and a T only when a time component follows it.
 _ISO_DUR = re.compile(
-    r"P(?:(?P<d>\d+)D)?T?(?:(?P<h>\d+)H)?(?:(?P<m>\d+)M)?(?:(?P<s>\d+)S)?", re.I)
+    rf"P(?:(?P<y>{_DUR_NUM})Y)?(?:(?P<mo>{_DUR_NUM})M)?(?:(?P<w>{_DUR_NUM})W)?"
+    rf"(?:(?P<d>{_DUR_NUM})D)?"
+    rf"(?:T(?:(?P<h>{_DUR_NUM})H)?(?:(?P<mi>{_DUR_NUM})M)?(?:(?P<s>{_DUR_NUM})S)?)?",
+    re.I)
+_ISO_PARTS = ("y", "mo", "w", "d", "h", "mi", "s")
+_ISO_MINUTES = {"w": 10080.0, "d": 1440.0, "h": 60.0, "mi": 1.0, "s": 1 / 60.0}
+# ISO 8601 alternative format, extended (P0000-00-01T01:18:00) or basic
+# (P00000001T011800).
+_ISO_DUR_ALT = re.compile(
+    r"P(?P<y>\d{4})(?P<sep>-?)(?P<mo>\d{2})(?P=sep)(?P<d>\d{2})"
+    r"T(?P<h>\d{2})(?P<tsep>:?)(?P<mi>\d{2})(?P=tsep)(?P<s>\d{2}(?:[.,]\d+)?)",
+    re.I)
+# Timecode: H:MM:SS, optionally fractional seconds or a frame count after ':'
+# or ';' (drop-frame); or two-part M:SS (fractional seconds allowed). Hours
+# and minutes-of-M:SS are unbounded; the fields after them must be 0-59.
+_TIMECODE = re.compile(
+    r"(?P<a>\d+):(?P<b>\d{1,2}(?:\.\d+)?)(?::(?P<c>\d{1,2}(?:\.\d+)?)(?:[:;]\d+)?)?")
+
+
+def _dur_num(v: str) -> float:
+    return float(v.replace(",", "."))
 
 
 def parse_minutes(raw):
-    """Parse '78', 'PT1H18M', '01:18:00' -> minutes (float) or None."""
-    if raw is None:
+    """Parse a runtime into minutes (float), or None.
+
+    Accepted (operator ruling 2026-10-19; 0.69.0 -- "handle unusual but
+    valid situations"):
+
+    - Bare minutes: ``'78'``, ``78``, ``'90.5'`` (anything ``float()``
+      reads that is finite and not negative).
+    - ISO 8601 durations, designator format: ``'PT1H18M'``, ``'P1DT2H'``,
+      ``'PT1H18M30.5S'``, ``'PT30,5S'``, ``'P2W'``, ``'P1W2D'``, ``'PT0S'``,
+      case-insensitive. A week is 10080 minutes and a day 1440. A decimal
+      fraction (comma or dot) is allowed on the LAST component only, as ISO
+      requires ('PT1.5H' -> 90.0; 'PT1.5H30M' -> None). Years and months are
+      not a fixed number of minutes, so a non-zero Y or M date component
+      returns None: ``'P78M'`` is 78 MONTHS in ISO and gives None (it read
+      as 78 minutes until 0.69.0). Zero ones are accepted ('P0Y0M1D').
+      Weeks combined with other components (ISO 8601-2) are accepted, being
+      unambiguous.
+    - ISO 8601 alternative format with zero years and months:
+      ``'P0000-00-00T01:18:00'``, ``'P00000000T011800'``; hours below 24,
+      minutes and seconds below 60.
+    - Timecode ``H:MM:SS`` (``'01:18:00'``, ``'1:18:30.5'``), with a frame
+      count after ``:`` or ``;`` ignored (``'01:18:00:12'``,
+      ``'01:18:00;12'``). Minutes and seconds must be 0-59.
+    - Two-part ``M:SS`` is MINUTES:SECONDS: ``'78:30'`` -> 78.5,
+      ``'1:30'`` -> 1.5. It was read as H:MM until 0.69.0 ('78:30' ->
+      4710.0). M:SS is how XML_to_JSON's ApproximateLength converter reads
+      the same cell (``_format_xs_duration``: 'HH:MM:SS' or 'MM:SS'), so a
+      sheet value and the duration registered from it compare equal; the
+      mirror's ``length_timecode`` is always three-part, and an Excel
+      time-formatted cell arrives three-part too.
+
+    Everything else -- including any string that only STARTS like one of
+    these, a negative or non-finite number, and ``None`` or ``''`` --
+    returns None, never a partial parse.
+    """
+    if raw is None or isinstance(raw, bool):
         return None
+    if isinstance(raw, (int, float)):
+        # Numbers directly, not via str(): str(1e-05) is '1e-05', and a
+        # float's repr is no business of the string grammar below.
+        v = float(raw)
+        return v if math.isfinite(v) and v >= 0 else None
     s = str(raw).strip()
     if not s:
         return None
-    if s.upper().startswith("P"):
-        m = _ISO_DUR.match(s.upper())
-        if m and any(m.group(k) for k in ("d", "h", "m", "s")):
-            d = int(m.group("d") or 0); h = int(m.group("h") or 0)
-            mi = int(m.group("m") or 0); se = int(m.group("s") or 0)
-            return d * 1440 + h * 60 + mi + se / 60.0
-    if ":" in s:                       # timecode HH:MM:SS(:FF)
-        parts = s.split(":")
-        try:
-            h, mi = int(parts[0]), int(parts[1])
-            se = int(parts[2]) if len(parts) > 2 else 0
-            return h * 60 + mi + se / 60.0
-        except ValueError:
+    if s[0] in "Pp":
+        return _parse_iso_duration(s)
+    if ":" in s:
+        m = _TIMECODE.fullmatch(s)
+        if not m:
             return None
+        a, b, c = m["a"], m["b"], m["c"]
+        if c is None:                   # two-part M:SS
+            sec_f = float(b)
+            return int(a) + sec_f / 60.0 if sec_f < 60 else None
+        if not b.isdigit():
+            return None                 # '1:18.5:00': only seconds take a fraction
+        mi, sec_f = int(b), float(c)
+        if mi >= 60 or sec_f >= 60:
+            return None
+        return int(a) * 60 + mi + sec_f / 60.0
     try:
-        return float(s)                # bare minutes
+        v = float(s)                    # bare minutes
     except ValueError:
         return None
+    # 'nan', 'inf' and '-5' all parse as floats; none is a runtime.
+    return v if math.isfinite(v) and v >= 0 else None
+
+
+def _parse_iso_duration(s: str) -> float | None:
+    """The ISO 8601 half of parse_minutes; None unless ``s`` is one whole
+    valid duration that a fixed number of minutes can express."""
+    m = _ISO_DUR.fullmatch(s)
+    if m:
+        present = [k for k in _ISO_PARTS if m[k] is not None]
+        if not present:
+            return None                 # bare 'P'
+        if "t" in s.casefold() and not any(m[k] is not None for k in ("h", "mi", "s")):
+            return None                 # 'P1DT': a T must introduce a time
+        if any(not m[k].isdigit() for k in present[:-1]):
+            return None                 # a fraction on a component that is not the last
+        if any(_dur_num(m[k]) for k in ("y", "mo") if m[k] is not None):
+            return None                 # years/months: no fixed length
+        return sum((_dur_num(m[k]) * _ISO_MINUTES[k] for k in present if k in _ISO_MINUTES), 0.0)
+    m = _ISO_DUR_ALT.fullmatch(s)
+    if m:
+        if int(m["y"]) or int(m["mo"]):
+            return None
+        h, mi, sec = int(m["h"]), int(m["mi"]), _dur_num(m["s"])
+        if h >= 24 or mi >= 60 or sec >= 60:
+            return None
+        return int(m["d"]) * 1440 + h * 60 + mi + sec / 60.0
+    return None
 
 
 # ---------------------------------------------------------------------------

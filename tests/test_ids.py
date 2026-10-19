@@ -242,6 +242,19 @@ def test_find_content_ids_respects_boundaries_and_empty_input():
     assert find_content_ids(None) == [] and find_content_ids("") == []
 
 
+def test_find_content_ids_does_not_match_after_a_slash():
+    # Deliberate, not a gap: an ID inside a doi.org URL or a path is not
+    # discovered. The only DOI IDs the portfolio needs are EIDR IDs and
+    # ShortDOI, both handled where they occur (operator ruling 2026-10-19;
+    # 0.69.0). Pinned so a "fix" to the lookbehind is a visible decision.
+    from eidr_core.ids import find_content_ids
+    assert find_content_ids(f"https://doi.org/{VALID}") == []
+    assert find_content_ids(f"http://dx.doi.org/{VALID}") == []
+    assert find_content_ids(f"see /records/{VALID}") == []
+    # The same ID with the URL prefix stripped (or space-separated) is found.
+    assert find_content_ids(f"https://doi.org/ {VALID}") == [VALID]
+
+
 
 # ── 0.33.0: the suffix rules are exported on their own ─────────────────────
 

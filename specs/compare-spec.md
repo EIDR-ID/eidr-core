@@ -11,17 +11,40 @@ history, commit `17574c4` and earlier).
 
 ## Tuning workflow (the whole point)
 
-1. Edit the JSON — **per creation type** wherever possible: the `weights`
-   section is organized Basic / Series / Season / Episode / Edit /
-   Compilation (+ Clip and Manifestation as `$alias` of Edit) precisely so a
-   tune has constrained, type-scoped impact (operator requirement, 2026-07-27).
-2. Bump `$spec.version`.
-3. Run BMR-Review's tests — `tests/test_spec_loading.py` pins a scored pair
-   and will fail on any behavior change: re-verify, update its expectations.
-4. Commit eidr-core AND note the tune in BMR-Review's CLAUDE.md change log.
-   The version bump is the cross-tool signal: golden-pair expectations
-   (Phase 2.3) regenerate against it, and every consumer (work-list payloads,
-   future scoring service) reports it as provenance.
+**The JSON is generated; never hand-edit its values.** Since 2026-08-05
+BMR-Review's `eidr_dedup_score/config.py` is the authoring surface, with the
+full inline rationale, and its `regen_compare_spec.py` projects it into the
+JSON here (the direction was inverted from the original "edit the JSON"
+workflow, which this section described until 2.21.0).
+
+1. Edit the constants / `config.WEIGHTS` / `config.STATE_BANDS` in
+   BMR-Review's `config.py` — **per creation type** wherever possible:
+   `config.WEIGHTS` is
+   organized Basic / Series / Season / Episode / Edit / Compilation (+ Clip
+   and Manifestation sharing Edit's object, emitted as `$alias`) precisely so
+   a tune has constrained, type-scoped impact (operator requirement,
+   2026-07-27).
+2. Bump `config.COMPARE_SPEC_VERSION`, with its change-log comment beside it.
+3. `python regen_compare_spec.py` (BMR-Review) writes this package's
+   `compare-spec.json`, stamping `$spec.version` and `updated`; it
+   round-trips the result through `load_spec` and writes nothing on a
+   mismatch.
+4. `python regen_golden_pairs.py` (BMR-Review) re-pins the golden-pair
+   expectations at the new version; it refuses a pair whose lesson the tune
+   breaks.
+5. Add the new version's values digest to eidr-core's
+   `tests/compare_spec_values_pin.json` (the test prints the line), then run
+   both suites — BMR-Review's `tests/test_spec_loading.py` and
+   `tests/test_golden_pairs.py` fail on any behaviour change until step 4.
+6. Commit BMR-Review AND eidr-core together. The version bump is the
+   cross-tool signal: golden-pair expectations regenerate against it, and
+   every consumer (work-list payloads, future scoring service) reports it as
+   provenance.
+
+An **engine rule change made in eidr-core** with no value change (2.21.0 is
+one) moves the version too: eidr-core stamps `$spec.version` in the same
+commit as the code, and BMR-Review raises `config.COMPARE_SPEC_VERSION` to match
+before its next regen, or that regen stamps the old number back.
 
 ## Structure
 
@@ -123,6 +146,18 @@ the reasoning, not just the number.
   and `crosstype-theatrical-serial-meets-movie-at-review`, each failing on 2.18.0
   and under its own mutant only; the short-series rule needs a registry episode
   count, which a pair fixture cannot carry, so BMR-Review's tests pin it.
+* **Estimated dates and one-sided episode parts (2.21.0, operator rulings
+  2026-10-19; eidr-core 0.69.0).** An engine RULE bump with no value change.
+  (1) Estimated-date leniency now divides the distance instead of
+  multiplying the credit, so an estimated mismatch can no longer outscore
+  the match; ` est` appears only where it changed the score (the Date
+  profiles section below states the rule and its numbers). (2) For an
+  Episode/Season pair a part number on one side only is ambiguous, not a
+  conflict: `part_ambiguous` true, `part_conflict` false. In BMR-Review's
+  scorer that pair takes the part-ambiguous cap (Review) instead of the
+  part-conflict branch, so it loses that branch's alt-ID override and its
+  related-parts floor. (3) Wording only: the Alt-ID Kind rule (below) is
+  stated as the engine applies it.
 
 **Porting requirements** (from BMR-Review's ENGINE_SYNC `BMR-20260926-1` for
 2.16.0, lifted verbatim at 2.17.0 as ruled 2026-09-26). These are the places a
@@ -162,6 +197,10 @@ BMR-Review.
    system-generated "Season 1: Episode 3" never qualifies (pinned since
    2.20.0 by `crosstype-system-titled-long-episode-is-not-a-tv-movie`, the
    one fixture that fails when the length test runs before the title test).
+6. **Estimated-date interpolation (2.21.0).** A port must reproduce the
+   fractional year-gap lookup exactly as written in the Date profiles
+   section, in that operation order, and compute the ` est` suffix by
+   comparing against the unflagged score rather than from the flag.
 
 ## Date profiles: the ANCHOR is per creation type, the SHAPE is measured
 
@@ -219,6 +258,43 @@ both:
   The form that holds is: **beyond the last band, a full-date pair scores
   exactly its year-level equivalent for that distance.**
 
+**Estimated dates (2.21.0, operator ruling 2026-10-19).** When either side's
+date is estimated, every DISTANCE is divided by `DATE_ESTIMATED_LENIENCY`
+(L, read as at least 1) before it is looked up; a match (same day, same
+year) is unaffected. Precisely:
+
+* **Year-level pair, gap g ≥ 1:** read the year table at g / L. A fractional
+  gap interpolates linearly between the two whole gaps around it, the step
+  past the largest key being `year_gap_floor`:
+  `q(lo) + (q(lo+1) - q(lo)) * (g/L - lo)`, `lo = floor(g/L)`. Cap the
+  result at the gap-0 credit (a no-op on a validated table).
+* **Full-date pair, d ≥ 1 days:** look up the bands at d / L. Beyond the last
+  band, the fall-through gap is `max(calendar_gap / L,
+  max(1, round((d / L) / 365.25)))`, read as above and clamped to the last
+  band.
+* **No profile, or a table that cannot answer:** the legacy curves, whose
+  half-life is multiplied by L — the same scaling, which is what the
+  profile paths now match.
+* **The detail** carries ` est` only when the quality differs from what the
+  same pair scores unflagged.
+
+At L = 2 this reads a one-year gap halfway between the match and gap-1
+credits, and a two-year gap at the gap-1 credit:
+
+```
+gap        0     1      2     3      4     5
+Episode  0.80  0.685  0.57  0.375  0.18  0.14   (unflagged 0.80/0.57/0.18/0.10...)
+Basic    1.00  0.855  0.71  0.465  0.22  0.195  (unflagged 1.00/0.71/0.22/0.17...)
+```
+
+Until 2.21.0 the year path multiplied the CREDIT by L (capped at 1.0), so an
+estimated Episode pair a year apart scored 1.0 against 0.80 for an exact
+year match, and the band and fall-through paths ignored L while still
+writing ` est`. The rule above holds the properties the ruling requires: an
+estimated pair never scores above the match at the same level (year match,
+or day-exact), always scores at least the same gap unflagged, and a larger
+gap never scores higher.
+
 **Authoring rule:** the last band must be at least the gap-1 credit, or the
 band-to-year boundary steps UP and a pair further apart scores higher. A clamp
 in `cmp_release_date` keeps a flawed profile monotonic, and
@@ -257,7 +333,15 @@ system") wherever it is not reproducing an emitted value.
 * **What counts as a COMMON Alt ID** (operator ruling, 2026-08-30) -- the
   definition both the match and the conflict paths apply, and the one thing
   in this document a consumer may not relax:
-  * the **Kind** matches: `id_type` AND the FULL domain.
+  * the **Kind** matches. The engine keys the Kind on the FULL domain when
+    there is one, otherwise on the `id_type` (`alt_source`). That is the
+    same rule as "`id_type` AND full domain must be equal": the registry
+    gives a domain only with type `Proprietary`, so any other type has no
+    domain and a domain implies Proprietary (operator ruling 2026-10-19,
+    "They both mean the same thing"; wording corrected at 2.21.0, behaviour
+    unchanged). A port may implement either form; on a record that breaks
+    the registry rule (a non-Proprietary type WITH a domain) only the
+    domain-first form reproduces this engine, so prefer it.
     `themoviedb.org/movie` and `themoviedb.org/tv` are different sources and
     may legitimately reuse the same number.
   * the **Value** matches, compared case-insensitively.
@@ -313,6 +397,10 @@ system") wherever it is not reproducing an emitted value.
 * **Part numbering is distinguishing** ("Show Part 2" vs "Part 3" = different
   works, capped to Review; floored back to Review — not no-match — when
   clearly related: base-title ≥ `PART_RELATED_TITLE_MIN` + matching year).
+  A part number on ONE side only ("Show Part 2" vs "Show") is a conflict
+  for films ("Rocky 2" vs "Rocky" is a sequel) but **ambiguous** for an
+  Episode/Season pair: the title meta reports `part_ambiguous` true and
+  `part_conflict` false (2.21.0, operator ruling 2026-10-19).
 * **Supplemental short-form guard** (`SUPPLEMENTAL_SHORT_RATIO`): a
   Supplemental much shorter than an otherwise-matching record is its
   trailer/promo, not its duplicate.

@@ -153,6 +153,14 @@ class TitleConstructionError(ValueError):
     * ``partial`` -- the full record/base with every inheritable field
       applied and NO title;
     * ``provenance`` -- the per-field map for that partial result.
+
+    "NO title" includes a stale system-generated title the self record
+    already carried: both adapters DROP it from ``partial`` (the JSON
+    adapter removes the ``ResourceName`` key, the object adapter removes
+    those elements from ``titles``) and ``provenance`` has no
+    ``ResourceName`` entry. It is the string generation just failed to
+    rebuild, so handing it on would let a caller such as XML_to_JSON export
+    an old derived title as current (operator ruling 2026-10-19; 0.69.0).
     """
 
     partial: Any = None
@@ -486,10 +494,45 @@ def build_full_base(
         # The caller need not re-derive the inherited fields through a second
         # path, and does not silently receive the parent's title standing in
         # for the one that could not be built.
+        #
+        # A stale system-generated title the self base already carried is
+        # dropped too: it is the string generation just failed to rebuild,
+        # and it reached XML_to_JSON's export through `exc.partial` with no
+        # provenance entry (operator ruling 2026-10-19; 0.69.0). Only
+        # generated entries can be here -- a user-supplied one would have
+        # skipped generation -- but the filter keeps anything else anyway.
+        kept = _without_generated(full.get("ResourceName"))
+        if kept:
+            full["ResourceName"] = kept
+        else:
+            full.pop("ResourceName", None)
+        prov.pop("ResourceName", None)
         title_error.partial, title_error.provenance = full, dict(prov)
         raise title_error
 
     return full, prov
+
+
+def _without_generated(titles: Any) -> list:
+    """``titles`` minus its system-generated entries, in either shape.
+
+    Used only on the TitleConstructionError path, to keep a stale generated
+    title out of ``exc.partial`` (operator ruling 2026-10-19; 0.69.0). Reads
+    the flag the same way :func:`has_user_supplied_title` does, so the two
+    cannot disagree about which entries are generated.
+    """
+    if is_absent(titles):
+        return []
+    items = titles if isinstance(titles, (list, tuple)) else [titles]
+    kept = []
+    for item in items:
+        if isinstance(item, dict):
+            generated = str(item.get("SystemGenerated")).strip().lower() == "true"
+        else:
+            generated = bool(getattr(item, "system_generated", False))
+        if not generated:
+            kept.append(item)
+    return kept
 
 
 def _best_title(base: dict | None) -> str:
@@ -678,14 +721,21 @@ def build_full_record(
         setattr(full, attr, inherited)
         prov["Credits"] = "inherited"
 
-    _attach(full, prov)
     if title_error is not None:
         # Inheritance has run, so the partial is complete in every field
         # EXCEPT the title: generation failed and the loops above never copy
         # ResourceName, so the parent's title does not stand in for the one
-        # that could not be built. Same contract as build_full_base.
+        # that could not be built. Same contract as build_full_base,
+        # including dropping a stale system-generated title and any
+        # ResourceName provenance a previous pass left in `prior` (operator
+        # ruling 2026-10-19; 0.69.0).
+        if getattr(full, "titles", None):
+            full.titles = _without_generated(full.titles)
+        prov.pop("ResourceName", None)
+        _attach(full, prov)
         title_error.partial, title_error.provenance = full, dict(prov)
         raise title_error
+    _attach(full, prov)
     return full
 
 

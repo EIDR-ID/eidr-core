@@ -21,6 +21,7 @@ constants are read through ``_params`` — consumers register their config via
 compare-spec.json). BMR-Review keeps thin re-export shims so its internal
 imports and the engine-tuning workflow are unchanged.
 """
+import math
 from dataclasses import dataclass
 from functools import partial
 
@@ -39,6 +40,7 @@ from . import _params as config
 from . import nonlinear
 from ._params import set_source as set_params  # the public registration API, re-exported
 from .titles import (
+    _numbered_parts_conflict,
     fuzzy,
     is_internal,
     parts_ambiguous,
@@ -257,7 +259,17 @@ def cmp_titles(a, b):
     # with it present they include Internal texts too, so a translated
     # "Part 2" can raise a part conflict. Deliberate, and part of what
     # BMR-Review measures before the knob lands.
-    pconf = parts_conflict(a_raw, b_raw)
+    #
+    # For an Episode/Season pair a part number on ONE side only ("Show Part 2"
+    # vs "Show") is AMBIGUOUS, not a conflict (operator ruling 2026-10-19,
+    # "That's ambiguous"; 0.69.0) -- the un-numbered title may be any one part
+    # or all of them. title_similarity already scored it so (0.70, the
+    # 2026-09-01 ruling), but parts_conflict counted numbered-vs-bare-base as
+    # a conflict, so the meta said part_conflict=True and part_ambiguous
+    # (computed only without a conflict) almost never fired. Only DIFFERENT
+    # numbers on the same base conflict for episodes; films keep both halves.
+    pconf = (_numbered_parts_conflict(a_raw, b_raw) if _ep
+             else parts_conflict(a_raw, b_raw))
     # When a part conflict is present, record whether the two sides share the
     # same BASE title (the numbered serial case, e.g. "<Show> Part 2" vs
     # "<Show> Part 3"). The raw best_sim is near zero once the differing part
@@ -461,6 +473,41 @@ def _profile_year_quality(profile, gap):
     return None
 
 
+def _profile_year_quality_at(profile, gap):
+    """:func:`_profile_year_quality` for a gap that may be FRACTIONAL.
+
+    A fractional gap arises only from estimated-date leniency (the gap divided
+    by ``DATE_ESTIMATED_LENIENCY``). It reads the table by linear
+    interpolation between the two whole gaps around it, the step past the
+    largest key being the floor: ``q(lo) + (q(lo+1) - q(lo)) * (gap - lo)``,
+    in that order so a second engine reproduces it to the bit. A whole gap is
+    exactly the integer lookup, so an unflagged pair is unaffected. ``None``
+    when either neighbour is unanswerable (the caller falls back to the
+    legacy curve, as for a whole gap).
+
+    Interpolation, not rounding, because rounding a halved one-year gap down
+    to zero hands an estimated mismatch the full year-MATCH credit -- the
+    defect this replaces (operator ruling 2026-10-19; 0.69.0) -- and rounding
+    it up gives no leniency at all.
+    """
+    lo = math.floor(gap)
+    if gap == lo:
+        return _profile_year_quality(profile, int(lo))
+    q_lo = _profile_year_quality(profile, int(lo))
+    q_hi = _profile_year_quality(profile, int(lo) + 1)
+    if q_lo is None or q_hi is None:
+        return None
+    return q_lo + (q_hi - q_lo) * (gap - lo)
+
+
+def _lenient(leniency):
+    """The divisor an estimated pair's distances are scaled by on the profile
+    paths: ``DATE_ESTIMATED_LENIENCY``, never below 1. A value below 1 would
+    make an estimated date count AGAINST the pair, the opposite of what the
+    flag says (operator ruling 2026-10-19; 0.69.0)."""
+    return max(1.0, float(leniency))
+
+
 def _profile_full_date_quality(profile, days):
     for max_days, quality in profile.get("full_date_bands") or []:
         if days <= max_days:
@@ -479,8 +526,14 @@ def _equivalent_year_gap(days):
     return max(1, round(days / 365.25))
 
 
-def _fallthrough_quality(profile, days, calendar_gap):
+def _fallthrough_quality(profile, days, calendar_gap, leniency=1.0):
     """Quality for a full-date pair BEYOND the last band.
+
+    ``leniency`` > 1 (an estimated pair) divides both distances before the
+    lookup, as everywhere else in :func:`cmp_release_date`; the year gap may
+    then be fractional and is read by :func:`_profile_year_quality_at`. The
+    minimum of one year still holds: a pair beyond the bands is beyond them
+    on its scaled distance, which is one-year evidence or more.
 
     Two rules, and both are load-bearing:
 
@@ -498,8 +551,9 @@ def _fallthrough_quality(profile, days, calendar_gap):
     reports. When the numbers are consistent the clamp is a no-op, and the
     result is exactly the distance-equivalent year value.
     """
-    gap = max(calendar_gap, _equivalent_year_gap(days))
-    q = _profile_year_quality(profile, gap)
+    lenient = _lenient(leniency)
+    gap = max(calendar_gap / lenient, _equivalent_year_gap(days / lenient))
+    q = _profile_year_quality_at(profile, gap)
     if q is None:
         return None
     bands = profile.get("full_date_bands") or []
@@ -556,7 +610,85 @@ def validate_date_profile(profile, name="profile"):
     return problems
 
 
+def _full_date_gap_quality(profile, dd, calendar_gap, leniency):
+    """Quality for two DIFFERENT full dates ``dd`` days apart.
+
+    ``leniency`` is 1.0 for an unflagged pair, else DATE_ESTIMATED_LENIENCY:
+    the day distance (and, past the bands, the year gap) is divided by it
+    before the lookup -- the same scaling the legacy curve has always applied
+    through its half-life (operator ruling 2026-10-19; 0.69.0).
+    """
+    if profile:
+        lenient = _lenient(leniency)
+        banded = _profile_full_date_quality(profile, dd / lenient)
+        if banded is not None:
+            return banded
+        # BEYOND THE LAST BAND, FALL THROUGH TO THE YEAR-LEVEL TABLE. A
+        # distant full-date pair carries no more information than a
+        # distant year pair: the measured likelihood is 0.331 at 32-365
+        # days against 0.332 at a one-year gap, which is why the bands
+        # stop at about a month in the first place.
+        #
+        # 0.24.0 documented this and then fell through to the legacy
+        # exponential instead, so the finding was never in effect: two
+        # full dates seven weeks apart scored 0.938, where the same two
+        # records with year-only precision scored their profile's gap-0
+        # value. It over-credited distant full dates -- wrong in the safe
+        # direction (costing precision, not recall), which is why
+        # BMR-Review shipped 2.8.0 without holding for it, but wrong.
+        gap_q = _fallthrough_quality(profile, dd, calendar_gap, leniency)
+        if gap_q is not None:
+            return gap_q
+    # No profile at all, or a profile whose year table cannot answer: the
+    # legacy curve, unchanged (a longer half-life is the same gap scaling).
+    hl = config.DATE_FULL_HALFLIFE_DAYS * leniency
+    return 0.5 ** (dd / hl)
+
+
+def _year_gap_quality(profile, gap, episode, leniency):
+    """Quality for two year-level dates ``gap`` (>= 1) years apart.
+
+    ESTIMATED-DATE LENIENCY (operator ruling 2026-10-19, "Fix this"; 0.69.0):
+    the GAP is divided by ``leniency`` and the table read at that, possibly
+    fractional, gap (:func:`_profile_year_quality_at`), capped at the gap-0
+    credit. Until 0.69.0 the CREDIT was multiplied instead (capped at 1.0),
+    so with RD:Pro on one side an Episode pair a year apart scored 1.0 while
+    an exact Episode year match scored 0.80 -- the inversion DATE_PROFILES
+    exist to prevent. Scaling the gap keeps every property the table has:
+    an estimated pair never beats the year match, still beats the same gap
+    unflagged, and a larger gap never scores higher. It is also what the
+    legacy curve below has always done (half-life times leniency).
+    """
+    if profile:
+        lenient = _lenient(leniency)
+        pq = _profile_year_quality_at(profile, gap / lenient)
+        if pq is not None:
+            # A measured table, not a curve. Under the legacy constants a
+            # year-only Episode MISMATCH outscored a MATCH for every gap below
+            # ~4.4 years (0.6 against 0.891 at gap 1) because the match credit
+            # and the decay were on different scales. A monotonic table cannot
+            # invert. The cap is a no-op on a table validate_date_profile
+            # passes; it keeps an unvalidated one from crediting a lenient
+            # mismatch above the match.
+            top = _profile_year_quality(profile, 0)
+            return min(pq, top) if top is not None else pq
+    hl_years = (config.DATE_YEAR_HALFLIFE_YEARS_EPISODE
+                if episode
+                else config.DATE_YEAR_HALFLIFE_YEARS)
+    return 0.5 ** (gap / (hl_years * leniency))
+
+
 def cmp_release_date(a, b):
+    """Release-date quality: exact and same-year matches, then a distance
+    that decays through the pair's date profile (``date_profile``).
+
+    When either side is estimated (``date_estimated``) every distance is
+    divided by ``DATE_ESTIMATED_LENIENCY`` before it is looked up -- days in
+    the full-date bands, years in the year table (fractional gaps
+    interpolated) -- and a match is unaffected. The detail carries " est"
+    only when that changed the quality: the flag alone is not a reason to
+    say leniency applied (operator ruling 2026-10-19; 0.69.0).
+    """
     ay, aymd = parse_date(a.release_date)
     by, bymd = parse_date(b.release_date)
     if ay is None or by is None:
@@ -566,6 +698,7 @@ def cmp_release_date(a, b):
     epoch = epoch_a or epoch_b
     estimated = a.date_estimated or b.date_estimated
     leniency = config.DATE_ESTIMATED_LENIENCY if estimated else 1.0
+    profile = date_profile(a.creation_type, b.creation_type)
     if aymd and bymd:
         if aymd == bymd:
             if epoch:      # both 1970-01-01: likely two systems defaulting
@@ -573,39 +706,17 @@ def cmp_release_date(a, b):
                                    "1970-01-01 epoch match (default-date suspect)")
             return FieldResult("release_date", 1.0, "exact")
         dd = days_between(aymd, bymd)
-        profile = date_profile(a.creation_type, b.creation_type)
-        banded = _profile_full_date_quality(profile, dd) if profile else None
-        if banded is not None:
-            q = banded
-        else:
-            # BEYOND THE LAST BAND, FALL THROUGH TO THE YEAR-LEVEL TABLE. A
-            # distant full-date pair carries no more information than a
-            # distant year pair: the measured likelihood is 0.331 at 32-365
-            # days against 0.332 at a one-year gap, which is why the bands
-            # stop at about a month in the first place.
-            #
-            # 0.24.0 documented this and then fell through to the legacy
-            # exponential instead, so the finding was never in effect: two
-            # full dates seven weeks apart scored 0.938, where the same two
-            # records with year-only precision scored their profile's gap-0
-            # value. It over-credited distant full dates -- wrong in the safe
-            # direction (costing precision, not recall), which is why
-            # BMR-Review shipped 2.8.0 without holding for it, but wrong.
-            gap_q = _fallthrough_quality(profile, dd, abs(ay - by)) if profile else None
-            if gap_q is not None:
-                q = gap_q
-            else:
-                # No profile at all, or a profile whose year table cannot
-                # answer: the legacy curve, unchanged.
-                hl = config.DATE_FULL_HALFLIFE_DAYS * leniency
-                q = 0.5 ** (dd / hl)
+        q = _full_date_gap_quality(profile, dd, abs(ay - by), leniency)
         if epoch:
             q = max(q, config.DATE_EPOCH_MISMATCH_FLOOR)
             return FieldResult("release_date", q, f"{dd}d apart (1970 epoch suspect)")
+        # " est" only where leniency moved the answer: scored once more as
+        # if unflagged and compared. Until 0.69.0 the band and fall-through
+        # paths ignored leniency yet still said " est".
+        est = estimated and q != _full_date_gap_quality(profile, dd, abs(ay - by), 1.0)
         return FieldResult("release_date", q, f"{dd}d apart"
-                           + (" est" if estimated else ""))
+                           + (" est" if est else ""))
     gap = abs(ay - by)
-    profile = date_profile(a.creation_type, b.creation_type)
     # Legacy path only: a flat per-type flag, kept so a config without
     # DATE_PROFILES behaves exactly as before.
     episode = (a.creation_type == "Episode" or b.creation_type == "Episode")
@@ -624,25 +735,13 @@ def cmp_release_date(a, b):
             return FieldResult("release_date", config.DATE_EPISODE_YEAR_MATCH_CREDIT,
                                "year match (year-only; weak for episodes)")
         return FieldResult("release_date", 1.0, "year match")
-    pq = _profile_year_quality(profile, gap) if profile else None
-    if pq is not None:
-        # A measured table, not a curve. Under the legacy constants a
-        # year-only Episode MISMATCH outscored a MATCH for every gap below
-        # ~4.4 years (0.6 against 0.891 at gap 1) because the match credit and
-        # the decay were on different scales. A monotonic table cannot invert.
-        q = pq * leniency if leniency != 1.0 else pq
-        q = min(q, 1.0)
-    else:
-        hl_years = (config.DATE_YEAR_HALFLIFE_YEARS_EPISODE
-                    if episode
-                    else config.DATE_YEAR_HALFLIFE_YEARS)
-        hl = hl_years * leniency
-        q = 0.5 ** (gap / hl)
+    q = _year_gap_quality(profile, gap, episode, leniency)
     if epoch:
         q = max(q, config.DATE_EPOCH_MISMATCH_FLOOR)
         return FieldResult("release_date", q, f"{gap}yr apart (1970 epoch suspect)")
+    est = estimated and q != _year_gap_quality(profile, gap, episode, 1.0)
     return FieldResult("release_date", q, f"{gap}yr apart"
-                       + (" est" if estimated else ""))
+                       + (" est" if est else ""))
 
 
 # -------- duration (absolute AND relative; lenient) --------
@@ -784,7 +883,14 @@ def cmp_alt_ids(a, b):
     A **common Alt ID** requires all three of these (operator ruling,
     2026-08-30). They are the definition; nothing here may relax them:
 
-    * the **Kind** matches -- that is the ``id_type`` AND the full domain.
+    * the **Kind** matches. The Kind is :func:`alt_source`: the full domain
+      when there is one, otherwise the ``id_type``. That is the same rule as
+      "``id_type`` AND full domain must be equal", because the registry
+      gives a domain only with type ``Proprietary`` -- any other type has no
+      domain, and a domain implies Proprietary (operator ruling 2026-10-19,
+      "They both mean the same thing"; wording fixed in 0.69.0, behaviour
+      unchanged). A non-conforming record such as ``IMDB`` WITH a domain is
+      keyed on its domain, like the Proprietary entry it should have been.
       ``themoviedb.org/movie`` and ``themoviedb.org/tv`` are different
       sources and may legitimately reuse the same number.
     * the **Value** matches, compared case-insensitively.

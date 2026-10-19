@@ -1,4 +1,4 @@
-# AltIDTool Input File Format (SPEC v1.5)
+# AltIDTool Input File Format (SPEC v1.6)
 
 **Status:** landed 2026-08-04 (register R9 / Phase 3 item 3). The reference
 implementation is **`eidr_core.altidtool_io`** (`format_line` / `write_lines`
@@ -34,23 +34,54 @@ Lines are therefore **3, 4, or 5 columns wide**:
 | BMRtoAltID `bmr_to_altid.py` | canonical variable-width | ✅ composes via `eidr_core.altidtool_io.format_line` (2026-08-04; **operator ruling**: variable columns, max 5, no trailing tabs — the fixed-5 dialect is retired; `parse_line` still tolerates old files) |
 | EIDR MCP `eidrtoaltid.py` | **NOT this format** — a 2–4 column extract *report* WITH a header (id + value, optional Relation/Resource Name). Previously mischaracterized as a parallel emitter (OVERLAPS row 4 / drift group); corrected 2026-08-04 | out of scope |
 
-## Removal lines (v1.1, 2026-09-11)
+## Removal lines (v1.1, 2026-09-11; narrowed v1.6, 2026-10-19)
 
-The AltIDTool itself also accepts **removal** lines, which no portfolio feed
-generator emits but which the python-tools `AltIDTool` reads
-(`docs/research/legacy-java-tools-extraction.md`: `ID` removes all Alt IDs;
-`ID<TAB>TYPE` removes every Alt ID of that type). A three-column line whose
-value is empty is a removal of that type, not an Alt ID with no value. Blank
-lines and lines starting with `//` are comments.
+Edit files also carry **removal** lines, which no portfolio feed generator
+emits but which the python-tools `AltIDTool` applies. A line is a removal
+when its Value (column 3) is empty or absent. Blank lines and lines starting
+with `//` are comments. Exactly two removals are valid:
 
-    10.5240/AAAA-…-X                          remove every alternate ID
-    10.5240/AAAA-…-X	IMDB                     remove every IMDB alternate ID
-    10.5240/AAAA-…-X	IMDB	                 same (empty value)
+    10.5240/AAAA-…-X	IMDB                         remove every IMDB Alt ID
+    10.5240/AAAA-…-X	IMDB	                     same (empty Value)
+    10.5240/AAAA-…-X	Proprietary		themoviedb.org/movie   remove every Proprietary Alt ID of that domain
+
+**Operator ruling, 2026-10-19:** "Refuse removing all alt IDs. The pattern
+ID<tab>Proprietary<tab><tab>Domain should remove all IDs of that domain only
+(Proprietary by itself without a domain should be refused)."
+
+Every form, by columns after splitting on TAB (trailing empty columns, the
+fixed-5 dialect, change nothing; `*` = any or none):
+
+| Line | v1.1–v1.5 | v1.6 |
+|---|---|---|
+| `ID` | remove every Alt ID | **refused** (remove-all) |
+| `ID<TAB>`, `ID<TAB><TAB>`, … (empty Type, empty Value, empty Domain) | remove every Alt ID (stray tabs) | **refused** (remove-all) |
+| `ID<TAB><TAB><TAB>Domain` (empty Type, Domain given) | remove every Alt ID (Domain ignored) | **refused** (remove-all) |
+| `ID<TAB><TAB>Value…` (empty Type, Value given) | an addition with no Type | **refused** (no Type) |
+| `ID<TAB>Named` / `ID<TAB>Named<TAB>` | remove every Alt ID of that type | unchanged |
+| `ID<TAB>Named<TAB><TAB>Domain` | remove the type (Domain ignored) | **refused** (Domain is for Proprietary only) |
+| `ID<TAB>Proprietary` / `ID<TAB>Proprietary<TAB>` / `…<TAB><TAB>` | remove every Proprietary Alt ID | **refused** (no Domain) |
+| `ID<TAB>Proprietary<TAB><TAB>Domain` | remove every Proprietary Alt ID (Domain ignored) | **remove the Proprietary Alt IDs of that Domain only** |
+| `ID<TAB>*<TAB><TAB>*<TAB>Relation` (any removal with a Relation) | Relation ignored | **refused** (a removal carries no Relation) |
+
+Why refuse rather than read literally: each refused line removes more than
+its author can have meant (stray tabs after an ID removed a record's every
+Alt ID; a Domain or Relation that looked like it narrowed a removal was
+dropped), and the failure is silent and lands on the registry. The legacy
+Java tool read a remove-all from `ID` alone and a domain removal from the
+THREE-column `ID<TAB>Proprietary<TAB>DOMAIN`
+(`docs/research/legacy-java-tools-extraction.md` in python-tools); this
+format never adopted that three-column form, which here is an addition
+whose Value is the third column.
 
 `parse_edit_line` in `eidr_core.altidtool_io` reads the superset (addition,
-removal, comment); `parse_line` stays strict so a feed generator can never
-produce a removal by accident. Added so that the tools can vendor this
-module (`specs/vendoring.md`) without losing their removal path.
+removal, comment) and raises `ValueError` for every refused line;
+`AltIdRemoval` carries `eidr_id`, `alt_type` (never empty) and `domain` (set
+on a Proprietary removal, empty on a named type). A caller that applies
+removals must match the domain as well as the type. `parse_line` stays
+strict so a feed generator can never produce a removal by accident. Added
+so that the tools can vendor this module (`specs/vendoring.md`) without
+losing their removal path.
 
 ## Identity, relation and what "already on the record" means (v1.2, 2026-09-23)
 
@@ -136,3 +167,22 @@ consumer a wrong answer.
 `parse_line` accepts all three widths and the fixed-5 dialect. Remediation
 action TSVs (`registry_remediation_actions.tsv` etc.) are a DIFFERENT format
 (they carry action verbs and context columns) and are not covered here.
+
+## Change history
+
+Earlier versions are marked in the section headings they introduced (v1.1
+removal lines, v1.2 identity and relation rules, v1.3-v1.5 rule 6 and the
+multi-form Kinds).
+
+- **v1.6 (2026-10-19)** -- removal lines narrowed on the operator's ruling of
+  2026-10-19 ("Refuse removing all alt IDs. The pattern
+  ID<tab>Proprietary<tab><tab>Domain should remove all IDs of that domain
+  only (Proprietary by itself without a domain should be refused)"). Every
+  spelling of remove-all (`ID`, `ID<TAB>`, `ID<TAB><TAB>`,
+  `ID<TAB><TAB><TAB>Domain`) is refused; `ID<TAB>Proprietary<TAB><TAB>Domain`
+  removes that domain's Proprietary Alt IDs only and `AltIdRemoval` gains a
+  `domain` field to carry it; a Proprietary removal without a Domain, a
+  Domain on a named-type removal, a Relation on any removal, and an addition
+  with an empty Type (`ID<TAB><TAB>value`) are refused. Named-type removals
+  (`ID<TAB>Type`, with or without an empty Value) are unchanged. Raised by
+  the 2026-10-02 dictionary audit.

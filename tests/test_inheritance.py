@@ -926,3 +926,68 @@ def test_a_model_without_a_titles_attribute_skips_title_handling():
     full = build_full_record(_NoTitles(), _parent_rec(), "Season")
     assert full.mode == "AudioVisual"
     assert "ResourceName" not in provenance(full)
+
+
+# ---------------------------------------------------------------------------
+# A stale system-generated title is dropped from the TitleConstructionError
+# partial (operator ruling 2026-10-19; 0.69.0). The docstring always said the
+# partial has NO title; both adapters left the self record's old generated
+# title in it, with no provenance entry, and XML_to_JSON exports exc.partial.
+# The two adapters are compared on the same input, per the repo convention.
+# ---------------------------------------------------------------------------
+
+def _stale_failures():
+    """The same untitleable Season (no number, no date of its own) carrying a
+    stale generated title, in both shapes; returns the two exceptions."""
+    with pytest.raises(TitleConstructionError) as ej:
+        build_full_base({"ResourceName": _GEN}, PARENT, "Season")
+    with pytest.raises(TitleConstructionError) as er:
+        build_full_record(
+            _Rec(creation_type="Season",
+                 titles=[_Title(text="Old Generated", is_resource=True,
+                                system_generated=True)]),
+            _parent_rec(), "Season")
+    return ej.value, er.value
+
+
+def test_both_adapters_drop_a_stale_generated_title_from_the_partial():
+    json_exc, rec_exc = _stale_failures()
+    assert "ResourceName" not in json_exc.partial
+    assert rec_exc.partial.titles == []
+    assert "ResourceName" not in json_exc.provenance
+    assert "ResourceName" not in rec_exc.provenance
+    assert "ResourceName" not in provenance(rec_exc.partial)
+    # Agreement, not just two separate passes: every field the JSON parent
+    # carries reads the same in both (the record parent also has a length
+    # and credits, which the JSON fixture lacks).
+    assert json_exc.provenance == {
+        k: rec_exc.provenance[k] for k in json_exc.provenance}
+    # ...and it is still a partial: the other fields inherited.
+    assert json_exc.partial["Mode"] == rec_exc.partial.mode == "AudioVisual"
+
+
+def test_a_re_entered_record_does_not_keep_a_stale_system_provenance():
+    """Re-entry carries prior provenance forward. A record a previous pass
+    titled ('system') whose parent has since lost its title must not report
+    'system' for a title the partial no longer holds."""
+    child = _Rec(creation_type="Season",
+                 titles=[_Title(text="The Series [2001]", is_resource=True,
+                                system_generated=True, self_defined=False)])
+    child.eidr_provenance = {"ResourceName": "system"}
+    with pytest.raises(TitleConstructionError) as ei:
+        build_full_record(child, _Rec(creation_type="Series"), "Season")
+    assert ei.value.partial.titles == []
+    assert "ResourceName" not in ei.value.provenance
+    assert "ResourceName" not in provenance(ei.value.partial)
+
+
+def test_dropping_leaves_the_input_untouched_and_success_unchanged():
+    base = {"ResourceName": [dict(t) for t in _GEN]}
+    with pytest.raises(TitleConstructionError):
+        build_full_base(base, PARENT, "Season")
+    assert base == {"ResourceName": _GEN}          # deep copy, not mutated
+    # When generation succeeds the stale title is still REPLACED, not dropped.
+    full, prov = build_full_base(base, PARENT, "Season",
+                                 extra={"SequenceNumber": "2"})
+    assert full["ResourceName"][0]["Title"] == "The Series: Season 2"
+    assert prov["ResourceName"] == "system"

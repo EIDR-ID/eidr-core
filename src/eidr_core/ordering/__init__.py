@@ -13,11 +13,17 @@ type/domain/value), never model objects or dicts, so the same functions serve
 BMR-Review's dataclasses, XML_to_JSON's dict entries, and any future
 consumer. All comparisons use Unicode ``str.casefold()`` on the KEY only —
 emitted values keep their original case.
+
+Titles are placed STRUCTURALLY: the caller says which title is the
+ResourceName (``is_resource``). A Title Class never makes a title the
+ResourceName; the only class that moves a title is Internal (operator
+ruling 2026-10-19; 0.69.0 -- "Ignore title classes, except for Internal and
+transliterated").
 """
 from __future__ import annotations
 
 __all__ = [
-    "ck", "is_internal_class", "is_resource_class", "title_bucket",
+    "ck", "is_internal_class", "title_bucket",
     "title_sort_key", "is_shortdoi", "altid_kind", "altid_canonical_key",
     "altid_display_key", "altid_collapsed_canonical_key",
 ]
@@ -31,21 +37,40 @@ def ck(s) -> str:
 # ── titles (§4.1 / title-display-order.md) ─────────────────────────────────
 
 def is_internal_class(title_class) -> bool:
+    """Is this the Internal Title Class (casefolded)? EIDR's own machine
+    translations carry it; it sends an ALTERNATE to the last bucket."""
     return ck(title_class) == "internal"
 
 
-def is_resource_class(title_class) -> bool:
-    """Title classes that mark the primary/ResourceName in sources that carry
-    the distinction as a class rather than a structural flag."""
-    return ck(title_class) in ("release", "resource")
+# `is_resource_class` (release/resource class => ResourceName) was REMOVED
+# at 0.69.0. It let an AlternateResourceName of class Release sort above the
+# real ResourceName, against the specs' "identified structurally, never by
+# its Title Class"; the operator ruled "Ignore title classes, except for
+# Internal and transliterated" (ruling 2026-10-19; 0.69.0). No consumer
+# imported it. Do not reintroduce a class-based ResourceName test: a caller
+# with no structural flag must derive one (e.g. md:ResourceName, or entry 0
+# of a ResourceName-first list), not guess from the class.
 
 
 def title_bucket(title_class, is_resource: bool = False) -> int:
     """The ratified three buckets: 0 = ResourceName (ALWAYS first — even when
     its class is Internal), 1 = non-Internal alternates, 2 = Internal
-    alternates. ResourceName identification is structural (`is_resource`) or
-    by a release/resource class; the Internal check never outranks it."""
-    if is_resource or is_resource_class(title_class):
+    alternates.
+
+    ResourceName identification is STRUCTURAL only: ``is_resource`` is the
+    caller's statement that this is the ``md:ResourceName``. No Title Class
+    puts a title in bucket 0 -- an alternate of class Release or Resource is
+    an ordinary alternate (bucket 1). Of the classes, only Internal moves a
+    title, and never the ResourceName. ``transliterated`` (EIDR's own
+    transliterations) is the ruling's other named exception, but neither
+    spec defines an ordering treatment for it, so it orders as an ordinary
+    alternate (operator ruling 2026-10-19; 0.69.0).
+
+    A caller that passes only a class gets bucket 1 or 2, never 0: such a
+    caller must pin its ResourceName itself, as XML_to_JSON's star mode does
+    by position.
+    """
+    if is_resource:
         return 0
     if is_internal_class(title_class):
         return 2
@@ -53,7 +78,11 @@ def title_bucket(title_class, is_resource: bool = False) -> int:
 
 
 def title_sort_key(text, title_class=None, is_resource: bool = False) -> tuple:
-    """Full display/canonical sort key: (bucket, casefold(text))."""
+    """Full display/canonical sort key: (bucket, casefold(text)).
+
+    ``is_resource`` must come from the record's structure (see
+    :func:`title_bucket`); the class alone never identifies the ResourceName
+    (operator ruling 2026-10-19; 0.69.0)."""
     return (title_bucket(title_class, is_resource), ck(text))
 
 

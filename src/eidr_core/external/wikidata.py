@@ -277,9 +277,12 @@ def _norm(s: str) -> str:
 def alternate_titles(entity: Mapping[str, Any], primary: str = "") -> list[tuple[str, str]]:
     """``(Alternate Title, Alt Title Language)`` from aliases then labels,
     de-duplicated (punctuation and case folded) against each other and the
-    primary title. Never P2441 (a literal translation is not a title the
-    work was released under). Whether labels and aliases are release titles
-    at all is with the operator (OD-47)."""
+    primary title. An Alternate Title need not be a release title: any title
+    by which third parties know the work counts, working and former titles
+    included (operator, eidr-metadata-sources OD-36c2, 2026-10-19). Never
+    P2441: a literal translation is not a title the work is known by.
+    Whether labels and aliases qualify is still with the operator (OD-47),
+    so this behaviour is unchanged until that ruling."""
     found: list[tuple[str, str]] = []
     for lang_key, arr in (entity.get("aliases") or {}).items():
         for a in arr or []:

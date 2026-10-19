@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.68.1<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.69.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,48 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.69.0 (2026-10-19)
+
+The operator's rulings of 2026-10-19 on the audit's ten open questions.
+compare-spec 2.21.0, altidtool-format v1.6, title-display-order v1.1 and
+normalized-record v1.1. Golden pairs restamped (no score moved) plus a new
+pair, `episode-estimated-year-gap-scores-below-year-match`; the corroborated
+one-sided-part fixture waits in `golden_pairs_pending` for BMR-Review's
+scorer decision.
+
+* **`compare.cmp_titles`:** an Episode or Season pair with a part number
+  on one side only (`Show Part 2` vs `Show`) is `part_ambiguous`, not
+  `part_conflict`; films are unchanged.
+* **`compare.cmp_release_date`:** estimated-date leniency divides every
+  date distance by `DATE_ESTIMATED_LENIENCY` instead of multiplying the
+  credit, so an estimated mismatch never outscores an exact match; ` est`
+  appears only where the flag changed the score.
+* **`compare.cmp_alt_ids`:** docstring and spec say the Kind rule (domain,
+  else type) equals "type and domain equal", since only Proprietary carries
+  a domain. No behaviour change.
+* **`normalize.norm_title`:** leading Italian `lo` and (before an Italian
+  plural or number) `i` are stripped as articles before numeral folding;
+  English `I ...` titles are unchanged.
+* **`normalize.parse_minutes`:** every valid ISO 8601 runtime form, whole
+  (fractions, weeks, days, the alternative form), else `None`; `P78M`
+  (months), negative and non-finite numbers are `None`; `a:b` is minutes
+  and seconds.
+* **`normalize.norm_lang`:** the wildcard test runs on the primary subtag
+  (`und-Latn`, `xx-YY` give `''`).
+* **`altidtool_io.parse_edit_line`:** removing all of a record's Alt IDs
+  is refused; `ID<TAB>Proprietary<TAB><TAB>Domain` removes that domain only
+  (new `AltIdRemoval.domain`); Proprietary without a domain, a Domain on a
+  named type, a Relation on a removal and a Value with no Type are refused.
+* **`ordering`:** a Title Class never places a title (except Internal), so
+  a Release-class alternate no longer sorts above the ResourceName;
+  `is_resource_class` is removed (no consumer imported it).
+* **`inheritance`:** `TitleConstructionError.partial` drops a stale
+  system-generated title in both adapters.
+* **`ids.find_content_ids`:** an ID after `/` stays unmatched, now by
+  ruling and pinned by a test.
+* **`external.wikidata.alternate_titles`:** docstring states the widened
+  Alternate Title rule (OD-36c2); behaviour unchanged pending OD-47.
 
 ### 0.68.1 (2026-10-18)
 
@@ -782,7 +824,7 @@ edition's Changes entry.
 | [`eidr_core.external.failover.WIKIMEDIA_MIN_INTERVAL`](#wikimedia_min_interval-constant) | constant | Seconds between request starts under Wikimedia's 200-requests-a-minute limit; `RequestPacer`'s default `min_interval`. |
 | [`eidr_core.external.failover.WIKIMEDIA_SLOW_PAUSE`](#wikimedia_slow_pause-constant) | constant | Seconds to wait after a request that took longer than `WIKIMEDIA_SLOW_REQUEST` (Wikimedia: "please wait 5 seconds"); `RequestPacer`'s default `slow_pause`. |
 | [`eidr_core.external.failover.WIKIMEDIA_SLOW_REQUEST`](#wikimedia_slow_request-constant) | constant | A request slower than this many seconds counts as slow and triggers the pause; `RequestPacer`'s default `slow_threshold`. |
-| [`eidr_core.external.wikidata.alternate_titles`](#alternate_titles) | function | Aliases then labels, de-duplicated with case and punctuation folded, the primary title excluded; never P2441. |
+| [`eidr_core.external.wikidata.alternate_titles`](#alternate_titles) | function | Aliases then labels, de-duplicated with case and punctuation folded, the primary title excluded; never P2441 (a literal translation is not a title the work is known by). |
 | [`eidr_core.external.wikidata.bmr_facts`](#bmr_facts) | function | Reads the entity into BMR fields. |
 | [`eidr_core.external.wikidata.claims`](#claims) | function | Reads a property's statements under the package's rank rule; every other reader goes through it. |
 | [`eidr_core.external.wikidata.duration_minutes`](#duration_minutes) | function | Approx Length from P2047, in minutes, seconds or hours. |
@@ -882,7 +924,7 @@ edition's Changes entry.
 | [`eidr_core.normalize.norm_name`](#norm_name) | function | Normalises a personal or organisation name for comparison. |
 | [`eidr_core.normalize.norm_title`](#norm_title) | function | Normalises a title for comparison, folding Unicode, case, punctuation, numerals and common word variants. |
 | [`eidr_core.normalize.parse_date`](#parse_date) | function | Parses a date into a year and an optional `(year, month, day)` tuple. |
-| [`eidr_core.normalize.parse_minutes`](#parse_minutes) | function | Parses a duration into minutes. |
+| [`eidr_core.normalize.parse_minutes`](#parse_minutes) | function | Parses a duration into minutes; the whole string must match one form, else `None` (never a partial parse). |
 | [`eidr_core.normalize.parse_registrant_extra`](#parse_registrant_extra) | function | Reads the length and release-date estimate flags from a Registrant Extra value. |
 | [`eidr_core.normalize.sanitize_field`](#sanitize_field) | function | Makes a text value safe to carry through a TSV file or PostgreSQL COPY stream without changing what it says. |
 | [`eidr_core.normalize.aliases.alias_name`](#alias_name) | function | Returns the canonical form of a personal or organisation name token. |
@@ -894,7 +936,6 @@ edition's Changes entry.
 | [`eidr_core.ordering.altid_kind`](#altid_kind) | function | Returns the Alt ID kind composite (casefolded Type, casefolded Domain) used for grouping and sorting. |
 | [`eidr_core.ordering.ck`](#ck) | function | Returns the casefolded sort key for a value, treating None as an empty string. |
 | [`eidr_core.ordering.is_internal_class`](#is_internal_class) | function | Tests whether a Title Class is `Internal` (casefolded, exact match). |
-| [`eidr_core.ordering.is_resource_class`](#is_resource_class) | function | Tests whether a Title Class marks the primary title, meaning it casefolds to `release` or `resource`. |
 | [`eidr_core.ordering.is_shortdoi`](#is_shortdoi) | function | Tests whether an Alt ID is a ShortDOI, by its Type or its Domain (stripped and casefolded since 0.47.0, exact match). |
 | [`eidr_core.ordering.title_bucket`](#title_bucket) | function | Returns the three-bucket rank of a title: ResourceName, then non-Internal alternates, then Internal alternates. |
 | [`eidr_core.ordering.title_sort_key`](#title_sort_key) | function | Returns the full title sort key: the three-bucket rank, then the casefolded text. |
@@ -1036,12 +1077,12 @@ Defined in `src/eidr_core/altidtool_io/__init__.py`.
 |---|---|---|---|
 | `line` | `str` | required | One line of an AltIDTool edit file. Trailing `\r` and `\n` are stripped, the line is split on tabs, and each column is whitespace-trimmed. |
 
-**Returns** `AltIdRow | AltIdRemoval | None` -- An `AltIdRow` for an addition (3-5 columns with a non-empty Value). An `AltIdRemoval` for a removal (1 column, 2 columns, or 3-5 columns with an empty Value). `None` for a blank line or one whose first non-space characters are `//`.
+**Returns** `AltIdRow | AltIdRemoval | None` -- An `AltIdRow` for an addition (3-5 columns with a non-empty Value). An `AltIdRemoval` for one of the two valid removals: a named type (`ID<TAB>IMDB`, or three columns with an empty Value) or one Proprietary domain (`ID<TAB>Proprietary<TAB><TAB>Domain`). `None` for a blank line or one whose first non-space characters are `//`.
 <!-- /dict -->
 
-**Does.** Parses one AltIDTool edit-file line into an addition, a removal, or None for a blank or comment line. Raises ValueError when column 1 (the EIDR ID) is empty or the line has more than 5 columns. Unlike `parse_line` it trims each column, so the two parsers can return different strings for the same addition line.
+**Does.** Parses one AltIDTool edit-file line into an addition, a removal, or None for a blank or comment line. Raises ValueError when column 1 (the EIDR ID) is empty, the line has more than 5 columns, or (since 0.69.0, spec v1.6, operator ruling 2026-10-19) the line would remove ALL of a record's Alt IDs (`ID`, `ID<TAB>`, `ID<TAB><TAB>`, a Domain or Relation with no Type), names Proprietary without a Domain, gives a Domain on a named-type removal, gives a Relation on any removal, or gives a Value with no Type. Unlike `parse_line` it trims each column, so the two parsers can return different strings for the same addition line.
 
-**Notes.** An empty Type in a removal shape gives `alt_type=""`, the remove-every-Alt-ID sentinel. So `ID<TAB>` and `ID<TAB><TAB>` both parse as "remove all". An addition with an empty Type (`ID<TAB><TAB>value`) comes back as an `AltIdRow`, not an error. Check rows before you apply them.
+**Notes.** Before 0.69.0 an empty Type meant "remove every Alt ID" and `ID<TAB>Proprietary<TAB><TAB>Domain` removed every Proprietary Alt ID whatever its domain; both are now refused or scoped as above. A caller applying a Proprietary removal must match the domain as well as the type (`AltIdRemoval.domain`).
 
 ### `parse_line`
 
@@ -1094,7 +1135,8 @@ Defined in `src/eidr_core/altidtool_io/__init__.py`.
 | Field | Type | Default | Purpose |
 |---|---|---|---|
 | `eidr_id` | `str` | required | EIDR ID of the record whose Alt IDs are removed (column 1). |
-| `alt_type` | `str` | `""` | Type whose Alt IDs are all removed (`IMDB`, ...). `""` means remove every Alt ID on the record. |
+| `alt_type` | `str` | `""` | Type whose Alt IDs are removed (`IMDB`, ..., or `Proprietary` with a `domain`). `parse_edit_line` never returns `""` since 0.69.0 (remove-all is refused); the default exists for compatible construction. |
+| `domain` | `str` | `""` | For a Proprietary removal, the one domain whose Alt IDs are removed (since 0.69.0); `""` for a named-type removal. |
 <!-- /dict -->
 
 **Does.** Represents one AltIDTool removal line, as returned by `parse_edit_line`. Portfolio producers never emit removals; the python-tools `AltIDTool` reads them. This module has no formatter for removals.
@@ -2133,7 +2175,7 @@ Defined in `src/eidr_core/compare/__init__.py`.
 
 **Does.** Compares third-party identifiers per namespace: a shared value is identity evidence; disagreeing values in a shared namespace are a conflict. Entries are dropped first when they are ShortDOIs (an alias of the EIDR ID), opaque registry IDs (`alt_source` gives None), or carry a non-identity relation (anything but missing, empty or `IsSameAs`, tested per entry). Values compare stripped and casefolded; a namespace counts as matched when any value overlaps, so a shared IMDb ID is not cancelled by a second, unshared one. This is the only comparator that produces a negative signal.
 
-**Notes.** Not in `COMPARATORS`: call it separately and read `conflict` and `meta["matches"]` (BMR-Review's scorer does, for the conflict penalty and the corroboration count). Quality `None` with `conflict > 0` is a normal result. The namespace is `alt_source`'s key (domain, else type), which is looser than the "id_type AND the full domain" Kind in the docstring and in compare-spec.md. No registered parameters are needed unless a namespace matches (`accumulate`). Since 0.47.0 its relation and ShortDOI tests are the shared `altidtool_io.is_identity_relation` and `ordering.is_shortdoi`.
+**Notes.** Not in `COMPARATORS`: call it separately and read `conflict` and `meta["matches"]` (BMR-Review's scorer does, for the conflict penalty and the corroboration count). Quality `None` with `conflict > 0` is a normal result. The namespace is `alt_source`'s key (domain, else type). That is the same rule as "id_type AND domain equal": the registry gives a domain only with type Proprietary (operator, 2026-10-19). A record that breaks that rule (an IMDB Alt ID with a domain) is keyed on its domain. No registered parameters are needed unless a namespace matches (`accumulate`). Since 0.47.0 its relation and ShortDOI tests are the shared `altidtool_io.is_identity_relation` and `ordering.is_shortdoi`.
 
 ### `cmp_assoc_orgs`
 
@@ -2310,7 +2352,7 @@ Defined in `src/eidr_core/compare/__init__.py`.
 
 **Does.** Scores two release dates by precision, comparing full dates by day distance and anything coarser by year gap. With `DATE_PROFILES` registered, full dates use the profile's `full_date_bands` and, beyond the last band, its year table keyed on the larger of the calendar year gap and the distance-equivalent gap (at least 1), clamped to the last band; year-level pairs use `year_gap_credit` and `year_gap_floor`. Without profiles, or when a table cannot answer, the legacy half-life curves (`DATE_FULL_HALFLIFE_DAYS`, `DATE_YEAR_HALFLIFE_YEARS*`) apply. Epoch suspects (year-only 1970, or 1970-01-01) get the `DATE_EPOCH_*` credits instead of a full match and a floor on a mismatch.
 
-**Notes.** The estimated flag acts differently by path: in the year-table path it multiplies the credit by `DATE_ESTIMATED_LENIENCY` (capped at 1.0, so at 2.0 a one-year gap scores 1.0, which for Episode beats the 0.80 a year match earns at compare-spec 2.20.0); in the legacy curves it lengthens the half-life; the day-band and fall-through paths ignore it apart from the ` est` detail suffix. A month-precision date (`YYYY-MM`) compares at year level. An impossible full ISO date such as `2001-02-30` against a different full date raises ValueError (from `days_between`).
+**Notes.** When either date is estimated, every distance is divided by `DATE_ESTIMATED_LENIENCY` (never below 1) before the lookup, on every path (since 0.69.0, compare-spec 2.21.0; it multiplied the year credit, so at 2.0 an estimated one-year Episode gap scored 1.0, above the 0.80 of a year match). Fractional year gaps interpolate between table entries, and the result is capped at the gap-0 credit, so an estimated pair never outscores an exact one and a larger gap never scores higher. With the shipped value 2.0, an Episode pair one year apart scores 0.685 estimated against 0.57 plain. ` est` appears in the detail only when the flag changed the score. A month-precision date (`YYYY-MM`) compares at year level; an impossible full date compares at year level (0.68.0).
 
 ### `cmp_sequence_number`
 
@@ -2369,7 +2411,7 @@ Defined in `src/eidr_core/compare/__init__.py`.
 
 **Does.** Compares two records' title lists with part and segment rules, greedy one-to-one alignment, and diminishing credit for extra matches. Real titles are preferred (`select_titles`): system-generated and, by default, Internal titles are fallback only, and the field is dropped when both sides fall back. Pair similarity is `titles.title_similarity`, with the episode rules on only when both records are Episode or Season. With `INTERNAL_TITLE_DISCOUNT` registered (a number in (0, 1]; compare-spec 2.20.0 sets 0.8), Internal titles are included, every pair touching one is multiplied by it, and an Internal pair counts only as the best aligned pair, never as an accumulation bonus; any other non-None value raises ValueError.
 
-**Notes.** Needs registered parameters unless the field is dropped (`accumulate` reads `NL_MODIFIER`, `FIELD_BONUS_CAP`). `part_ambiguous` is reported only for episodic pairs with no part conflict, and `parts_conflict` already flags a numbered title against its bare base, so two episodes titled `Show Part 2` and `Show` report `part_conflict: True`, `part_ambiguous: False` while scoring `PART_AMBIGUOUS_QUALITY` (0.70). The detail strings `no real title to compare` and `system-generated titles only - ignored` are pinned by De-Dupe UI's spec audit; do not reword them casually.
+**Notes.** Needs registered parameters unless the field is dropped (`accumulate` reads `NL_MODIFIER`, `FIELD_BONUS_CAP`). For an Episode or Season pair, a part number on one side only (`Show Part 2` vs `Show`) reports `part_ambiguous: True`, `part_conflict: False` (since 0.69.0, operator ruling 2026-10-19; it reported a conflict) and scores `PART_AMBIGUOUS_QUALITY` (0.70); different part numbers still conflict, and films are unchanged (`Rocky 2` vs `Rocky` conflicts). `titles.parts_conflict` itself keeps the film meaning. The detail strings `no real title to compare` and `system-generated titles only - ignored` are pinned by De-Dupe UI's spec audit; do not reword them casually.
 
 ### `cmp_version_language`
 
@@ -3684,7 +3726,7 @@ Defined in `src/eidr_core/ids/__init__.py`.
 
 **Does.** Extracts every EIDR Content ID mentioned in free text, upper-cased and de-duplicated in order of appearance. Matching uses `CONTENT_ID_SEARCH_RE`, which refuses a match glued to a preceding letter, digit or `/`, or to a following letter, digit or hyphen. Party, service and user IDs are ignored.
 
-**Notes.** An ID inside a URL path is NOT found: `https://doi.org/10.5240/...` returns `[]` because the ID follows a `/`. Strip URL prefixes first if your text carries them. A resolver's REDIRECT URL also percent-encodes the slash after the prefix (`https://resolve.eidr.org/EIDR/object/10.5240%2F...`, measured by MCP 2026-10-02), so decode it (`urllib.parse.unquote`) as well. `doi:10.5240/...`, `id=10.5240/...` and `(10.5240/...)` are found.
+**Notes.** An ID inside a URL path is NOT found, deliberately: `https://doi.org/10.5240/...` returns `[]` because the ID follows a `/` (operator, 2026-10-19: the only DOIs that matter are EIDR IDs and ShortDOIs, already handled; pinned by a test). Strip URL prefixes first if your text carries them. A resolver's REDIRECT URL also percent-encodes the slash after the prefix (`https://resolve.eidr.org/EIDR/object/10.5240%2F...`, measured by MCP 2026-10-02), so decode it (`urllib.parse.unquote`) as well. `doi:10.5240/...`, `id=10.5240/...` and `(10.5240/...)` are found.
 
 ### `is_valid_eidr_id`
 
@@ -4009,7 +4051,7 @@ Defined in `src/eidr_core/inheritance/__init__.py`.
 
 | Field | Type | Default | Purpose |
 |---|---|---|---|
-| `partial` | `Any` | `None` | Set on the raised instance: the full base dict or record object with every inheritable field applied and no newly built title (a system-generated title the child already carried stays in place). `None` on the class itself. |
+| `partial` | `Any` | `None` | Set on the raised instance: the full base dict or record object with every inheritable field applied and no title: since 0.69.0 a stale system-generated title the child already carried is dropped too, and `provenance` has no `ResourceName` entry (operator ruling 2026-10-19). `None` on the class itself. |
 | `provenance` | `dict \| None` | `None` | Set on the raised instance: a copy of the provenance map for `partial`. `None` on the class itself. |
 <!-- /dict -->
 
@@ -4219,10 +4261,10 @@ Defined in `src/eidr_core/normalize/__init__.py`.
 |---|---|---|---|
 | `s` | `str` | required | A language tag such as `en-US` or `zh-Hans`. A falsy value returns `''`. |
 
-**Returns** `str` -- The primary subtag, lower-case (`'en-US'` -> `'en'`); `''` for empty input and when the WHOLE tag is one of the wildcards `und`, `xx`, `zz`, `none` or `null`.
+**Returns** `str` -- The primary subtag, lower-case (`'en-US'` -> `'en'`); `''` for empty input and when the primary subtag is one of the wildcards `und`, `xx`, `zz`, `none` or `null`.
 <!-- /dict -->
 
-**Does.** Reduces a language tag to its lower-case primary subtag for comparison. It splits only on `-`, so `en_US` stays `en_us`. It does not map between ISO 639 code lengths, so `eng` and `en` stay different. The wildcard test runs on the whole tag before the split, so `und-Latn` returns `'und'`, not `''`.
+**Does.** Reduces a language tag to its lower-case primary subtag for comparison. It splits only on `-`, so `en_US` stays `en_us`. It does not map between ISO 639 code lengths, so `eng` and `en` stay different. The wildcard test runs on the primary subtag (since 0.69.0, operator ruling 2026-10-19), so `und-Latn` and `xx-YY` return `''`. `zxx` and `mul` are real codes, not wildcards.
 
 ### `norm_name`
 
@@ -4263,7 +4305,7 @@ Defined in `src/eidr_core/normalize/__init__.py`.
 
 **Does.** Normalises a title for comparison, folding Unicode, case, punctuation, numerals and common word variants. The steps are NFKC, ASCII fold, casefold, curly quotes to `'`, `&` and `+` to `and`, other punctuation to spaces, then per token Roman numerals i to xii and number words one to twelve to digits and `alias_title` (ordinals and the CT list), so `Part II`, `Part 2` and `Part Two` agree. A letter beside an ampersand stays verbatim and is never taken for an article (`A&E Networks` -> `a and e networks`).
 
-**Notes.** Numeral folding and aliasing run before the article check, so two listed articles are never stripped: Italian `i` becomes `1` (`I Promessi Sposi` -> `1 promessi sposi`) and `lo` becomes `low`. Apostrophes split words (`Don't` -> `don t`, `L'Amour` -> `amour`). A trailing article (`Matrix, The`) is not moved back to the front.
+**Notes.** The leading article is tested on the first word as written, before numeral and alias folding (since 0.69.0, operator ruling 2026-10-19; Italian `i` and `lo` were folded to `1` and `low` first). `lo` is always an article (`Lo Hobbit` -> `hobbit`). `i` is one only when an Italian plural, an Italian cardinal or `più` follows (`I Promessi Sposi` -> `promessi sposi`), so English `I Love Lucy`, `I, Robot` and `I Spy` normalise as before (`1 love lucy`). Known misses: about 1 in 40 Italian `I ...` titles (loanwords such as `I babysitter`); `Lo and Behold` loses `lo`. Apostrophes split words (`Don't` -> `don t`, `L'Amour` -> `amour`). A trailing article (`Matrix, The`) is not moved back to the front.
 
 ### `parse_date`
 
@@ -4294,12 +4336,12 @@ Defined in `src/eidr_core/normalize/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `raw` | - | required | A duration: bare minutes (`'78'`, `78`, `'1.5'`), ISO 8601 (`'PT1H18M'`, with `D` days allowed), or a timecode `HH:MM`, `HH:MM:SS` or `HH:MM:SS:FF`. Stringified and stripped; `None` or empty returns `None`. |
+| `raw` | - | required | A duration: bare minutes (`'78'`, `78`, `'1.5'`), ISO 8601 in the designator form (`'PT1H18M30.5S'`, `'P1DT2H'`, `'P2W'`) or the alternative form (`'P0000-00-00T01:18:30'`), or a timecode `M:SS`, `H:MM:SS` or `H:MM:SS:FF`. `None` or empty returns `None`. |
 
 **Returns** not annotated -- Minutes as a `float`, or `None` when the value cannot be parsed.
 <!-- /dict -->
 
-**Does.** Parses a duration into minutes. ISO durations count a day as 1440 minutes, support no years, months or weeks (`P78M` is read as 78 minutes), and drop fractional seconds entirely (`PT1H18M30.5S` gives 78.0). A two-part timecode is read as hours and minutes (`78:30` is 4710.0), and frames are ignored. Bare numbers go through `float()`, so `'nan'` and `'-5'` come back as numbers rather than `None`.
+**Does.** Parses a duration into minutes; the whole string must match one form, else `None` (never a partial parse). ISO durations count a week as 10,080 minutes and a day as 1,440; a decimal (comma or dot) is allowed on the last component only (`PT1H18M30.5S` gives 78.508); a non-zero year or month has no fixed length and gives `None` (`P78M` is 78 months). A two-part timecode is minutes and seconds (`78:30` gives 78.5), as XML_to_JSON reads ApproximateLength; three parts are hours, minutes and seconds, minutes and seconds 0-59, fractional seconds allowed and a frame count ignored. Bare numbers must be finite and not negative. All since 0.69.0 (operator ruling 2026-10-19: handle unusual but valid forms); before, `P78M` gave 78.0, `PT1H18M30.5S` 78.0, `78:30` 4710.0, and `'nan'` a number.
 
 ### `parse_registrant_extra`
 
@@ -4412,7 +4454,7 @@ Defined in `src/eidr_core/normalize/aliases.py`.
 ## `eidr_core.ordering`
 
 <!-- dict-module:eidr_core.ordering -->
-Source `src/eidr_core/ordering/__init__.py`. Public names: 10 functions (declared by `__all__`).
+Source `src/eidr_core/ordering/__init__.py`. Public names: 9 functions (declared by `__all__`).
 <!-- /dict-module -->
 
 **Purpose.** Sort-key functions for the canonical order and the display order of an EIDR record's titles and Alternate IDs. They implement the ratified normalized-record spec (§3.x casefold, §4.1 titles, §4.2 Alt IDs) and the two API Shim handoff documents. Extracted on 2026-08-02 (register R2) so that XML_to_JSON's star-mode export and BMR-Review's `render_record` stop maintaining the same rules in parallel. The functions take plain values (text, class, type, domain, value), never model objects, and only the keys are casefolded: the values you emit keep their case.
@@ -4555,26 +4597,6 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 
 **Does.** Tests whether a Title Class is `Internal` (casefolded, exact match). No whitespace trimming, so `" Internal"` gives False. An Internal title goes to bucket 2 unless it is the ResourceName.
 
-### `is_resource_class`
-
-<!-- dict:eidr_core.ordering.is_resource_class -->
-```python
-def is_resource_class(title_class) -> bool
-```
-
-Defined in `src/eidr_core/ordering/__init__.py`.
-
-| Parameter | Type | Default | Purpose |
-|---|---|---|---|
-| `title_class` | - | required | The title's Title Class. None allowed (gives False). |
-
-**Returns** `bool` -- True when the class casefolds to `release` or `resource`.
-<!-- /dict -->
-
-**Does.** Tests whether a Title Class marks the primary title, meaning it casefolds to `release` or `resource`. It serves sources that mark the ResourceName with a class instead of a structural flag. `title_bucket` uses it alongside `is_resource`.
-
-**Notes.** Any title whose class is `Release` or `Resource` lands in bucket 0, an alternate title included. The title spec identifies the ResourceName by structure, never by class. If your source has the structural flag, pass `is_resource` and check whether your alternate titles can carry these class values.
-
 ### `is_shortdoi`
 
 <!-- dict:eidr_core.ordering.is_shortdoi -->
@@ -4611,7 +4633,7 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 **Returns** `int` -- 0 for the ResourceName, 1 for a non-Internal alternate, 2 for an Internal alternate.
 <!-- /dict -->
 
-**Does.** Returns the three-bucket rank of a title: ResourceName, then non-Internal alternates, then Internal alternates. A title is bucket 0 when `is_resource` is True or its class is `release` or `resource`, and `Internal` never overrides that. Pure.
+**Does.** Returns the three-bucket rank of a title: ResourceName, then non-Internal alternates, then Internal alternates. Only the structural `is_resource` flag puts a title in bucket 0 (since 0.69.0, operator ruling 2026-10-19: a Title Class never places a title, except Internal); a Release-class alternate is an ordinary alternate. `Internal` sends an alternate to bucket 2 and never demotes the ResourceName. Class `transliterated` has no ordering effect today. Pure.
 
 ### `title_sort_key`
 
@@ -6957,7 +6979,7 @@ Defined in `src/eidr_core/external/wikidata.py`.
 **Returns** `list[tuple[str, str]]` -- `(Alternate Title, Alt Title Language)` pairs.
 <!-- /dict -->
 
-**Does.** Aliases then labels, de-duplicated with case and punctuation folded, the primary title excluded; never P2441. Whether labels and aliases are release titles at all is with the operator (OD-47, examples requested).
+**Does.** Aliases then labels, de-duplicated with case and punctuation folded, the primary title excluded; never P2441 (a literal translation is not a title the work is known by). An Alternate Title need not be a release title: any title third parties know the work by counts (operator, OD-36c2, 2026-10-19). Whether labels and aliases qualify is still with the operator (OD-47, examples with the operator); the behaviour is unchanged until then.
 
 ### `bmr_facts`
 

@@ -362,12 +362,13 @@ def parts_conflict(a_raws, b_raws):
     pb = [parse_part(x) for x in b_raws]
     na = [norm_title(x) for x in a_raws if x]
     nb = [norm_title(x) for x in b_raws if x]
-    # Bare-base variants with a LEADING numeral token stripped. Some articles
-    # normalise into digits ("I miserabili" -> "1 miserabili": the Italian
-    # article is read as roman numeral I), which hides the bare base from the
-    # one-sided comparison below. Either reading -- article or part-one marker
-    # -- makes a pair against "<base> 2" a part question, so the stripped
-    # variant participates in the bare-base check.
+    # Bare-base variants with a LEADING numeral token stripped. A leading
+    # "I" that norm_title keeps (English "I Spy" -> "1 spy"; Italian "I ..."
+    # is stripped as an article since 0.69.0) still normalises into a digit,
+    # which hides the bare base from the one-sided comparison below. Either
+    # reading -- word or part-one marker -- makes a pair against "<base> 2" a
+    # part question, so the stripped variant participates in the bare-base
+    # check.
     _lead = re.compile(r"^(?:[0-9]{1,2}|[ivx]{1,4})\s+")
     na = na + [_lead.sub("", t) for t in na if _lead.match(t)]
     nb = nb + [_lead.sub("", t) for t in nb if _lead.match(t)]

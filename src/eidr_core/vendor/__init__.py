@@ -223,14 +223,56 @@ _IMPORT_RE = re.compile(
     r"|import\s+eidr_core(?P<sub2>(?:\.[A-Za-z_][A-Za-z0-9_]*)+)(?P<rest>.*))$")
 
 
+# A relative import: its dots and what follows them. Relative imports are
+# left as written (they resolve inside the copy), but one that climbs out of
+# its module reaches a SIBLING top-level module, which must be listed too.
+_REL_IMPORT_RE = re.compile(
+    r"^\s*from\s+(?P<dots>\.+)(?P<sub>[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)?"
+    r"\s+import\s+(?P<names>.+)$")
+
+
+def _relative_tops(line: str, relpath: str) -> list[str]:
+    """Top-level eidr_core modules a relative import in ``relpath`` reaches,
+    or ``[]`` when it stays inside its own module.
+
+    Until 0.68.1 only absolute ``eidr_core`` imports were checked, so
+    bmr_io's function-local ``from ..ids import is_valid_eidr_id`` passed a
+    bmr_io-only sync, and the copy's ``resolve_parent`` then failed with
+    ModuleNotFoundError (python-tools' trial, 2026-10-18).
+    """
+    m = _REL_IMPORT_RE.match(line)
+    if not m:
+        return []
+    # The file's package, as path parts under eidr_core: "bmr_io/writer.py"
+    # and "bmr_io/__init__.py" are both in package ("bmr_io",); a root-level
+    # "foo.py" is in the root package ().
+    pkg = relpath.split("/")[:-1]
+    up = len(m.group("dots")) - 1
+    if up < len(pkg):
+        return []                       # still inside the module's own package
+    if up > len(pkg):
+        return ["<beyond eidr_core>"]   # climbs past the root: never valid
+    if m.group("sub"):
+        return [m.group("sub").split(".")[0]]
+    return [n.strip().split(" as ")[0].strip("() ")
+            for n in m.group("names").split(",") if n.strip()]
+
+
 def _rewrite(text: str, relpath: str, manifest: Manifest) -> str:
     """Rewrite ``eidr_core`` imports to ``manifest.package``, refusing any
-    that reach a module outside the closed list."""
+    that reach a module outside the closed list (relative imports that climb
+    out of their module included)."""
     allowed = set(manifest.modules)
     out = []
     for lineno, line in enumerate(text.splitlines(keepends=True), 1):
         m = _IMPORT_RE.match(line.rstrip("\r\n"))
         if not m:
+            bad = [t for t in _relative_tops(line.rstrip("\r\n"), relpath) if t not in allowed]
+            if bad:
+                raise VendorError(
+                    f"{relpath}:{lineno}: a relative import reaches eidr_core.{bad[0]}, which is "
+                    f"not in modules={list(manifest.modules)}; the module list must be closed "
+                    "under imports")
             out.append(line)
             continue
         sub = m.group("sub") if m.group("sub") is not None else m.group("sub2")

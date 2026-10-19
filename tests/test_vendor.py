@@ -135,6 +135,51 @@ def test_module_list_not_closed_under_imports_is_refused(tmp_path, source):
     assert not m.target_dir.exists(), "a refused sync leaves no target"
 
 
+def _add_and_commit(source, files):
+    pkg = source / "src" / "eidr_core"
+    for rel, text in files.items():
+        (pkg / rel).parent.mkdir(parents=True, exist_ok=True)
+        (pkg / rel).write_text(text)
+    _git("-c", "user.email=t@t", "-c", "user.name=t", "add", "-A", cwd=source)
+    _git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "rel", cwd=source)
+
+
+def test_a_relative_import_out_of_the_module_must_be_listed_too(tmp_path, source):
+    # 0.68.1: only absolute imports were checked, so a function-local
+    # `from ..ids import x` passed a sync without ids and failed at call time.
+    _add_and_commit(source, {
+        "relmod/__init__.py": "from .inner import Y\n"
+                              "def f():\n    from ..ids import is_valid_eidr_id\n"
+                              "    return is_valid_eidr_id\n",
+        "relmod/inner.py": "from . import __name__ as _n\nY = 1\n",
+    })
+    m = _manifest(tmp_path, source, ["relmod"])
+    with pytest.raises(VendorError, match=r"relmod/__init__\.py:3: a relative import reaches "
+                                          r"eidr_core\.ids"):
+        sync(m, source_path=source)
+    m = _manifest(tmp_path, source, ["relmod", "ids"])
+    sync(m, source_path=source)    # listed: accepted, imports left relative
+    assert "from ..ids import" in (m.target_dir / "relmod" / "__init__.py").read_text()
+
+
+def test_a_relative_import_past_the_root_is_refused(tmp_path, source):
+    _add_and_commit(source, {"climber.py": "from .. import anything\n"})
+    with pytest.raises(VendorError, match="beyond eidr_core"):
+        sync(_manifest(tmp_path, source, ["climber"]), source_path=source)
+
+
+def test_real_bmr_io_alone_is_refused_for_its_relative_ids_import(tmp_path, source):
+    # The case python-tools hit on 2026-10-18: bmr_io's resolve_parent
+    # imports ids relatively, so bmr_io alone is not closed.
+    import shutil
+    shutil.copytree(_SRC / "bmr_io", source / "src" / "eidr_core" / "bmr_io",
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    _add_and_commit(source, {})
+    with pytest.raises(VendorError, match=r"bmr_io/__init__\.py:\d+: a relative import reaches "
+                                          r"eidr_core\.ids"):
+        sync(_manifest(tmp_path, source, ["bmr_io"]), source_path=source)
+
+
 def test_residual_string_reference_is_refused(tmp_path, source):
     m = _manifest(tmp_path, source, ["string_ref"])
     with pytest.raises(VendorError, match="residual reference to eidr_core"):

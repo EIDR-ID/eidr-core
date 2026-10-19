@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.68.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.68.1<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,16 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.68.1 (2026-10-18)
+
+* **`vendor.sync`** now refuses a module list that a RELATIVE import
+  leaves (`from ..ids import x` inside `bmr_io` reaches `ids`); only absolute
+  `eidr_core` imports were checked. A `bmr_io`-only sync used to succeed and
+  the copy's `resolve_parent` then raised ModuleNotFoundError (found by
+  python-tools' trial). Vendor `bmr_io` with `ids`. No current vendored
+  consumer is affected (python-sdk `ids`; python-tools `altidtool_io`).
+  `check` is unchanged.
 
 ### 0.68.0 (2026-10-18)
 
@@ -4934,7 +4944,7 @@ Source `src/eidr_core/vendor/__init__.py`. Public names: 3 functions, 3 classes,
 **Do not use it when.** Another route applies:
 * Your project can depend on eidr-core. Then install it (`@main`) and import it; vendoring is the exception the dependency direction forces.
 * Never edit a vendored copy, never hand-copy a module, and never write your own copier. Fix the code in eidr-core and move the pin.
-* The module mentions `eidr_core` in its text or reads package data by that name. `sync` refuses it (the residual-reference rule). A trial sync of 0.68.0 accepts `altidtool_io`, `bmr_io`, `codes`, `ids`, `inheritance`, `ordering`, `secrets_loader`, `swap` and `verify` (since 0.68.0) on their own, and `lookup`, `bmr_rows` and `verdicts` with their closures. It refuses `db_schemas`, `registry`, `external`, `normalize` (so `compare`) and `vendor` itself for residual text, and `altid_audit` because it needs `db_schemas`. A refused module needs a seam in eidr-core first, which is a proposal.
+* The module mentions `eidr_core` in its text or reads package data by that name. `sync` refuses it (the residual-reference rule). A trial sync of 0.68.1 accepts `altidtool_io`, `codes`, `ids`, `inheritance`, `ordering`, `secrets_loader`, `swap` and `verify` (since 0.68.0) on their own, and `bmr_io` (with `ids`), `lookup`, `bmr_rows` and `verdicts` with their closures. It refuses `db_schemas`, `registry`, `external`, `normalize` (so `compare`) and `vendor` itself for residual text, and `altid_audit` because it needs `db_schemas`. A refused module needs a seam in eidr-core first, which is a proposal.
 * At runtime in the shipped package. Deployed code imports its vendored copy and never `eidr_core.vendor`.
 
 **Used by.**
@@ -5022,7 +5032,7 @@ Defined in `src/eidr_core/vendor/__init__.py`.
 | `commit` | `str` | required | The exact 40-hex commit to vendor, lowercase. Never a branch or tag. |
 | `target` | `str` | required | Directory of the copy, relative to the `vendor.toml` file. The tool owns it and replaces it on every sync. |
 | `package` | `str` | required | Dotted import path the rewritten imports use, such as `eidr._core`. |
-| `modules` | `tuple[str, ...]` | required | Top-level eidr_core module names to copy, such as `("ids",)`. Must be closed under imports. |
+| `modules` | `tuple[str, ...]` | required | Top-level eidr_core module names to copy, such as `("ids",)`. Must be closed under imports, relative imports that climb out of a module included (checked since 0.68.1). |
 | `path` | `Path` | `field(compare=False, default=Path("vendor.toml"))` | Path of the `vendor.toml` this was read from (absolute when built by `load_manifest`). `target` resolves against its directory. Ignored by equality. |
 
 | Method | Signature | Purpose |

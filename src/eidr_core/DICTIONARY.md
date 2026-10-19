@@ -963,6 +963,7 @@ Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 8 functions, 2 cl
 **Used by.**
 <!-- dict-usedby:eidr_core.altidtool_io -->
 Scan of 2026-10-18; regenerated at each release from the consumer trees.
+* **BMR-Review**: `identity_relation_sql`, `is_identity_relation`
 * **BMRtoAltID**: `AltIdRow`, `emission_problem`, `format_line`, `multi_form_domains`
 * **eidr-dq**: `identity_relation_sql`
 * **eidr-imdb**: `AltIdRow`, `format_line`, `parse_line`, `write_lines`
@@ -3403,6 +3404,7 @@ Source `src/eidr_core/external/failover.py`. Public names: 5 functions, 8 consta
 Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **eidr-imdb**: `DEFAULT_RATE_LIMIT_FLOOR`, `http_status`
 * **eidr-wikidata**: `is_bad_query_error`, `is_outage_error`
+* **LanguageTool**: `DEFAULT_MAX_RETRY_AFTER`, `retry_after_seconds`
 <!-- /dict-usedby -->
 
 ### `cooldown_remaining`

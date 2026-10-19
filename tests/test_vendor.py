@@ -352,3 +352,51 @@ def test_real_verdicts_closure_vendors_and_works_without_eidr_core(tmp_path, sou
     r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() == "ok"
+
+
+# -- every manifest or tree error is a VendorError, exit 2 (0.68.0) ----------
+# Dictionary audit 2026-10-02: a missing vendor.toml, a TOML syntax error, an
+# unparseable MANIFEST.json and a missing git each escaped as a raw traceback
+# with exit 1 -- the code the CLI reserves for "check found drift", so a CI
+# gate read a broken setup as drift.
+
+def test_missing_vendor_toml_is_a_vendor_error(tmp_path, capsys):
+    cfg = tmp_path / "vendor.toml"
+    with pytest.raises(VendorError, match="cannot read"):
+        load_manifest(cfg)
+    assert main(["check", "--config", str(cfg)]) == 2
+    assert "error:" in capsys.readouterr().err
+
+
+def test_toml_syntax_error_is_a_vendor_error(tmp_path):
+    cfg = tmp_path / "vendor.toml"
+    cfg.write_text('[vendor]\nsource = "unterminated\n')
+    # 3.11+ reports it through tomllib, 3.10 through the flat parser; both
+    # must surface as VendorError.
+    with pytest.raises(VendorError):
+        load_manifest(cfg)
+    assert main(["sync", "--config", str(cfg)]) == 2
+
+
+def test_bad_manifest_json_is_a_vendor_error(tmp_path, source, capsys):
+    m = _manifest(tmp_path, source, ["ids"])
+    sync(m, source_path=source)
+    (m.target_dir / MANIFEST_FILE).write_text("{not json")
+    with pytest.raises(VendorError, match="not valid JSON"):
+        check(m)
+    assert main(["check", "--config", str(m.path)]) == 2
+    (m.target_dir / MANIFEST_FILE).write_text("[]")
+    with pytest.raises(VendorError, match="not a JSON object"):
+        check(m)
+
+
+def test_missing_git_is_a_vendor_error(tmp_path, source, monkeypatch):
+    import eidr_core.vendor as vendor_mod
+
+    def no_git(*a, **k):
+        raise FileNotFoundError(2, "No such file or directory", "git")
+    m = _manifest(tmp_path, source, ["ids"])
+    monkeypatch.setattr(vendor_mod.subprocess, "run", no_git)
+    with pytest.raises(VendorError, match="git is not installed"):
+        sync(m, source_path=source)
+    assert main(["sync", "--config", str(m.path), "--from", str(source)]) == 2

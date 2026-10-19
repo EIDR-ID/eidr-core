@@ -39,8 +39,30 @@ def test_parse_line_stays_strict(line):
         parse_line(line)
 
 
+# Dictionary audit 2026-10-02; 0.68.0. Both of these used to come back as
+# rows: an empty Value as value='' (a removal handed to addition-only code)
+# and a // comment with the comment text as the EIDR ID. parse_edit_line
+# reads the same lines as a removal and a comment; that is unchanged.
+@pytest.mark.parametrize("line", [
+    f"{ID}\tIMDB\t",            # three columns, empty Value: a removal per the spec
+    f"{ID}\tIMDB\t \t",         # whitespace-only Value is empty too
+    f"{ID}\tIMDB\t\t\t",        # fixed-5 dialect with no Value
+])
+def test_parse_line_refuses_an_empty_value(line):
+    with pytest.raises(ValueError, match="empty Value"):
+        parse_line(line)
+    assert parse_edit_line(line) == AltIdRemoval(ID, "IMDB")
+
+
+@pytest.mark.parametrize("line", ["// c\tx\ty", "  // note\tIMDB\ttt1\n"])
+def test_parse_line_refuses_a_comment(line):
+    with pytest.raises(ValueError, match="comment"):
+        parse_line(line)
+    assert parse_edit_line(line) is None
+
+
 @pytest.mark.parametrize("line,expected", [
-    (f"{ID}\n", AltIdRemoval(ID)),                       # remove every alt ID
+    (f"{ID}\n", AltIdRemoval(ID)),                      # remove every alt ID
     (f"{ID}\tIMDB\r\n", AltIdRemoval(ID, "IMDB")),       # remove every IMDB
     (f"{ID}\tIMDB\t", AltIdRemoval(ID, "IMDB")),         # empty value == removal of the type
     (f"  {ID}  \t IMDB \t tt0133093 ", AltIdRow(ID, "IMDB", "tt0133093")),  # per-column trim

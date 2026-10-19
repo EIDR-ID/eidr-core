@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.67.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.68.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,53 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.68.0 (2026-10-18)
+
+Fixes from the 2026-10-02 dictionary audit (the open items triaged against
+0.67.0). One signature widens; the rest are behaviour a caller could notice.
+
+* **`bmr_io`:** `transplant` (so `write_sheet`, `subset_rows`, `fill_column`)
+  pairs worksheets by tab name, not part path: a template numbered out of tab
+  order no longer gets one tab's content under another (no real workbook was).
+  `expand_family` takes keyword-only `header_row=` (default row 3).
+  `check_sheet` accepts a sheet with no `<dimension>` (it raised TypeError) and
+  reads past a stale one; `read_headers` works on such a read-only sheet.
+* **`altidtool_io.parse_line`** raises ValueError for an empty Value (a
+  removal under spec v1.1) and for a `//` comment line; it returned them as
+  rows. Read edit files with `parse_edit_line`, which is unchanged.
+* **`normalize`:** `parse_date` returns `(year, None)` for an impossible
+  `YYYY-MM-DD` date, so `compare.cmp_release_date` scores it as year-only
+  instead of raising (golden pairs unchanged). `sanitize_field` strips last,
+  so an edge control character leaves no space (`'a\t'` -> `'a'`); EIDR MCP's
+  two copies changed with it. `nfkc` / `ascii_fold` are typed by overloads
+  (`None` -> `None`).
+* **`inheritance.build_full_record`:** `titles=None` is untitled (a title is
+  generated or inherited, or TitleConstructionError raised, as
+  `build_full_base` does); a `ResourceName` in a custom `attrs` is ignored.
+* **`external`:** `call_with_failover(max_retries<1)` raises ValueError;
+  `retry_after_seconds` also reads `exc.response.headers` when `exc.headers`
+  lacks the header, and takes a naive `now` as UTC; a failed
+  `JsonFactCache.store` leaves the file, the memory and no `.tmp` behind.
+* **`registry`:** `build_registry_credentials` raises KeyError for a null or
+  blank USER_ID / PARTY_ID / PASSWORD (a null was sent as `'None'`) and
+  TypeError for a non-mapping section; `parse_operation_status(es)` no longer
+  lets a block without `<Code>` take the next block's verdict.
+* **`secrets_loader.load_secrets`:** empty `local_flag_envs` /
+  `local_path_envs` no longer raise IndexError on the AWS-failure path.
+* **`verify`:** an unknown `compare_release_date` mode raises ValueError;
+  `compare_year_arbitration` returns `insufficient` when the two fields
+  agree; `runtime_candidates` reads a single value as one runtime. The module
+  now vendors on its own.
+* **`codes.normalize_country_code`** takes an int M49 code
+  (`code: str | int | None`; `19` -> `"019"`).
+* **`db_schemas.load_manifest`** returns a fresh deep copy each call.
+* **`vendor`:** a missing or malformed `vendor.toml`, a corrupt
+  `MANIFEST.json` or no `git` exit 2 with a message (they exited 1 with a
+  traceback, which read as drift).
+* Docstrings corrected across `compare`, `external`, `registry`,
+  `secrets_loader`, `ids`, `db_schemas`; README module map rows for `ids` and
+  `external`.
 
 ### 0.67.0 (2026-10-18)
 
@@ -579,7 +626,7 @@ edition's Changes entry.
 | [`eidr_core.altidtool_io.AltIdRow`](#altidrow-class) | class | Holds one AltIDTool addition line as a NamedTuple in column order. |
 | [`eidr_core.bmr_io.check_sheet`](#check_sheet) | function | Checks, without writing, whether `subset_rows` or `fill_column` would accept a sheet, and reports its columns. |
 | [`eidr_core.bmr_io.count_family`](#count_family) | function | Returns how many numbered groups of a column family a header map carries, as the highest group number. |
-| [`eidr_core.bmr_io.expand_family`](#expand_family) | function | Inserts columns so a family reaches `want` groups, writing the new header names on row 3. |
+| [`eidr_core.bmr_io.expand_family`](#expand_family) | function | Inserts columns so a family reaches `want` groups, writing the new header names on `header_row` (row 3 by default). |
 | [`eidr_core.bmr_io.families_for`](#families_for) | function | Returns one template's column families, optionally narrowing which columns new groups add. |
 | [`eidr_core.bmr_io.family_layout`](#family_layout) | function | Maps a repeating family's headers to `{group number: {member: header}}`, keeping the sheet's own group numbers. |
 | [`eidr_core.bmr_io.fill_column`](#fill_column) | function | Copies a BMR workbook and writes values into one column of one sheet, keyed by absolute sheet row number. |
@@ -909,9 +956,9 @@ Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 8 functions, 2 cl
 * Do not reimplement the line format (an f-string with `\t`, a fixed-5 writer, trailing tabs). Call `format_line` or `write_lines`. The empty-Domain placeholder and "Relation only when non-empty" rules are easy to get wrong.
 * Do not keep a local copy of the multi-form domain list. Call `multi_form_domains()`.
 * Other formats: MCP's `eidrtoaltid.py` extract report (it has a header and its own columns), remediation action TSVs, and BMR-Review's de-dupe outputs are not this format.
-* Do not read an edit file with `parse_line`. It refuses 1- or 2-column removals and most comments, but it reads a 3-column removal (empty Value) as an addition with an empty value, and a `//` comment holding 2 to 4 tabs as a row. Use `parse_edit_line`.
+* Do not read an edit file with `parse_line`. It refuses removals (1 or 2 columns, or an empty Value) and `//` comments with a `ValueError` (since 0.68.0 for the empty-Value and comment cases). Use `parse_edit_line`.
 * Content validation: nothing here checks EIDR ID syntax (use `eidr_core.ids`), whether a domain belongs on a named type, or whether a value is URI-safe. That is the caller's job.
-* Vendoring: since 0.39.0 the module cannot be vendored. `multi_form_domains` reads package data through `files("eidr_core")`, so `eidr_core.vendor.sync` refuses the module (residual reference). python-tools' vendored copy is pinned at 0.34.1, before that function existed.
+* Vendoring: the module vendors on its own again since 0.45.1 (`multi_form_domains` reads its data through the parent package, not a literal `files("eidr_core")`), and `tests/test_vendor.py` guards it.
 
 **Used by.**
 <!-- dict-usedby:eidr_core.altidtool_io -->
@@ -963,7 +1010,7 @@ No parameters.
 
 **Does.** Returns the Proprietary domains exempt from altidtool-format rule 6, read from the packaged `multi_form_kinds.json`. Compare a Kind's domain, lowercased, against the set; a listed Kind may legitimately hold several `IsSameAs` values. It reads the package data file on every call (no cache) and raises if the file is missing or malformed (FileNotFoundError, json.JSONDecodeError, KeyError). An entry is listed on a `measured` or an operator-`ruled` basis, but callers get one set either way.
 
-**Notes.** Call it once per run and keep the result, rather than once per row. Never copy the list into a consumer. This function is why the module cannot be vendored today: the literal `files("eidr_core")` fails `sync`'s residual-reference check, and the JSON file sits outside the module directory.
+**Notes.** Call it once per run and keep the result, rather than once per row. Never copy the list into a consumer. It reads the JSON through the parent package (since 0.45.1), so a vendored copy finds the file the sync copies beside it.
 
 ### `parse_edit_line`
 
@@ -1001,9 +1048,9 @@ Defined in `src/eidr_core/altidtool_io/__init__.py`.
 **Returns** `AltIdRow` -- The row, with missing trailing columns set to `""`. Column text is kept exactly as found, surrounding spaces included.
 <!-- /dict -->
 
-**Does.** Parses one 3-, 4- or 5-column AltIDTool addition line back into an AltIdRow. Raises ValueError for any other column count, which catches blank lines, 1- or 2-column removals and `//` comments with fewer than 2 tabs. It also accepts the retired BMRtoAltID fixed-5 dialect with empty trailing columns. Only the column count is checked: an empty Value or a malformed EIDR ID is returned as found.
+**Does.** Parses one 3-, 4- or 5-column AltIDTool addition line back into an AltIdRow. Raises ValueError for any other column count, which catches blank lines, 1- or 2-column removals and `//` comments with fewer than 2 tabs. It also accepts the retired BMRtoAltID fixed-5 dialect with empty trailing columns. Since 0.68.0 it also raises ValueError for an empty or whitespace-only Value (spec v1.1 reads that line as a removal) and for a line whose first column starts with `//` (a comment). A malformed EIDR ID is still returned as found.
 
-**Notes.** Under spec v1.1 a 3-column line with an empty Value is a removal, but `parse_line` returns it as an `AltIdRow` with `value=""`. A `//` comment that holds 2 to 4 tabs also comes back as an `AltIdRow` (with `eidr_id` starting `//`). Use `parse_edit_line` for any file that may contain removals or comments.
+**Notes.** Before 0.68.0 an empty-Value line came back as an `AltIdRow` with `value=""`, and a `//` comment holding 2 to 4 tabs as a row with `eidr_id` starting `//`; a caller that relied on that now gets ValueError. Use `parse_edit_line` for any file that may contain removals or comments.
 
 ### `write_lines`
 
@@ -1171,7 +1218,7 @@ Defined in `src/eidr_core/bmr_io/subset.py`.
 **Returns** `SheetCheck` -- the template key resolved from the tab name, the row-3 header map, the extra columns and the missing optional columns. Nothing is written.
 <!-- /dict -->
 
-**Does.** Checks, without writing, whether `subset_rows` or `fill_column` would accept a sheet, and reports its columns. Raises `TemplateMismatch` when the tab name is not a Template-22 data sheet, the workbook has no such tab, or a required column (see `required_headers`) is missing from row 3; raises `FileNotFoundError` for a missing file. Opens the file read-only and needs openpyxl (the `bmr` extra). It runs the same conformance function as `subset_rows` and `fill_column`, so a sheet that passes here passes their conformance check too; their own argument checks (an unknown `column` or `blank_columns` name) still apply.
+**Does.** Checks, without writing, whether `subset_rows` or `fill_column` would accept a sheet, and reports its columns. Raises `TemplateMismatch` when the tab name is not a Template-22 data sheet, the workbook has no such tab, or a required column (see `required_headers`) is missing from row 3; raises `FileNotFoundError` for a missing file. Opens the file read-only and needs openpyxl (the `bmr` extra); the sheet's declared `<dimension>` is discarded first (since 0.68.0), so a sheet with none, or a stale one, is judged on its real header row as `subset_rows` judges it. It runs the same conformance function as `subset_rows` and `fill_column`, so a sheet that passes here passes their conformance check too; their own argument checks (an unknown `column` or `blank_columns` name) still apply.
 
 ### `count_family`
 
@@ -1196,7 +1243,7 @@ Defined in `src/eidr_core/bmr_io/__init__.py`.
 
 <!-- dict:eidr_core.bmr_io.expand_family -->
 ```python
-def expand_family(ws, primary: str, anchor_members: list[str], insert_members: list[str], want: int, headers: dict[int, str]) -> None
+def expand_family(ws, primary: str, anchor_members: list[str], insert_members: list[str], want: int, headers: dict[int, str], *, header_row: int = HEADER_ROW) -> None
 ```
 
 Defined in `src/eidr_core/bmr_io/__init__.py`.
@@ -1209,11 +1256,12 @@ Defined in `src/eidr_core/bmr_io/__init__.py`.
 | `insert_members` | `list[str]` | required | Columns each new group adds, in order; each is written as `"{member} {n}"`. |
 | `want` | `int` | required | Target group count. Nothing happens when it is not above the current count. |
 | `headers` | `dict[int, str]` | required | Header map for `ws`; updated in place to match the inserted columns. |
+| `header_row` | `int` | `HEADER_ROW` (keyword-only) | Row the new header names are written to (since 0.68.0). Pass the row `headers` was read from; the default is the template's row 3. |
 
 **Returns** `None` -- the worksheet and `headers` are changed in place.
 <!-- /dict -->
 
-**Does.** Inserts columns so a family reaches `want` groups, writing the new header names on row 3. New groups of `len(insert_members)` columns are packed one after another, starting right after the rightmost anchor column. If no anchor column exists it logs a warning and returns without raising. The headers always go to `HEADER_ROW` (row 3), whatever row the sheet's real headers are on.
+**Does.** Inserts columns so a family reaches `want` groups, writing the new header names on `header_row` (row 3 by default). New groups of `len(insert_members)` columns are packed one after another, starting right after the rightmost anchor column. If no anchor column exists it logs a warning and returns without raising. Before 0.68.0 the headers always went to row 3, whatever row the sheet's real headers were on.
 
 **Notes.** Prefer `write_sheet`, which sizes and expands every family from the rows and reports what grew. An incomplete `anchor_members` lands new groups too far left (see `Family`).
 
@@ -1442,13 +1490,13 @@ Defined in `src/eidr_core/bmr_io/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `ws` | - | required | Open openpyxl worksheet. A normal (not read-only) worksheet is best: this reads cells one by one, which is slow in read-only mode. |
+| `ws` | - | required | Open openpyxl worksheet, normal or read-only. A read-only one believes the sheet's declared `<dimension>`: call `ws.reset_dimensions()` first to read past a stale one. |
 | `header_row` | `int` | `HEADER_ROW` | 1-based row holding the headers; pass the discovered row for a round-tripped sheet. |
 
 **Returns** `dict[int, str]` -- `{1-based integer column: trimmed header}`, blank cells skipped (the `header_map` policy).
 <!-- /dict -->
 
-**Does.** Returns the header map `{1-based column: header}` of an open worksheet, using the shared `header_map` policy. It scans columns 1 to `ws.max_column` of `header_row`. For a file path rather than an open worksheet, use `open_sheet` or `read_sheet`.
+**Does.** Returns the header map `{1-based column: header}` of an open worksheet, using the shared `header_map` policy. It reads `header_row` with `iter_rows` (since 0.68.0), so a read-only worksheet with no `<dimension>` works (it raised TypeError) and a row past the end gives `{}`. For a file path rather than an open worksheet, use `open_sheet` or `read_sheet`.
 
 ### `read_sheet`
 
@@ -1573,9 +1621,9 @@ Defined in `src/eidr_core/bmr_io/__init__.py`.
 **Returns** `None` -- `template_xlsx` is rewritten in place.
 <!-- /dict -->
 
-**Does.** Replaces the worksheet XML and shared strings in one `.xlsx` with another file's, keeping all its other parts. Workbook structure, styles, macros and relationships all come from `template_xlsx`, which is how they survive an openpyxl save. Worksheet parts are paired by part path (`xl/worksheets/sheetN.xml`), not by tab name, and a worksheet present in only one file is not exchanged. Writes to a temp file in the same directory, then replaces `template_xlsx`.
+**Does.** Replaces the worksheet XML and shared strings in one `.xlsx` with another file's, keeping all its other parts. Workbook structure, styles, macros and relationships all come from `template_xlsx`, which is how they survive an openpyxl save. Worksheets are paired by TAB NAME, read from each workbook's own index (since 0.68.0; before, by part path), and a tab present in only one file is not exchanged. Writes to a temp file in the same directory, then replaces `template_xlsx`.
 
-**Notes.** Pairing by part path assumes both files number their worksheet parts the same way. openpyxl numbers them in tab order, so a source whose parts are numbered otherwise would get each tab's content under the wrong tab (reproduced with a constructed file; on 2026-10-02 the shipped templates and all 462 readable workbooks under `D:\BMR` were in tab order). `write_sheet`, `subset_rows` and `fill_column` already call it.
+**Notes.** Pairing by part path, before 0.68.0, gave a tab the wrong tab's content when the template numbered its parts out of tab order (openpyxl saves them in tab order); on 2026-10-02 the shipped templates and all 462 readable workbooks under `D:\BMR` were in tab order, so no real file was affected. A template tab with no namesake in the edited file keeps its own XML, but its text cells then index the edited shared-string table. `write_sheet`, `subset_rows` and `fill_column` already call it.
 
 ### `write_sheet`
 
@@ -1934,14 +1982,14 @@ Scan of 2026-10-18; regenerated at each release from the consumer trees.
 
 <!-- dict:eidr_core.codes.normalize_country_code -->
 ```python
-def normalize_country_code(code: str) -> str
+def normalize_country_code(code: str | int | None) -> str
 ```
 
 Defined in `src/eidr_core/codes/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `code` | `str` | required | One country code in any case, surrounding whitespace allowed. `None` or `""` gives `""`. Pass M49 region codes as strings: an int raises AttributeError. |
+| `code` | `str \| int \| None` | required | One country code in any case, surrounding whitespace allowed. `None` or `""` gives `""`. An int is taken as an M49 region code and zero-padded to three digits (`19` -> `"019"`, since 0.68.0; it raised AttributeError). |
 
 **Returns** `str` -- The code stripped and uppercased, with an obsolete alpha-2 code replaced by its alpha-4 code (`SU` to `SUHH`, `YU` to `YUCS`, `CS` to `CSHH`, `DD` to `DDDE`, `BU` to `BUMM`). `""` for empty input.
 <!-- /dict -->
@@ -2582,7 +2630,7 @@ Defined in `src/eidr_core/compare/spec.py`.
 
 **Does.** Loads compare-spec.json and returns its constants as a `{NAME: value}` dict with Python container semantics restored. `WEIGHTS` maps creation type to `{"thresholds": tuple, "weights": dict}`, and an `$alias` entry is the same dict object as its target. Raises ValueError for an unknown container type or an alias whose target is not defined, KeyError for a missing `$spec.version` or a weights entry without `thresholds` / `weights`, and OSError or JSONDecodeError for an unreadable file. It reads the file on every call, caches nothing and does not check values (it does not run `validate_date_profile`).
 
-**Notes.** The docstring promises a failure on a duplicate alias; there is no such check, and duplicate JSON keys silently keep the last value. An alias to another alias loads only when the target alias comes earlier in `weights`; otherwise it raises ValueError. To register the result: `set_params(types.SimpleNamespace(**load_spec()))`.
+**Notes.** Duplicate JSON keys are not detected: the last value wins (the docstring promised a duplicate-alias check until 0.68.0; there never was one). An alias to another alias loads only when the target alias comes earlier in `weights`; otherwise it raises ValueError. To register the result: `set_params(types.SimpleNamespace(**load_spec()))`.
 
 ### `spec_path`
 
@@ -2829,7 +2877,7 @@ Defined in `src/eidr_core/compare/titles.py`.
 **Returns** not annotated -- `list[str]` of normalised segments in original order, or `None` when there is no `/` or `;` or fewer than two non-empty segments.
 <!-- /dict -->
 
-**Does.** Splits a compound title on `/` or `;` into normalised segments; returns None for a single-segment title. Every `/` splits, so `AC/DC: Live` gives `['ac', 'dc live']`; `title_similarity` treats compound titles as combinations only when `episodic` is set. The docstring says "set", but the result is a list and keeps duplicates.
+**Does.** Splits a compound title on `/` or `;` into normalised segments; returns None for a single-segment title. Every `/` splits, so `AC/DC: Live` gives `['ac', 'dc live']`; `title_similarity` treats compound titles as combinations only when `episodic` is set. The result is a list and keeps duplicates (the docstring said "set" until 0.68.0).
 
 ### `select_titles`
 
@@ -2976,9 +3024,9 @@ Defined in `src/eidr_core/db_schemas/__init__.py`.
 **Returns** `dict` -- The parsed `manifest.json`, with keys `database`, `version`, `generated_at`, `owner`, `source` and `tables`. `tables` maps each table name (no schema prefix) to `{"columns": [{"name", "type", "nullable"}, ...]}`.
 <!-- /dict -->
 
-**Does.** Loads and returns a database's packaged schema manifest as a dict. Raises KeyError for a name not in `DATABASES`. The result is cached for the life of the process (`functools.cache`), so every call returns the same dict object.
+**Does.** Loads and returns a database's packaged schema manifest as a dict. Raises KeyError for a name not in `DATABASES`. The file is read once per process, and since 0.68.0 every call returns a fresh deep copy.
 
-**Notes.** Never mutate the returned dict: every later call in the process sees the change, `assert_tables` included. `eidr_core.vendor.load_manifest` has the same name and is unrelated.
+**Notes.** Before 0.68.0 every call returned the same cached dict, so a caller that mutated it changed the contract for every later caller, `assert_tables` included. `eidr_core.vendor.load_manifest` has the same name and is unrelated.
 
 ### `table_columns`
 
@@ -3132,7 +3180,7 @@ Defined in `src/eidr_core/external/failover.py`.
 | `endpoints` | `Sequence[str]` | required | Endpoints (URLs, or any label your `attempt` understands), tried in order. Build it with `endpoint_chain`. A one-element list gives retry without failover. Empty: nothing is attempted. |
 | `attempt` | `Callable[[str], Any]` | required | Called as `attempt(endpoint)`: performs ONE request and returns the parsed result. Must raise on any failure and must never return None (None is the "all endpoints exhausted" signal). |
 | `classify` | `Callable[[Exception], str]` | required | Called as `classify(exc)` on each exception `attempt` raises; returns `RETRY`, `NEXT_ENDPOINT`, `OUTAGE` or `FATAL`. Any other string acts as `NEXT_ENDPOINT`. An exception raised by `classify` itself propagates to your caller. Use `classify_sparql_error` for SPARQL. |
-| `max_retries` | `int` | `5` (keyword-only) | Attempts per endpoint, INCLUDING the first (5 = one try plus up to 4 retries). 0 or less: no endpoint is attempted. |
+| `max_retries` | `int` | `5` (keyword-only) | Attempts per endpoint, INCLUDING the first (5 = one try plus up to 4 retries). Below 1 raises ValueError (since 0.68.0; it slept any cooldown and attempted nothing). |
 | `backoff` | `float` | `2.0` (keyword-only) | Base of the retry sleep, in seconds: before retry n (n = 1, 2, ...) the loop sleeps `backoff * 2**n + uniform(0, jitter)`, or the owed Retry-After or rate-limit wait if that is longer, so 4.0 to 4.5 s before the first retry with the defaults. Not capped by `max_retry_after`. |
 | `jitter` | `float` | `0.5` (keyword-only) | Upper bound, in seconds, of the random amount added to each retry sleep. 0 disables it. |
 | `delay_seconds` | `float` | `0.0` (keyword-only) | Pacing sleep, in seconds, before EVERY attempt including the first, on top of any retry sleep. 0 or less disables it. |
@@ -3143,7 +3191,7 @@ Defined in `src/eidr_core/external/failover.py`.
 | `max_retry_after` | `float` | `DEFAULT_MAX_RETRY_AFTER` (keyword-only) | Longest single Retry-After or cooldown wait, in seconds, slept inside one call (the exponential backoff is not capped by it). A Retry-After or cooldown longer than this makes the loop leave that endpoint for the rest of the call instead of sleeping. |
 | `cooldowns` | `dict[str, float] \| None` | `None` (keyword-only) | Cross-call Retry-After memo, endpoint -> `time.monotonic()` deadline, mutated in place. Pass one dict to every call in an operation so a later call does not probe a cooling endpoint. None: waits are honoured only within this call. Never persist it across processes. |
 
-**Returns** `tuple[Any, str | None, Exception | None]` -- `(result, endpoint_used, last_exception)`. Success: `(result, endpoint, None)`. A `FATAL` verdict: `(None, None, exc)`. Every endpoint exhausted or skipped: `(None, None, last_exc)`, where `last_exc` is the most recent exception, or None when no attempt was made at all (empty chain, every endpoint in `outage_endpoints` or cooling for longer than `max_retry_after`, `max_retries` <= 0). Test `result is None` to detect failure, not the exception slot.
+**Returns** `tuple[Any, str | None, Exception | None]` -- `(result, endpoint_used, last_exception)`. Success: `(result, endpoint, None)`. A `FATAL` verdict: `(None, None, exc)`. Every endpoint exhausted or skipped: `(None, None, last_exc)`, where `last_exc` is the most recent exception, or None when no attempt was made at all (empty chain, every endpoint in `outage_endpoints` or cooling for longer than `max_retry_after`). Test `result is None` to detect failure, not the exception slot.
 <!-- /dict -->
 
 **Does.** Runs one request across an ordered endpoint chain, retrying, backing off, honouring Retry-After and failing over per your verdicts. Per verdict: `RETRY` retries the same endpoint after the backoff sleep or the Retry-After interval, whichever is longer; `NEXT_ENDPOINT` moves on at once; `OUTAGE` moves on and adds the endpoint to `outage_endpoints`; `FATAL` stops the whole walk. Any exception carrying a Retry-After interval (or a 429/503 status) is recorded in `cooldowns` whatever the verdict, and at the start of each endpoint a cooling one is skipped when a later endpoint is usable, otherwise its remaining window is slept, unless that window exceeds `max_retry_after`, in which case it is skipped too. Only `Exception` subclasses from `attempt` are caught; sleeps are blocking `time.sleep` calls, and every failure is logged as a WARNING (success on a fallback as INFO) on the `eidr_core.external.failover` logger.
@@ -3237,7 +3285,7 @@ Defined in `src/eidr_core/external/__init__.py`.
 |---|---|---|
 | `__init__` | `def __init__(path: str \| os.PathLike[str], *, ttl_seconds: float \| None = None) -> None` | `path`: the JSON file, read now if it exists (missing means an empty cache; the file is created on the first `store`). `ttl_seconds`: entries stored more than this many seconds ago (wall clock) are invisible to `load`; None means never expire. A file that is not valid JSON raises `json.JSONDecodeError` here, and one in another shape usually raises `ValueError` or `TypeError` (an empty object `{}` loads as an empty cache). |
 | `load` | `def load(keys: list[Key], *, refresh: bool = False) -> dict[Key, Entry]` | Returns the live entries among `keys`; missing or expired keys are absent. `refresh`: when true returns `{}` without deleting anything. |
-| `store` | `def store(results: dict[Key, Entry]) -> None` | Stamps each entry with the current time, merges it in, and rewrites the WHOLE file atomically (writes `<path>.tmp`, then `os.replace`). Entries must be JSON-serialisable: a bad one raises `TypeError`, leaves a partial `<path>.tmp`, and stays in memory, so every later `store` on that object fails too. |
+| `store` | `def store(results: dict[Key, Entry]) -> None` | Stamps each entry with the current time, merges it in, and rewrites the WHOLE file atomically (writes `<path>.tmp`, then `os.replace`). Entries must be JSON-serialisable: a bad one raises `TypeError` and, since 0.68.0, leaves the file, the memory and the directory as they were (it used to leave a partial `<path>.tmp` and poison every later `store`). |
 <!-- /dict -->
 
 **Does.** Persists fact entries in one JSON file, with an optional single expiry time and atomic whole-file writes. A crash mid-store leaves the previous file intact. Expired entries are never purged: they stay in the file and are rewritten on every store, and one `ttl_seconds` applies to every status (found, not_found and error alike). Not safe for two writers at once (processes or threads); use a database-backed `FactCache` for that.
@@ -3441,8 +3489,8 @@ Defined in `src/eidr_core/external/failover.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `exc` | `BaseException` | required | An exception from your transport. Read in order: `exc.retry_after` (seconds, or a header string; set it when your transport hides headers), else the `Retry-After` header of `exc.headers` (urllib `HTTPError`), or of `exc.response.headers` (requests) only when `exc.headers` is absent or None. A present `exc.headers` without the header gives None; `exc.response.headers` is then not tried. |
-| `now` | `datetime \| None` | `None` | Reference time for the HTTP-date form; None means the current UTC time. Must be timezone-aware: a naive datetime raises `TypeError` when the value is an HTTP-date. Exists for tests. |
+| `exc` | `BaseException` | required | An exception from your transport. Read in order: `exc.retry_after` (seconds, or a header string; set it when your transport hides headers), else the `Retry-After` header of `exc.headers` (urllib `HTTPError`), then of `exc.response.headers` (requests). Since 0.68.0 the response headers are also tried when `exc.headers` exists but has no usable Retry-After. |
+| `now` | `datetime \| None` | `None` | Reference time for the HTTP-date form; None means the current UTC time. A naive datetime is taken as UTC (since 0.68.0; it raised `TypeError`). Exists for tests. |
 
 **Returns** `float | None` -- The interval in seconds, never negative (a past date or a negative number gives 0.0), or None when no value is present or it cannot be parsed.
 <!-- /dict -->
@@ -3860,7 +3908,7 @@ Defined in `src/eidr_core/inheritance/__init__.py`.
 
 **Does.** Builds a child's full record object from its self-defined one and its parent's full record, by the `build_full_base` policy. Title inputs come from the child's `sequence_number`, `distribution_number` and `release_date` attributes; a generated title is a deep copy of the parent's first title element with `text`, `title_class`, `system_generated=True`, `self_defined=False` and `is_resource=True` set where the class has them. Elements of the list attributes get `self_defined` stamped (False when inherited, otherwise `not system_generated`, and an existing explicit False is kept), so running it again over an already-built cached record does not promote inherited values to self-defined. Raises `TitleConstructionError` as `build_full_base` does, after inheritance, with `partial` and `provenance` attached.
 
-**Notes.** When the record's `titles` attribute is missing or `None`, title handling is skipped entirely: no title is generated and no `TitleConstructionError` is raised, unlike `build_full_base`. A field whose attribute is missing on either record is skipped silently. If the object cannot take the `eidr_provenance` attribute (slotted or frozen), the map is dropped silently and `provenance()` returns `{}`. Do not put `ResourceName` in a custom `attrs`: the field loop would then copy the parent's title into `exc.partial` when a Season or Episode title fails and `titles` is empty, and a system-generated title it does not replace would be reported as `'self'`.
+**Notes.** When the record has no `titles` attribute at all, title handling is skipped. `titles=None` is treated as untitled (since 0.68.0; it was skipped silently), so a title is generated or inherited, or `TitleConstructionError` raised, exactly as `build_full_base` does. A field whose attribute is missing on either record is skipped silently. If the object cannot take the `eidr_provenance` attribute (slotted or frozen), the map is dropped silently and `provenance()` returns `{}`. A `ResourceName` entry in a custom `attrs` is ignored (since 0.68.0): titles are built only by the title logic, so the parent's title no longer leaks into `exc.partial` and a system-generated title is no longer reported as `'self'`.
 
 ### `has_user_supplied_title`
 
@@ -4041,19 +4089,19 @@ Scan of 2026-10-18; regenerated at each release from the consumer trees.
 
 <!-- dict:eidr_core.normalize.ascii_fold -->
 ```python
-def ascii_fold(s: str) -> str
+def ascii_fold(s: str | None) -> str | None
 ```
 
 Defined in `src/eidr_core/normalize/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `s` | `str` | required | Text to fold. `None`, `''` and any other falsy value are returned unchanged. A non-string such as an `int` raises `TypeError`. |
+| `s` | `str \| None` | required | Text to fold. `None`, `''` and any other falsy value are returned unchanged. A non-string such as an `int` raises `TypeError`. |
 
-**Returns** `str` -- The folded text, case preserved; not lower-cased and not whitespace-normalised. A falsy input comes back as itself, so `None` returns `None` despite the annotation.
+**Returns** `str | None` -- The folded text, case preserved; not lower-cased and not whitespace-normalised. A falsy input comes back as itself; `None` returns `None` (typed by overloads since 0.68.0).
 <!-- /dict -->
 
-**Does.** Folds Latin diacritics and ligatures to ASCII so they do not count as differences. It maps a fixed ligature table (æ -> ae, ß -> ss, ø -> o), applies NFKD, then drops every combining mark (é -> e). Because combining marks are dropped in every script, some non-Latin letters change too (Cyrillic й -> и, Japanese が -> か), although the docstring says non-Latin scripts are left intact. NFKD also folds compatibility forms (full-width `Ａ` -> `A`, `²` -> `2`).
+**Does.** Folds Latin diacritics and ligatures to ASCII so they do not count as differences. It maps a fixed ligature table (æ -> ae, ß -> ss, ø -> o), applies NFKD, then drops every combining mark (é -> e). Because combining marks are dropped in every script, some non-Latin letters change too (Cyrillic й -> и, Japanese が -> か) (the docstring said non-Latin scripts were left intact until 0.68.0). NFKD also folds compatibility forms (full-width `Ａ` -> `A`, `²` -> `2`).
 
 ### `cmp_key`
 
@@ -4090,22 +4138,22 @@ Defined in `src/eidr_core/normalize/__init__.py`.
 **Returns** not annotated -- An `int`: the absolute difference in days.
 <!-- /dict -->
 
-**Does.** Returns the absolute number of days between two `(year, month, day)` tuples. Raises `TypeError` if either is `None`, and `ValueError` for an impossible date, which `parse_date` can hand back for `YYYY-MM-DD` input because it does not validate that form. Check both tuples before calling.
+**Does.** Returns the absolute number of days between two `(year, month, day)` tuples. Raises `TypeError` if either is `None`, and `ValueError` for an impossible date. `parse_date` never hands one back since 0.68.0 (it validated only the slash forms before), so its tuples are safe.
 
 ### `nfkc`
 
 <!-- dict:eidr_core.normalize.nfkc -->
 ```python
-def nfkc(s: str) -> str
+def nfkc(s: str | None) -> str | None
 ```
 
 Defined in `src/eidr_core/normalize/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `s` | `str` | required | Text. `None` and `''` are returned unchanged; any other non-`str` value is converted with `str()` first (numeric titles and episode numbers arrive as `int`). |
+| `s` | `str \| None` | required | Text. `None` and `''` are returned unchanged; any other non-`str` value is converted with `str()` first (numeric titles and episode numbers arrive as `int`). |
 
-**Returns** `str` -- The NFKC-normalised string, or the input itself when it is `None` or `''` (so despite the annotation it can return `None`).
+**Returns** `str | None` -- The NFKC-normalised string, or the input itself when it is `None` or `''` (typed by overloads since 0.68.0: `str` in, `str` out).
 <!-- /dict -->
 
 **Does.** Applies Unicode NFKC normalisation, folding compatibility forms such as full-width letters and ligature code points. It does not fold case or strip diacritics. `norm_title`, `norm_name` and `norm_code` call it first.
@@ -4221,7 +4269,7 @@ Defined in `src/eidr_core/normalize/__init__.py`.
 **Returns** not annotated -- `(year, ymd)`: `year` an `int` or `None`, and `ymd` a `(year, month, day)` tuple of ints, or `None` when there is no day or the day cannot be read. `(None, None)` for anything unrecognised.
 <!-- /dict -->
 
-**Does.** Parses a date into a year and an optional `(year, month, day)` tuple. Slash dates are read US-style as M/D/YYYY unless the first field exceeds 12, then as D/M/YYYY, so `05/06/2007` is May 6. Slash dates are validated (an impossible one gives `(year, None)`), but `YYYY-MM-DD` is NOT, so `2006-13-45` returns `(2006, (2006, 13, 45))` and `days_between` will raise on it. `YYYY-MM` keeps only the year, and `YYYY/MM/DD` or month names are not recognised.
+**Does.** Parses a date into a year and an optional `(year, month, day)` tuple. Slash dates are read US-style as M/D/YYYY unless the first field exceeds 12, then as D/M/YYYY, so `05/06/2007` is May 6. Every full date is validated: an impossible one (`2006-13-45`, `2006-02-30`) gives `(year, None)`, like a year-only date (since 0.68.0 for `YYYY-MM-DD`, which used to come back as given and made `days_between` raise inside `compare.cmp_release_date`). `YYYY-MM` keeps only the year, and `YYYY/MM/DD` or month names are not recognised.
 
 ### `parse_minutes`
 
@@ -4272,12 +4320,12 @@ Defined in `src/eidr_core/normalize/__init__.py`.
 |---|---|---|---|
 | `s` | - | required | Any value. `None` returns `''`; anything else is converted with `str()`. |
 
-**Returns** `str` -- The value on one line: stripped, NUL bytes removed, and tab, CR, LF and every other C0 control character replaced by a space; `''` for `None`, empty or whitespace-only input. Never `None`.
+**Returns** `str` -- The value on one line: NUL bytes removed, tab, CR, LF and every other C0 control character replaced by a space, then stripped; `''` for `None`, empty or whitespace-only input. Never `None`.
 <!-- /dict -->
 
-**Does.** Makes a text value safe to carry through a TSV file or PostgreSQL COPY stream without changing what it says. It strips surrounding whitespace, removes NUL bytes (PostgreSQL rejects them), and replaces tab, CR, LF and every other C0 control character with a space. Apply it last, on the way out, and never compare on its output.
+**Does.** Makes a text value safe to carry through a TSV file or PostgreSQL COPY stream without changing what it says. It removes NUL bytes (PostgreSQL rejects them), replaces tab, CR, LF and every other C0 control character with a space, and then strips surrounding whitespace. Apply it last, on the way out, and never compare on its output.
 
-**Notes.** It escapes nothing: backslashes, quotes and commas pass through, so CSV quoting and COPY's own backslash escaping stay the writer's job. It does not collapse runs of spaces, and because stripping runs first, a control character that `str.strip()` does not treat as whitespace (for example `\x01`) becomes a leading or trailing space when it sits at either end. DEL (0x7F) and C1 controls (0x80 to 0x9F) pass through unchanged. EIDR MCP keeps two local copies by decision (register R6, extract-only); new code calls this one.
+**Notes.** It escapes nothing: backslashes, quotes and commas pass through, so CSV quoting and COPY's own backslash escaping stay the writer's job. It does not collapse runs of spaces. Stripping runs last since 0.68.0, so a control character at either end no longer leaves a space behind (`'a\t'` gives `'a'`; it gave `'a '`). DEL (0x7F) and C1 controls (0x80 to 0x9F) pass through unchanged. EIDR MCP keeps two local copies by decision (register R6, extract-only), pinned to this one by its agreement test and changed with it in 0.68.0; new code calls this one.
 
 ## `eidr_core.normalize.aliases`
 
@@ -4621,7 +4669,7 @@ Defined in `src/eidr_core/registry/__init__.py`.
 
 **Does.** Builds SDK `Credentials` from a project secrets dict, falling back to the SDK's own credential discovery. A section that is present but lacks `user_id`, `party_id` or `password` raises `KeyError`; an empty section counts as absent. Without the SDK installed it raises `ImportError`, even when `secrets` is None. The fallback `Credentials.load()` (environment variables, EIDR XML config, `~/.eidr/secrets.json` or `./.secrets.json`, AWS) raises `EIDRCredentialsNotFoundError` when nothing resolves and, in SDK 1.3.0, `EIDRCredentialAmbiguityError` when more than one source does.
 
-**Notes.** The `registry` key must hold a dict: a string there (a target name, for example) raises `AttributeError`. Values are not validated: each goes through `str()`, so an empty string stays empty and a JSON null becomes the string `"None"`; nothing rejects either before the registry call. A section spelled in any other case (`Registry`) is not recognised: the top-level keys are tried, then the SDK fallback.
+**Notes.** The `registry` key must hold a mapping: anything else (a target name, for example) raises `TypeError` (since 0.68.0; it was `AttributeError`). A required field that is absent, `null` or blank raises `KeyError` naming it (since 0.68.0; a `null` used to reach the registry as the string `"None"`). `EIDRCredentialAmbiguityError` comes from the SDK fallback when more than one source resolves. A section spelled in any other case (`Registry`) is not recognised: the top-level keys are tried, then the SDK fallback.
 
 ### `get_registry_client`
 
@@ -4667,7 +4715,7 @@ Defined in `src/eidr_core/registry/operation_status.py`.
 
 **Does.** Extracts the registry's verdict on one write from a status-lookup body; None means no verdict yet. Only text from an `<OperationStatus>` tag onward is read, so the envelope's own success status, which comes first, can never be mistaken for the write's, and a block with code 2 or type `pending` (any case) is skipped. Parsing is a regex over the raw text: the tags must appear literally (no namespace prefix, no attributes), and `Details` text comes back without XML entities decoded (`&amp;` stays `&amp;`). For a paged batch body use `parse_operation_statuses`; this returns only the first verdict.
 
-**Notes.** The match does not stop at `</OperationStatus>`. A block with no `<Code>`/`<Type>` pair of its own takes the NEXT block's verdict under its own token, and that next block is then not reported separately. A `<Token>` is captured only when it directly follows `<OperationStatus>`. The registry bodies seen so far always carry both, but this applies to `parse_operation_statuses` too.
+**Notes.** The match stops at a block boundary (since 0.68.0): a block with no `<Code>`/`<Type>` pair of its own yields no verdict. Before, it took the NEXT block's verdict under its own token, and that block was dropped. A `<Token>` is captured only when it directly follows `<OperationStatus>`. The same applies to `parse_operation_statuses`.
 
 ### `parse_operation_statuses`
 
@@ -4842,8 +4890,8 @@ Defined in `src/eidr_core/secrets_loader/__init__.py`.
 | `default_region` | `str` | `"us-west-2"` (keyword-only) | Region used when none of `region_envs` is set. |
 | `profile_envs` | `Sequence[str]` | `("AWS_PROFILE",)` (keyword-only) | Environment variables checked in order for the AWS profile. |
 | `default_profile` | `str \| None` | `None` (keyword-only) | Profile used when none of `profile_envs` is set; None means boto3's default session. |
-| `local_flag_envs` | `Sequence[str]` | `("USE_LOCAL_SECRETS",)` (keyword-only) | Environment variables that select local mode when any is truthy (`1`, `true`, `yes`, `on`, any case). Keep it non-empty: its first name is used in an error message. |
-| `local_path_envs` | `Sequence[str]` | `("SECRETS_PATH",)` (keyword-only) | Environment variables checked in order for the local file path, used by local mode and by the AWS fallback. Keep it non-empty, for the same reason. |
+| `local_flag_envs` | `Sequence[str]` | `("USE_LOCAL_SECRETS",)` (keyword-only) | Environment variables that select local mode when any is truthy (`1`, `true`, `yes`, `on`, any case). May be empty (since 0.68.0; an empty sequence raised IndexError in the AWS-failure message). |
+| `local_path_envs` | `Sequence[str]` | `("SECRETS_PATH",)` (keyword-only) | Environment variables checked in order for the local file path, used by local mode and by the AWS fallback. May be empty, likewise. |
 | `default_local_path` | `str` | `".secrets.json"` (keyword-only) | Local file path when none of `local_path_envs` is set; relative to the current working directory. |
 | `aws_fallback_to_local` | `bool` | `True` (keyword-only) | On ANY failure of the AWS path, load the local file instead if it exists, with a stderr warning. False: raise `SecretsError`. |
 | `validate` | `Callable[[dict], Any] \| None` | `None` (keyword-only) | Called as `validate(cfg)` before return; it may mutate the dict (to inject defaults, for example). Its return value is ignored; raise to reject, and the exception propagates unchanged. |
@@ -4873,18 +4921,18 @@ Defined in `src/eidr_core/secrets_loader/__init__.py`.
 Source `src/eidr_core/vendor/__init__.py`. Public names: 3 functions, 3 classes, 2 constants (declared by `__all__`).
 <!-- /dict-module -->
 
-**Purpose.** The one mechanism for copying eidr-core modules into a package that cannot depend on eidr-core. Two packages need it: the Python SDK (`eidr`, which eidr-core itself depends on) and the python-tools command-line scripts, which must run with only the SDK installed. It copies the listed modules from a pinned commit, rewrites their `eidr_core` imports to the consumer's package, refuses a module list that is not closed under imports, and records SHA-256 hashes so that `check` can gate the consumer's CI against drift. Proposed by python-tools; landed in 0.31.0 (2026-09-11). Run it as `python -m eidr_core.vendor sync|check --config vendor.toml`.
+**Purpose.** The one mechanism for copying eidr-core modules into a package that cannot depend on eidr-core. Two packages need it: the Python SDK (`eidr`, which eidr-core's `registry` module imports, through the optional `registry` extra) and the python-tools command-line scripts, which must run with only the SDK installed. It copies the listed modules from a pinned commit, rewrites their `eidr_core` imports to the consumer's package, refuses a module list that is not closed under imports, and records SHA-256 hashes so that `check` can gate the consumer's CI against drift. Proposed by python-tools; landed in 0.31.0 (2026-09-11). Run it as `python -m eidr_core.vendor sync|check --config vendor.toml`.
 
 **Use it when.** Your package cannot import eidr-core:
 * The dependency direction forbids it (the SDK), or the deliverable must run without it (the CLI tools), yet it needs shared logic.
 * For the CI gate, run `python -m eidr_core.vendor check --config vendor.toml`. Add `--resync` where eidr-core is installed at the pin.
 * To refresh the copy after moving the pin, run `python -m eidr_core.vendor sync --config vendor.toml`. Add `--from <eidr-core checkout at the pin>` to skip the clone.
-* CLI exit codes: 0 means OK, 1 means `check` found drift, 2 means a `VendorError` (or an argument error). An exception that is not a `VendorError` (no `vendor.toml`, a TOML syntax error on Python 3.11+, `git` missing from PATH, a corrupt `MANIFEST.json`) prints a traceback and also exits 1, so read the output before treating 1 as drift.
+* CLI exit codes: 0 means OK, 1 means `check` found drift, 2 means a `VendorError` (or an argument error). Since 0.68.0 a missing or unreadable `vendor.toml`, a TOML syntax error, `git` missing from PATH and a corrupt `MANIFEST.json` are all `VendorError`s (exit 2); before, they printed a traceback and exited 1, which read as drift.
 
 **Do not use it when.** Another route applies:
 * Your project can depend on eidr-core. Then install it (`@main`) and import it; vendoring is the exception the dependency direction forces.
 * Never edit a vendored copy, never hand-copy a module, and never write your own copier. Fix the code in eidr-core and move the pin.
-* The module mentions `eidr_core` in its text or reads package data by that name. `sync` refuses it (the residual-reference rule). A trial sync of 0.43.0 accepts only `ids`, `codes`, `ordering` and `secrets_loader` on their own. It refuses `altidtool_io` (since 0.39.0), `verify` (its docstring names `eidr_core`), `db_schemas`, `bmr_io`, `external`, `inheritance` and `registry` for residual text, and `compare` and `normalize` for residual text even when their imports are listed. A refused module needs a seam in eidr-core first, which is a proposal.
+* The module mentions `eidr_core` in its text or reads package data by that name. `sync` refuses it (the residual-reference rule). A trial sync of 0.68.0 accepts `altidtool_io`, `bmr_io`, `codes`, `ids`, `inheritance`, `ordering`, `secrets_loader`, `swap` and `verify` (since 0.68.0) on their own, and `lookup`, `bmr_rows` and `verdicts` with their closures. It refuses `db_schemas`, `registry`, `external`, `normalize` (so `compare`) and `vendor` itself for residual text, and `altid_audit` because it needs `db_schemas`. A refused module needs a seam in eidr-core first, which is a proposal.
 * At runtime in the shipped package. Deployed code imports its vendored copy and never `eidr_core.vendor`.
 
 **Used by.**
@@ -4933,7 +4981,7 @@ Defined in `src/eidr_core/vendor/__init__.py`.
 **Returns** `Manifest` -- The validated `[vendor]` table, with `commit` lowercased and `path` made absolute.
 <!-- /dict -->
 
-**Does.** Reads and validates a consumer's `vendor.toml` into a Manifest. Raises VendorError when the `[vendor]` table or a required key is missing, `commit` is not a 40-hex SHA (branches and tags are refused), `package` is not a dotted import path, or `modules` is empty, holds a non-identifier, or repeats a name. On Python 3.11+ it parses with `tomllib`, so a TOML syntax error raises `tomllib.TOMLDecodeError`, not VendorError; on 3.10 a strict flat-TOML parser raises VendorError instead. A missing file raises FileNotFoundError.
+**Does.** Reads and validates a consumer's `vendor.toml` into a Manifest. Raises VendorError when the `[vendor]` table or a required key is missing, `commit` is not a 40-hex SHA (branches and tags are refused), `package` is not a dotted import path, or `modules` is empty, holds a non-identifier, or repeats a name. A TOML syntax error and a missing or unreadable file also raise VendorError (since 0.68.0; they raised `tomllib.TOMLDecodeError` and FileNotFoundError).
 
 **Notes.** `eidr_core.db_schemas.load_manifest` has the same name and is unrelated.
 
@@ -5071,7 +5119,7 @@ Defined in `src/eidr_core/verify/__init__.py`.
 | `reg_date` | `date \| None` | required | The registered full release date. None when the registry holds only a year, or nothing. |
 | `reg_year` | `int \| None` | required | The registered release year, or None. Used for year comparisons; when it is None (or 0) the year of `reg_date` is used. |
 | `facts` | `dict` | required | The inner `facts` dict of the `eidr_core.external` contract, not the outer `{status, facts}` wrapper. Reads `release_date`, which must be a full `YYYY-MM-DD` string even for month or year precision (first 10 characters parsed), and `release_date_precision` (`day`, `month` or `year`; absent means `day`). |
-| `mode` | `str` | `"window"` (keyword-only) | `exact_date`: the same day is required. `year`: years only. `window`: within `tolerance_days`, falling back to month or year as precision allows. Any other string behaves as `window`, with no error. |
+| `mode` | `str` | `"window"` (keyword-only) | `exact_date`: the same day is required. `year`: years only. `window`: within `tolerance_days`, falling back to month or year as precision allows. Any other string raises ValueError (since 0.68.0; it silently behaved as `window`). |
 | `tolerance_days` | `int` | `30` (keyword-only) | Window mode only: the largest day difference that still matches a day-precision fact. At 28 or more, an adjacent month also matches a month-precision fact. |
 
 **Returns** `tuple[str, str]` -- `(comparison, note)`. comparison is `match`, `mismatch`, `insufficient` or `none`; note is a short human-readable reason, such as `"date 2001-05-04 vs 2001-05-20 (16d, match)"`.
@@ -5079,7 +5127,7 @@ Defined in `src/eidr_core/verify/__init__.py`.
 
 **Does.** Compares a registered release date or year with an external release-date fact, honouring the fact's precision. Returns `none` when the fact has no `release_date` or it does not parse, and `insufficient` when the registry lacks what the mode needs or (in `exact_date` mode) the fact is not day-precision. In window mode a day-precision fact is compared in days and a month-precision fact by month; anything else (year precision, an unrecognised precision, or no registered full date) is compared by year. Pure; `year` mode ignores precision.
 
-**Notes.** A mistyped `mode` silently gets window behaviour, so validate mode strings that come from configuration.
+**Notes.** The mode is checked before anything else, so a mistyped mode fails even when the fact is empty.
 
 ### `compare_runtime`
 
@@ -5117,12 +5165,12 @@ Defined in `src/eidr_core/verify/__init__.py`.
 | `reg_year` | `int \| None` | required | The registered release_year. None gives `insufficient` when the fact has a parseable `release_date` (otherwise `none`). |
 | `facts` | `dict` | required | The inner `facts` dict. Reads only `release_date`; precision is ignored and the year of the parsed date is used. |
 
-**Returns** `tuple[str, str]` -- `(comparison, note)`. `mismatch` whenever the external date parses and both registry fields are present, with the note naming the field the external year agrees with, or saying it agrees with neither. Otherwise `none` or `insufficient`. Never `match`.
+**Returns** `tuple[str, str]` -- `(comparison, note)`. `mismatch` whenever the external date parses and the two registry fields are present and disagree, with the note naming the field the external year agrees with, or saying it agrees with neither. `insufficient` when they agree (since 0.68.0). Otherwise `none` or `insufficient`. Never `match`.
 <!-- /dict -->
 
 **Does.** Reports which of a record's two disagreeing date fields an external release date supports. It returns `mismatch` whenever it can compare, because the record is inconsistent whatever the outside source says, and the note tells a curator which field to fix. `none` when the fact has no parseable `release_date` (checked first), then `insufficient` when either registry field is None.
 
-**Notes.** Call it only for records whose release_date year and release_year differ; it does not check. On a consistent record whose years equal the external year it still returns `mismatch`, with the false note "matches neither release_date (...) nor release_year (...)".
+**Notes.** Meant for records whose release_date year and release_year differ. Since 0.68.0 it checks: when they agree it returns `("insufficient", "release_date and release_year agree; nothing to arbitrate")`; before, it returned `mismatch` with the false note "matches neither ...".
 
 ### `parse_iso_date`
 
@@ -5162,7 +5210,7 @@ Defined in `src/eidr_core/verify/__init__.py`.
 
 **Does.** Collects every comparable runtime in a fact set as floats in minutes, including series episode runtimes. Raises ValueError or TypeError when an item cannot be converted to float.
 
-**Notes.** A scalar in place of a list is not caught cleanly. A number raises TypeError, and a string such as `"90"` is read character by character, giving `[9.0, 0.0]`.
+**Notes.** A single value in place of a list is read as one runtime (since 0.68.0): `"90"` and `90` both give `[90.0]`. Before, a number raised TypeError and `"90"` gave `[9.0, 0.0]`.
 
 ## `eidr_core.bmr_map`
 

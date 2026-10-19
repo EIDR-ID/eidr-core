@@ -87,10 +87,16 @@ __all__ = [
 # that confusion is the entire bug this module exists to prevent, so the
 # anchor is load-bearing and is pinned by a test.
 # <Details> is optional: the registry omits it for some outcomes.
+# The gap before <Code> may not cross a block boundary (</OperationStatus>,
+# or a following <OperationStatus> in a malformed body). It was an unbounded
+# ``.*?`` under re.S, so a block without its own <Code> silently took the
+# NEXT block's verdict -- attributing it to the wrong token -- and swallowed
+# that block, losing one verdict from the batch list (dictionary audit
+# 2026-10-02; 0.68.0). A block with no <Code> now yields nothing: no verdict.
 _OP_STATUS_RE = re.compile(
     r"<OperationStatus>\s*"
     r"(?:<Token>(?P<token>[^<]*)</Token>\s*)?"
-    r".*?"
+    r"(?:(?!</?OperationStatus>).)*?"
     r"<Code>(?P<code>\d+)</Code>\s*"
     r"<Type>(?P<type>[^<]*)</Type>"
     r"(?:\s*<Details>(?P<details>[^<]*)</Details>)?",

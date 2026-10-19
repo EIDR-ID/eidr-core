@@ -55,8 +55,10 @@ def spec_path() -> Path:
 
 def load_spec(path: str | os.PathLike | None = None) -> dict:
     """Load the spec and return ``{NAME: value}`` with Python semantics
-    restored. Raises on a missing/duplicate-alias or unknown container type —
-    a malformed tuning file must fail loudly, never score with defaults."""
+    restored. Raises on an alias to an unknown profile or an unknown
+    container type — a malformed tuning file must fail loudly, never score
+    with defaults. Duplicate JSON keys are NOT detected: ``json.loads`` keeps
+    the last one."""
     p = Path(path) if path else Path(os.environ.get(_ENV_VAR) or spec_path())
     data = json.loads(p.read_text(encoding="utf-8"))
 

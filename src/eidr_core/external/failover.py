@@ -66,9 +66,11 @@ Wikimedia's access rules, which its Terms of Use incorporate, require a
 client to wait the ``Retry-After`` interval of a 429, and at least five
 seconds when the header is absent; continuing inside the window risks a
 temporary ban from the query service. Until 0.41.0 this loop ignored the
-header and retried after ``backoff * 2**attempt + jitter`` -- about 2-3 s on
-the first retry with the defaults (raised by eidr-metadata-sources from its
-Wikidata licence review, 2026-09-30).
+header and retried after ``backoff * 2**attempt + jitter`` -- about 4-4.5 s
+on the first retry with the defaults (backoff 2.0 x 2**1, plus up to 0.5 s
+jitter; corrected from "2-3 s" by the dictionary audit 2026-10-02, 0.68.0)
+(raised by eidr-metadata-sources from its Wikidata licence review,
+2026-09-30).
 
 The chassis never sees a response, only the exception the provider raised,
 so it reads the interval from the exception (``retry_after_seconds``):
@@ -76,8 +78,9 @@ so it reads the interval from the exception (``retry_after_seconds``):
 * an explicit ``exc.retry_after`` (seconds), for a provider whose transport
   hides the headers -- set it when raising;
 * else the ``Retry-After`` header of ``exc.headers`` (urllib's ``HTTPError``,
-  which SPARQLWrapper re-raises unchanged for 429 and 503) or of
-  ``exc.response.headers`` (requests), as seconds or an HTTP-date.
+  which SPARQLWrapper re-raises unchanged for 429 and 503) or, when that
+  has none, of ``exc.response.headers`` (requests), as seconds or an
+  HTTP-date.
 
 Before the next attempt on the SAME endpoint the loop sleeps
 ``max(Retry-After, the computed backoff)``. With no header on a 429 or 503
@@ -89,9 +92,9 @@ The interval is a fact about the ENDPOINT, so it should outlive the call.
 A caller that makes several calls in one operation passes one
 ``cooldowns`` dict to all of them -- the same shape as the outage memo --
 and every interval is recorded there. A later call that reaches a cooling
-endpoint skips it when another endpoint in its chain is usable, and
-otherwise waits out the remainder (up to ``max_retry_after``) before the
-first request: eidr-wikidata's ``pairs_batch`` re-probes WDQS at the start
+endpoint skips it when a later endpoint in its chain is usable, and
+otherwise waits out the remainder before the first request (a remainder over
+``max_retry_after`` is skipped instead): eidr-wikidata's ``pairs_batch`` re-probes WDQS at the start
 of every batch, and that probe must not land inside the window. Failing
 over to a DIFFERENT endpoint is never delayed. Without a memo, the wait is
 still honoured inside the call.
@@ -336,6 +339,12 @@ def _parse_retry_after(raw: Any, now: datetime | None = None) -> float | None:
     if when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)
     ref = now or datetime.now(timezone.utc)
+    if ref.tzinfo is None:
+        # An HTTP-date is always GMT, so ``when`` is aware; a naive ``now``
+        # made the subtraction raise TypeError. Read it as UTC, as the
+        # naive-``when`` branch above does (dictionary audit 2026-10-02;
+        # 0.68.0).
+        ref = ref.replace(tzinfo=timezone.utc)
     return max(0.0, (when - ref).total_seconds())
 
 
@@ -344,22 +353,31 @@ def retry_after_seconds(exc: BaseException, now: datetime | None = None) -> floa
 
     An explicit ``exc.retry_after`` wins (a provider that cannot expose
     headers sets it when raising); otherwise the header is read from
-    ``exc.headers`` (urllib) or ``exc.response.headers`` (requests).
-    ``now`` exists for tests of the HTTP-date form.
+    ``exc.headers`` (urllib) and, when that carries no usable Retry-After,
+    from ``exc.response.headers`` (requests). ``now`` exists for tests of
+    the HTTP-date form; a naive ``now`` is read as UTC.
     """
     explicit = getattr(exc, "retry_after", None)
     if explicit is not None:
         return _parse_retry_after(explicit, now)
-    headers = getattr(exc, "headers", None)
-    if headers is None:
-        headers = getattr(getattr(exc, "response", None), "headers", None)
-    if headers is None:
-        return None
-    try:
-        raw = headers.get("Retry-After")
-    except AttributeError:
-        return None
-    return _parse_retry_after(raw, now)
+    # Both header sources are consulted in turn. Until 0.68.0 the response
+    # was read only when ``exc.headers`` was absent, so an exception carrying
+    # BOTH (headers without Retry-After, the response with it) lost the
+    # interval and the caller retried inside the server's window
+    # (dictionary audit 2026-10-02; 0.68.0).
+    sources = (getattr(exc, "headers", None),
+               getattr(getattr(exc, "response", None), "headers", None))
+    for headers in sources:
+        if headers is None:
+            continue
+        try:
+            raw = headers.get("Retry-After")
+        except AttributeError:
+            continue
+        seconds = _parse_retry_after(raw, now)
+        if seconds is not None:
+            return seconds
+    return None
 
 
 def _note_cooldown(cooldowns: dict[str, float] | None, endpoint: str,
@@ -453,7 +471,17 @@ def call_with_failover(
     the cross-call memo (endpoint -> monotonic deadline): pass one dict to
     every call in an operation, as with ``outage_endpoints``, and a later
     call will not probe an endpoint inside its window.
+
+    Raises ``ValueError`` when ``max_retries`` is below 1 (0.68.0). Such a
+    call attempted nothing yet still slept any cooldown window and returned
+    ``(None, None, None)`` -- "every endpoint exhausted" with no exception
+    to explain it.
     """
+    # Checked at entry, before any sleep: max_retries=0 made zero attempts
+    # per endpoint, which reads to the caller as a silent total failure
+    # (dictionary audit 2026-10-02; 0.68.0).
+    if max_retries < 1:
+        raise ValueError(f"max_retries must be at least 1, got {max_retries!r}")
     endpoints = list(endpoints)
     skip_outage: set[str] = (
         outage_endpoints if outage_endpoints is not None else set()
@@ -470,8 +498,11 @@ def call_with_failover(
             left = cooldown_remaining(cooldowns, endpoint)
             if left > 0:
                 # Another endpoint can take the request now: use it rather
-                # than wait. Only the last usable endpoint waits its window
-                # out, and only up to max_retry_after.
+                # than wait. An endpoint with no usable endpoint AFTER it
+                # waits its window out (a window over max_retry_after is
+                # skipped instead), so when every endpoint is cooling, the
+                # first one waits. (Comment corrected by the dictionary
+                # audit 2026-10-02; 0.68.0: it said "the last".)
                 others = [e for e in endpoints[idx + 1:]
                           if e not in skip_outage
                           and cooldown_remaining(cooldowns, e) <= 0]

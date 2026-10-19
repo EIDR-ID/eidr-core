@@ -1,7 +1,7 @@
 """Runtime parameter source for the L2 comparators (interim mechanism).
 
 The comparators read tuning constants (NL_MODIFIER, FIELD_BONUS_CAP,
-LIST_DENOMINATOR, NAME_MATCH_MIN, DATE_*, DUR_*, ...) through this module via
+NAME_MATCH_MIN, DATE_*, DUR_*, ...) through this module via
 plain attribute access (``config.NAME_MATCH_MIN`` style — the extracted code
 is textually unchanged from its BMR-Review origin). A consumer registers its
 parameter object once at startup:

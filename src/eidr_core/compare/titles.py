@@ -144,7 +144,9 @@ PART_AMBIGUOUS_QUALITY = 0.70        # numbered vs un-numbered: cannot reach Acc
 
 
 def segments(raw):
-    """Split a slash-delimited segment title into a normalised set, or None."""
+    """Split a slash- or semicolon-delimited segment title into an ordered
+    list of normalised segments (duplicates kept, empties dropped), or None
+    when there are fewer than two."""
     if not raw or not re.search(r"[/;]", str(raw)):
         return None
     parts = [norm_title(p) for p in re.split(r"[/;]", str(raw))]
@@ -316,9 +318,10 @@ def select_titles(titles, *, include_internal=False):
 
 
 def parts_ambiguous(a_titles, b_titles):
-    """True when the best-matching title pair has a part number on exactly ONE
-    side with agreeing bases -- the un-numbered title may be any one part or
-    all parts combined, so the pair may not reach Accept on the title."""
+    """True when ANY pair of raw title strings (not only the best-matching
+    pair) has a part number on exactly ONE side with agreeing bases (fuzzy
+    >= 0.85) -- the un-numbered title may be any one part or all parts
+    combined, so the pair may not reach Accept on the title."""
     for a in a_titles:
         for b in b_titles:
             pa, pb = parse_part(a), parse_part(b)

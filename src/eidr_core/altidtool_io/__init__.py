@@ -17,7 +17,8 @@ item 3 / OVERLAPS row 4; format contract: ``specs/altidtool-format.md``):
   Relation is always column 5 when present.
 * Lines are therefore 3, 4, or 5 columns wide. ``parse_line`` accepts all
   three shapes (and tolerates BMRtoAltID's fixed-5 output, where trailing
-  empties collapse to the same row).
+  empties collapse to the same row). It refuses an empty Value and a ``//``
+  comment, which are not additions (0.68.0).
 
 BMR-Review's dedupe pipeline does not emit this format; MCP's
 ``eidrtoaltid.py`` is a different artifact (an extract REPORT with a header
@@ -86,10 +87,29 @@ def write_lines(path: str | os.PathLike[str],
 
 
 def parse_line(line: str) -> AltIdRow:
-    """Parse a 3/4/5-column AltIDTool line back into an AltIdRow."""
-    parts = line.rstrip("\r\n").split("\t")
+    """Parse a 3/4/5-column AltIDTool ADDITION line back into an AltIdRow.
+
+    Strict: raises ``ValueError`` for anything that is not an addition --
+    a width outside 3-5, a ``//`` comment line, or an EMPTY (or
+    whitespace-only) Value. Use ``parse_edit_line`` to read edit files,
+    which may hold removals and comments.
+    """
+    body = line.rstrip("\r\n")
+    # A comment is not an addition. Before 0.68.0 a ``//`` line with enough
+    # tabs came back as a row whose eidr_id was the comment text (dictionary
+    # audit 2026-10-02; 0.68.0).
+    if body.lstrip().startswith("//"):
+        raise ValueError(f"not an AltIDTool line (a // comment): {line!r}")
+    parts = body.split("\t")
     if not 3 <= len(parts) <= 5:
         raise ValueError(f"not an AltIDTool line ({len(parts)} columns): {line!r}")
+    # The spec reads a three-column line with an empty Value as a REMOVAL of
+    # the type (v1.1), so returning it as an addition with value '' handed a
+    # removal to code that only knows additions -- the accident parse_line's
+    # strictness exists to prevent (dictionary audit 2026-10-02; 0.68.0).
+    if not parts[2].strip():
+        raise ValueError(f"not an AltIDTool addition (empty Value; the spec reads "
+                         f"this as a removal -- use parse_edit_line): {line!r}")
     parts += [""] * (5 - len(parts))
     return AltIdRow(*parts)
 

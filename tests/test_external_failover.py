@@ -358,3 +358,66 @@ def test_an_outage_429_still_records_its_window(clock):
     call_with_failover(["a", "b"], script, classify_all(OUTAGE), cooldowns=memo, **FAST)
     assert fo.cooldown_remaining(memo, "a") == 60.0
 
+
+
+# --- 0.68.0: dictionary audit 2026-10-02 -----------------------------------
+
+def test_a_naive_now_is_read_as_utc():
+    """An HTTP-date parses aware; a naive ``now`` made the subtraction raise
+    TypeError instead of returning the interval."""
+    aware = datetime(2026, 9, 30, 12, 0, 0, tzinfo=timezone.utc)
+    naive = aware.replace(tzinfo=None)
+    when = _eu.format_datetime(aware + timedelta(seconds=90), usegmt=True)
+    assert fo.retry_after_seconds(_http_error(503, when), now=naive) == 90.0
+
+
+class _Resp:
+    def __init__(self, headers):
+        self.headers = headers
+        self.status_code = 429
+
+
+def test_response_headers_are_read_when_exc_headers_lack_retry_after():
+    """Both sources present, only the response carrying Retry-After: the
+    interval was lost and the caller retried inside the server's window."""
+    exc = RuntimeError("429")
+    exc.headers = {"Content-Type": "text/plain"}  # type: ignore[attr-defined]
+    exc.response = _Resp({"Retry-After": "17"})  # type: ignore[attr-defined]
+    assert fo.retry_after_seconds(exc) == 17.0
+
+
+def test_exc_headers_still_win_over_the_response():
+    exc = RuntimeError("429")
+    exc.headers = {"Retry-After": "3"}  # type: ignore[attr-defined]
+    exc.response = _Resp({"Retry-After": "17"})  # type: ignore[attr-defined]
+    assert fo.retry_after_seconds(exc) == 3.0
+
+
+@pytest.mark.parametrize("bad", [0, -1])
+def test_max_retries_below_one_is_rejected_before_any_sleep(clock, bad):
+    """It attempted nothing, still slept any cooldown, and returned the
+    exhausted triple with no exception to explain it."""
+    memo = {"a": clock["now"] + 3.0}
+    with pytest.raises(ValueError, match="max_retries"):
+        call_with_failover(["a"], lambda ep: "ok", classify_all(RETRY),
+                           max_retries=bad, cooldowns=memo, **FAST)
+    assert clock["sleeps"] == []
+
+
+def test_first_retry_sleeps_four_seconds_with_the_default_backoff(clock):
+    """Pins the module docstring: backoff 2.0 x 2**1 on the first retry
+    (it used to say "about 2-3 s")."""
+    script = Script({"a": [RuntimeError("HTTP 502"), "ok"]})
+    call_with_failover(["a"], script, classify_all(RETRY), jitter=0.0)
+    assert clock["sleeps"] == [4.0]
+
+
+def test_when_every_endpoint_is_cooling_the_first_one_waits(clock):
+    """Pins the corrected comment: the endpoint with no usable endpoint after
+    it waits -- with all cooling that is the FIRST, not the last."""
+    memo = {"a": clock["now"] + 20.0, "b": clock["now"] + 5.0}
+    script = Script({"a": ["from a"], "b": ["from b"]})
+    res, used, _ = call_with_failover(["a", "b"], script, classify_all(RETRY),
+                                      cooldowns=memo, **FAST)
+    assert (res, used) == ("from a", "a")
+    assert clock["sleeps"] == [20.0]

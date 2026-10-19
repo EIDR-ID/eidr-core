@@ -37,3 +37,27 @@ def test_the_file_is_replaced_atomically(tmp_path):
     assert not (tmp_path / "facts.json.tmp").exists()
     with open(p, encoding="utf-8") as fh:
         assert json.load(fh)[0][:2] == ["a", "1"]
+
+
+def test_an_unserialisable_store_leaves_cache_file_and_tmp_as_they_were(tmp_path):
+    """store merged into the live dict before json.dump, so one bad value
+    poisoned the cache (every later store raised) and left a .tmp behind
+    (dictionary audit 2026-10-02; 0.68.0)."""
+    import pytest
+
+    p = tmp_path / "facts.json"
+    c = JsonFactCache(p)
+    good = {("a", "1"): {"status": "found", "facts": {}}}
+    c.store(good)
+    before = p.read_text(encoding="utf-8")
+
+    with pytest.raises(TypeError):
+        c.store({("a", "2"): {"status": "found", "facts": {"bad": object()}}})
+
+    assert not (tmp_path / "facts.json.tmp").exists()
+    assert p.read_text(encoding="utf-8") == before
+    assert c.load([("a", "1"), ("a", "2")]) == good
+    # The poisoning symptom: the NEXT, valid store must succeed.
+    c.store({("a", "3"): {"status": "not_found", "facts": {}}})
+    assert set(JsonFactCache(p).load([("a", "1"), ("a", "2"), ("a", "3")])) == {
+        ("a", "1"), ("a", "3")}

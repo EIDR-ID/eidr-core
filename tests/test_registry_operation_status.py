@@ -400,3 +400,42 @@ def test_a_real_rejection_still_reads_as_failure():
     status = parse_operation_status(REJECTED)
     assert status is not None and status.is_failure
 
+
+
+# --- 0.68.0: a block without its own <Code> --------------------------------
+# The gap between <OperationStatus> and <Code> was an unbounded `.*?` under
+# re.S, so a block lacking <Code> borrowed the NEXT block's verdict (wrong
+# token) and swallowed that block (dictionary audit 2026-10-02).
+
+NO_CODE_THEN_REJECTED = """<Response>
+  <Status><Code>0</Code><Type>success</Type></Status>
+  <RequestStatusResults>
+    <OperationStatus>
+      <Token>111</Token>
+    </OperationStatus>
+    <OperationStatus>
+      <Token>222</Token>
+      <Status><Code>4</Code><Type>validation error</Type>
+        <Details>Duplicate Alternate ID</Details>
+      </Status>
+    </OperationStatus>
+  </RequestStatusResults>
+</Response>"""
+
+
+def test_a_block_without_code_does_not_borrow_the_next_verdict():
+    got = parse_operation_statuses(NO_CODE_THEN_REJECTED)
+    assert [(s.token, s.code) for s in got] == [("222", 4)]
+    assert got[0].details == "Duplicate Alternate ID"
+
+
+def test_single_form_skips_a_block_without_code():
+    status = parse_operation_status(NO_CODE_THEN_REJECTED)
+    assert status is not None and status.token == "222"
+
+
+def test_an_unclosed_block_does_not_borrow_the_next_verdict_either():
+    body = NO_CODE_THEN_REJECTED.replace("</OperationStatus>\n    <Op", "<Op", 1)
+    assert "</OperationStatus>" in body and body.count("</OperationStatus>") == 1
+    got = parse_operation_statuses(body)
+    assert [s.token for s in got] == ["222"]

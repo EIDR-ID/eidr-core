@@ -1,9 +1,12 @@
 """
 Field comparators -> FieldResult(quality in [0, 1+bonus]).
 
-Within-field aggregation uses nonlinear.accumulate(): one match = full first-
-match credit (independent of list length), additional matches add a diminishing,
-capped bonus. Quality may exceed 1.0; the record-level average is clamped.
+Within-field aggregation for titles, codes and Alt IDs uses
+nonlinear.accumulate(): one match = full first-match credit (independent of
+list length), additional matches add a diminishing, capped bonus. People and
+associated organisations use ``_proportional`` instead: matched strength
+divided by the smaller list's length, capped at 1.0. Quality may exceed 1.0;
+the record-level average is clamped.
 
 Only Alt-IDs are a negative signal (conflict). Dates and durations never go
 negative -- distant values just earn little credit.
@@ -23,11 +26,11 @@ from functools import partial
 
 from eidr_core.normalize import (
     days_between,
-    norm_code,  # noqa: F401 — re-exported; BMR-Review's compare.py shim star-imports it
+    norm_code,  # noqa: F401 — kept importable from here for old callers; not in __all__
     norm_country,
     norm_lang,
     norm_name,
-    norm_title,  # noqa: F401 — re-exported; BMR-Review's compare.py shim star-imports it
+    norm_title,  # noqa: F401 — kept importable from here for old callers; not in __all__
     parse_date,
     parse_minutes,
 )
@@ -518,9 +521,10 @@ def validate_date_profile(profile, name="profile"):
     * the year table is monotonically non-increasing -- the inversion that
       motivated profiles in the first place;
     * the last full-date band is at least the gap-1 credit, so the band-to-year
-      boundary does not step UP. As of compare-spec 2.8.0 ``Basic`` fails this
-      by 0.01 (last band 0.70, gap-1 0.71); raising the band to 0.71, or
-      lowering gap-1 to 0.70, makes the clamp unnecessary.
+      boundary does not step UP. ``Basic`` failed this by 0.01 until
+      compare-spec 2.10.0 raised its last band; both shipped profiles now
+      validate clean, so the clamp is a no-op for them and remains a guard
+      for a future tune.
     """
     problems = []
     credits = profile.get("year_gap_credit") or {}
@@ -841,9 +845,10 @@ def cmp_alt_ids(a, b):
     for k in shared:
         # It is the FULL domain that identifies an Alt ID namespace:
         # themoviedb.org/movie and themoviedb.org/tv are different sources and
-        # may legitimately reuse the same number. Entries under a shared stem
-        # are only comparable when their full domains agree, or when one side
-        # gives no path (a bare "themoviedb.org" aligns with either).
+        # may legitimately reuse the same number. The key is the full
+        # casefolded domain, so a bare "themoviedb.org" is its own namespace
+        # and does NOT line up with "themoviedb.org/movie" or "/tv" (the
+        # earlier wording said it did; dictionary audit 2026-10-02).
         if {v for _f, v in av[k]} & {v for _f, v in bv[k]}:
             qs.append(1.0)
         else:

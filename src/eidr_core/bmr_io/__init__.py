@@ -9,14 +9,16 @@ BMR-Review that had drifted from it. Six primitives, canonical semantics:
   the template carries (returns the MAX index — robust to gaps, unlike the
   old audit-copy count-of-matches).
 * ``rightmost_in(headers, members)`` — rightmost column of a family.
-* ``expand_family(ws, primary, anchor_members, insert_members, want, headers)``
-  — add family groups. The anchor/insert split is the operator's 2026-05-09
-  direction (anchor = existing group-1 columns used to find the insertion
-  point; insert = which columns new groups actually add). The pre-split
-  behavior is the special case ``anchor_members=members, insert_members=members``
-  (how the BMR-Review audit writer calls it).
+* ``expand_family(ws, primary, anchor_members, insert_members, want, headers,
+  *, header_row=HEADER_ROW)`` — add family groups. The anchor/insert split
+  is the operator's 2026-05-09 direction (anchor = existing group-1 columns
+  used to find the insertion point; insert = which columns new groups
+  actually add). The pre-split behavior is the special case
+  ``anchor_members=members, insert_members=members`` (how the BMR-Review
+  audit writer calls it).
 * ``transplant(template_xlsx, edited_xlsx)`` — swap edited worksheet XML +
   shared strings into the template, preserving formulas/validations/macros.
+  Worksheets are paired by tab name (0.68.0), not part path.
 * ``fix_shared_strings(xlsx_path)`` — inlineStr -> shared-string conversion
   for EPPlus-based BMR tooling compatibility.
 
@@ -87,6 +89,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
+import posixpath
 import re
 import tempfile
 import xml.etree.ElementTree as ET
@@ -142,11 +145,11 @@ def _header_map(values: Iterable) -> dict[int, str]:
     whole reason the shared reader exists (register R3: XML_to_JSON's two
     hand-rolled scans each broke at the first blank cell).
 
-    Takes raw values rather than a worksheet because the two callers
-    reach the row differently for a real reason — ``read_headers`` random-
-    accesses a live worksheet, ``read_sheet`` streams in read-only mode
-    where ``ws.cell`` is O(N) per access. Only the ACCESS differs; the
-    policy is identical, so it lives here rather than in both.
+    Takes raw values rather than a worksheet because its callers reach the
+    row differently — ``read_headers`` takes a worksheet the caller opened
+    (normal or read-only), ``open_sheet`` streams one it opened itself, and
+    ``header_map`` is handed a plain row. Only the ACCESS differs; the
+    policy is identical, so it lives here rather than in each.
     """
     out: dict[int, str] = {}
     for col_idx, v in enumerate(values, 1):
@@ -178,12 +181,23 @@ def read_headers(ws, header_row: int = HEADER_ROW) -> dict[int, str]:
     this argument that consumer could not adopt the shared reader at all,
     which is how it came to keep its own copy (register R3, 2026-08-25).
 
+    Works on a READ-ONLY worksheet too. The row is read with ``iter_rows``
+    rather than ``ws.cell`` over ``range(1, ws.max_column + 1)``: in
+    read-only mode ``max_column`` is the sheet's declared ``<dimension>``,
+    which is None when the element is absent (the range raised TypeError)
+    and is believed when it is stale. ``iter_rows`` with no column bound
+    reads the row's real width when the dimension is unknown, so a caller
+    that opened read-only should call ``ws.reset_dimensions()`` first to
+    read past a stale one, as ``check_sheet`` does (dictionary audit
+    2026-10-02; 0.68.0). In normal mode the result is unchanged.
+
     For a path rather than an open worksheet, use ``read_sheet``, which
     also returns the data rows and streams instead of random-accessing.
     """
-    return _header_map(
-        ws.cell(header_row, c).value for c in range(1, ws.max_column + 1)
-    )
+    for row_vals in ws.iter_rows(min_row=header_row, max_row=header_row,
+                                 values_only=True):
+        return _header_map(row_vals)
+    return {}    # the sheet has no such row
 
 def count_family(headers: dict[int, str], primary: str) -> int:
     best = 0
@@ -207,13 +221,22 @@ def rightmost_in(headers: dict[int, str], members: list[str]) -> int | None:
 
 def expand_family(ws, primary: str,
                    anchor_members: list[str], insert_members: list[str],
-                   want: int, headers: dict[int, str]) -> None:
+                   want: int, headers: dict[int, str], *,
+                   header_row: int = HEADER_ROW) -> None:
     """Add ``want - have`` new groups for the given family.
 
     ``anchor_members`` drives where new groups land (rightmost match
     in template). ``insert_members`` drives what columns are added
     per group; on each iteration the anchor advances by
     ``len(insert_members)`` to keep new groups packed together.
+
+    ``header_row`` is the row the new headers are written to, and should be
+    the row ``headers`` was read from. It defaults to the template's row 3;
+    it is a parameter for the same reason as on ``read_headers``: a
+    consumer that discovered the header row elsewhere read its headers from
+    that row, and new headers written to row 3 would land in the wrong row
+    while ``headers`` claimed they were there (dictionary audit 2026-10-02;
+    0.68.0).
     """
     have = count_family(headers, primary)
     if want <= have:
@@ -227,7 +250,7 @@ def expand_family(ws, primary: str,
         ws.insert_cols(insert_at, len(insert_members))
         new_hdrs = [f"{m} {n}" for m in insert_members]
         for i, h in enumerate(new_hdrs):
-            ws.cell(HEADER_ROW, insert_at + i).value = h
+            ws.cell(header_row, insert_at + i).value = h
         # Shift headers dict right for moved columns
         shifted = {}
         for col, h in headers.items():
@@ -238,18 +261,73 @@ def expand_family(ws, primary: str,
         headers.update(shifted)
         anchor_col += len(insert_members)   # keep anchor pointing at last inserted
 
+def _worksheet_parts(z: zipfile.ZipFile) -> dict[str, str]:
+    """``{tab name: worksheet part path}`` from a workbook's own index.
+
+    The tab name is the only identity a worksheet keeps across a save:
+    openpyxl renumbers the parts ``sheet1.xml``, ``sheet2.xml``, ... in TAB
+    order, while a workbook written by another tool (or edited by hand) may
+    number them in any order. So the part path is not a key, and the tab
+    name has to be followed through ``xl/workbook.xml`` (name -> r:id) and
+    ``xl/_rels/workbook.xml.rels`` (r:id -> target).
+
+    Tags and attributes are matched by LOCAL name, so a Strict OOXML file
+    (whose namespaces differ from the transitional ones) reads the same.
+    Only targets under ``xl/worksheets/`` are returned; chartsheets and
+    dialog sheets have no cells for a transplant to carry.
+    """
+    def _local(tag: str) -> str:
+        return tag.rsplit("}", 1)[-1]
+
+    rid_to_target: dict[str, str] = {}
+    for el in ET.fromstring(z.read("xl/_rels/workbook.xml.rels")).iter():
+        if _local(el.tag) == "Relationship":
+            target = el.get("Target", "")
+            # A target is relative to the workbook part (xl/), or absolute
+            # within the package when it starts with "/".
+            path = (target.lstrip("/") if target.startswith("/")
+                    else posixpath.normpath(posixpath.join("xl", target)))
+            rid_to_target[el.get("Id", "")] = path
+
+    out: dict[str, str] = {}
+    for el in ET.fromstring(z.read("xl/workbook.xml")).iter():
+        if _local(el.tag) != "sheet":
+            continue
+        rid = next((v for k, v in el.attrib.items() if _local(k) == "id"), None)
+        part = rid_to_target.get(rid or "")
+        if part and part.startswith("xl/worksheets/"):
+            out[el.get("name", "")] = part
+    return out
+
+
 def transplant(template_xlsx: str, edited_xlsx: str) -> None:
+    """Replace the worksheets and shared strings of ``template_xlsx`` (in
+    place) with those of ``edited_xlsx``, keeping every other part of the
+    template: formulas' defined names, validations, macros, styles.
+
+    Worksheets are paired by TAB NAME, read from each workbook's own index,
+    not by part path. Pairing by path gave tab A the content of tab B
+    whenever the template numbered its parts out of tab order, because the
+    edited copy openpyxl saved numbers them in tab order (reproduced with a
+    swapped two-tab workbook; dictionary audit 2026-10-02; 0.68.0).
+
+    ``edited_xlsx`` is expected to be a copy of the template that was
+    loaded, changed and saved, so it has every tab. A template tab with no
+    namesake there keeps its own XML, but its text cells then index the
+    EDITED shared-string table, which replaces the template's.
+    """
     out_dir = os.path.dirname(os.path.abspath(template_xlsx)) or "."
     fd, tmp = tempfile.mkstemp(suffix=".xlsx", dir=out_dir)
     os.close(fd)
     try:
         with (zipfile.ZipFile(template_xlsx, "r") as zt,
               zipfile.ZipFile(edited_xlsx, "r") as ze):
-            t_names = {i.filename for i in zt.infolist()}
             e_names = {i.filename for i in ze.infolist()}
-            replace_ws = [n for n in t_names
-                          if n.startswith("xl/worksheets/") and n.endswith(".xml")
-                          and n in e_names]
+            t_parts = _worksheet_parts(zt)
+            e_parts = _worksheet_parts(ze)
+            # {template part path: edited part path} for each shared tab.
+            replace_ws = {t_parts[name]: e_parts[name]
+                          for name in t_parts if name in e_parts}
             replace_ss = "xl/sharedStrings.xml" in e_names
             with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zn:
                 for info in zt.infolist():
@@ -259,8 +337,8 @@ def transplant(template_xlsx: str, edited_xlsx: str) -> None:
                     if replace_ss and nm == "xl/sharedStrings.xml":
                         continue
                     zn.writestr(info, zt.read(nm))
-                for nm in replace_ws:
-                    zn.writestr(nm, ze.read(nm))
+                for t_nm, e_nm in replace_ws.items():
+                    zn.writestr(t_nm, ze.read(e_nm))
                 if replace_ss:
                     zn.writestr("xl/sharedStrings.xml", ze.read("xl/sharedStrings.xml"))
         os.replace(tmp, template_xlsx)

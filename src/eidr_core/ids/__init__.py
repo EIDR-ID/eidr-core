@@ -98,8 +98,10 @@ EIDR_CONTENT_ID_RE = re.compile(r"^10\.5240/" + CONTENT_ID_SUFFIX + r"$", re.I)
 # column, a log line, an error message). Added 2026-09-11: BMR-Review carried
 # FOUR different search regexes for this one question (`[0-9A-Za-z-]{20,}`,
 # hex-quad-anchored, `[0-9A-Fa-f-]{20,}`, prefix-only), and De-Dupe UI's
-# engine mirrors the notes-parsing rule in JavaScript, so the pattern is a
-# cross-language fact. Word-boundaried so `10.5240/...-Kx` is not a match.
+# engine spec (spec/engine/*.md) restates the notes-parsing rule for a
+# JavaScript port, so the pattern is a cross-language fact. (De-Dupe UI has
+# no JavaScript code of its own -- corrected by the dictionary audit
+# 2026-10-02; 0.68.0.) Word-boundaried so `10.5240/...-Kx` is not a match.
 CONTENT_ID_SEARCH_RE = re.compile(
     r"(?<![0-9A-Z/])10\.5240/" + CONTENT_ID_SUFFIX + r"(?![0-9A-Z-])", re.I
 )

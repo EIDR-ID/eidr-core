@@ -834,3 +834,95 @@ def test_full_base_key_order_does_not_depend_on_string_hashing():
                     "CountryOfOrigin", "ReleaseDate", "Status", "AssociatedOrg",
                     "ApproximateLength"]
     assert inherited == [k for k in parent_order if k in inherited]
+
+
+# --- dictionary audit 2026-10-02; 0.68.0 -------------------------------------
+# A custom `attrs` that maps ResourceName must not route the title through
+# the presence-driven attrs loops, and a model whose `titles` is None is
+# untitled, not title-less-by-design. Both were silent: a plausible title or
+# provenance came back, never an error.
+
+_ATTRS_WITH_TITLE = {"ResourceName": "titles", "Mode": "mode"}
+
+
+def test_custom_attrs_do_not_report_a_system_generated_title_as_self():
+    """The attrs self loop read ResourceName by presence, so a kept
+    system-generated title (no-parent path) came back 'self'."""
+    child = _Rec(creation_type="Season",
+                 titles=[_Title(text="Old Gen", is_resource=True,
+                                system_generated=True)])
+    full = build_full_record(child, None, "Season", attrs=_ATTRS_WITH_TITLE)
+    assert provenance(full).get("ResourceName") != "self"
+    # And a user-supplied one is still 'self' -- via the title logic.
+    child2 = _Rec(creation_type="Season",
+                  titles=[_Title(text="Given", is_resource=True)])
+    full2 = build_full_record(child2, None, "Season", attrs=_ATTRS_WITH_TITLE)
+    assert provenance(full2)["ResourceName"] == "self"
+
+
+def test_custom_attrs_do_not_hand_a_failed_season_its_parents_title():
+    """The attrs inheritance loop copied the parent's title into the
+    TitleConstructionError partial, marked 'inherited'. Compared against the
+    JSON adapter on the same input: neither partial may carry a title."""
+    with pytest.raises(TitleConstructionError) as ei:
+        build_full_record(_Rec(creation_type="Season"), _parent_rec(),
+                          "Season", attrs=_ATTRS_WITH_TITLE)
+    partial = ei.value.partial
+    assert partial.titles == []
+    assert "ResourceName" not in provenance(partial)
+    # ...while every other mapped field still inherited (it IS a partial).
+    assert partial.mode == "AudioVisual"
+    assert provenance(partial)["Mode"] == "inherited"
+
+    with pytest.raises(TitleConstructionError) as ej:
+        build_full_base({}, PARENT, "Season")
+    assert "ResourceName" not in ej.value.partial
+    assert "ResourceName" not in ej.value.provenance
+
+
+def test_custom_attrs_still_let_an_edit_inherit_its_parents_title():
+    # Skipping ResourceName in the attrs loops must not stop _apply_title.
+    full = build_full_record(_Rec(creation_type="Edit"), _parent_rec(),
+                             "Edit", attrs=_ATTRS_WITH_TITLE)
+    assert full.titles[0].text == "The Series"
+    assert provenance(full)["ResourceName"] == "inherited"
+
+
+def test_titles_none_is_untitled_and_gets_a_generated_title():
+    """`titles=None` used to skip title handling entirely, leaving a Season
+    untitled where build_full_base builds one."""
+    child = _Rec(creation_type="Season", sequence_number="6", titles=None)  # type: ignore[arg-type]
+    full = build_full_record(child, _parent_rec(), "Season")
+    json_full, json_prov = build_full_base({}, PARENT, "Season",
+                                           extra={"SequenceNumber": "6"})
+    assert [t.text for t in full.titles] == ["The Series: Season 6"]
+    assert full.titles[0].text == json_full["ResourceName"][0]["Title"]
+    assert provenance(full)["ResourceName"] == json_prov["ResourceName"] == "system"
+
+
+def test_titles_none_raises_like_build_full_base_when_untitleable():
+    with pytest.raises(TitleConstructionError):
+        build_full_record(_Rec(creation_type="Season", titles=None),  # type: ignore[arg-type]
+                          _parent_rec(), "Season")
+    with pytest.raises(TitleConstructionError):
+        build_full_base({}, PARENT, "Season")
+
+
+def test_titles_none_on_an_edit_inherits_the_parents_title():
+    full = build_full_record(_Rec(creation_type="Edit", titles=None),  # type: ignore[arg-type]
+                             _parent_rec(), "Edit")
+    assert full.titles[0].text == "The Series"
+    assert provenance(full)["ResourceName"] == "inherited"
+
+
+def test_a_model_without_a_titles_attribute_skips_title_handling():
+    # No attribute at all: the model cannot carry a title, so nothing is
+    # built and nothing is raised.
+    @dataclass
+    class _NoTitles:
+        creation_type: str = "Season"
+        mode: str | None = None
+
+    full = build_full_record(_NoTitles(), _parent_rec(), "Season")
+    assert full.mode == "AudioVisual"
+    assert "ResourceName" not in provenance(full)

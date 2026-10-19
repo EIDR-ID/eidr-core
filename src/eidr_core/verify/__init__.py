@@ -18,19 +18,19 @@ about verdicts, findings, rules, or confidence scores: eidr-dq maps these to
 corroborated/contradicted, and a matching program would map them to score
 contributions, from the same primitives.
 
-WHY THIS IS NOT ``eidr_core.compare``
--------------------------------------
+WHY THIS IS NOT THE ``compare`` MODULE
+--------------------------------------
 Both packages contain a function that compares two release dates, and they
 are deliberately NOT merged. They answer different questions with different
 contracts:
 
-* ``eidr_core.compare`` (L2, seeded from BMR-Review) scores an EIDR record
+* this package's ``compare`` module (L2, seeded from BMR-Review) scores an EIDR record
   against ANOTHER EIDR RECORD for de-duplication. It returns a continuous
   quality in [0, 1+bonus] via half-life decay, is tuned through
   ``compare-spec.json``, and its behaviour is pinned by the golden-pair
   corpus. Both sides are registry-shaped, so neither carries a stated
   precision.
-* ``eidr_core.verify`` (this module) checks a registered value against an
+* this module (``verify``) checks a registered value against an
   OUTSIDE SOURCE. It returns a categorical verdict because a DQ finding is
   binary, and it honours the external fact's stated precision — a
   year-precision fact can only support a year-level claim, so an exact-date
@@ -46,10 +46,17 @@ Tuning values are PARAMETERS here, never module constants: eidr-dq passes
 per-rule tolerances from its rule config. A second consumer with different
 tolerances (e.g. eidr-wikidata's year bands) passes its own — the shared
 part is the arithmetic and the precision logic, not the thresholds.
+
+The two modules are named above without the package prefix on purpose: the
+vendoring tool refuses any copied file that still names its source package
+after rewriting, so the dotted form made this module unvendorable (dictionary
+audit 2026-10-02; 0.68.0).
 """
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import date
+from numbers import Number
 
 __all__ = [
     "parse_iso_date",
@@ -74,10 +81,25 @@ def runtime_candidates(facts: dict) -> list[float]:
     Series ApproximateLength is the typical episode duration per the best
     practices, so TMDb episode_run_time is directly comparable and is
     included alongside runtime_minutes.
+
+    Each key normally holds a list; a single value (a number or a numeric
+    string such as ``"90"``) is read as a one-item list (0.68.0).
     """
-    out = list(facts.get("runtime_minutes") or [])
-    out += list(facts.get("episode_runtime_minutes") or [])
+    out = _as_list(facts.get("runtime_minutes"))
+    out += _as_list(facts.get("episode_runtime_minutes"))
     return [float(x) for x in out]
+
+
+def _as_list(value: object) -> list:
+    # list() of a bare value was wrong both ways: "90" became [9.0, 0.0]
+    # (a plausible runtime, silently) and 90 raised TypeError (dictionary
+    # audit 2026-10-02; 0.68.0). A str or a number is one runtime.
+    # Falsy is empty, as the `or []` this replaced had it.
+    if not value:
+        return []
+    if isinstance(value, (str, Number)) or not isinstance(value, Iterable):
+        return [value]
+    return list(value)
 
 
 def compare_runtime(reg_minutes: float, facts: dict,
@@ -99,6 +121,9 @@ def compare_runtime(reg_minutes: float, facts: dict,
     return "mismatch", f"runtime {best:g} vs {reg_minutes:g} (mismatch)"
 
 
+_RELEASE_DATE_MODES = frozenset({"exact_date", "year", "window"})
+
+
 def compare_release_date(reg_date: date | None, reg_year: int | None,
                          facts: dict, *, mode: str = "window",
                          tolerance_days: int = 30) -> tuple[str, str]:
@@ -113,7 +138,15 @@ def compare_release_date(reg_date: date | None, reg_year: int | None,
         year        only the years are compared
         window      within tolerance_days, degrading to month or year
                     comparison as the available precision requires
+
+    Any other ``mode`` raises ``ValueError`` (0.68.0).
     """
+    # Checked first, before any early return: an unknown mode used to fall
+    # through to the window logic, so a typo ("exactdate") returned plausible
+    # verdicts under the wrong rule (dictionary audit 2026-10-02; 0.68.0).
+    if mode not in _RELEASE_DATE_MODES:
+        raise ValueError(f"unknown mode {mode!r}; expected one of "
+                         f"{sorted(_RELEASE_DATE_MODES)}")
     ext_raw = facts.get("release_date")
     if not ext_raw:
         return "none", "no release date"
@@ -174,7 +207,9 @@ def compare_year_arbitration(reg_date: date | None, reg_year: int | None,
 
     Returns mismatch whenever an external date is available (the finding is
     a true defect either way), with a note naming the field the external
-    fact agrees with, or noting that it agrees with neither.
+    fact agrees with, or noting that it agrees with neither. When the two
+    fields do NOT disagree, there is nothing to arbitrate and it returns
+    ``insufficient`` (0.68.0).
     """
     ext_raw = facts.get("release_date")
     if not ext_raw:
@@ -184,6 +219,12 @@ def compare_year_arbitration(reg_date: date | None, reg_year: int | None,
         return "none", "unparseable external date"
     if reg_date is None or reg_year is None:
         return "insufficient", "registry lacks both fields to arbitrate"
+    # The precondition, checked rather than assumed: with agreeing fields the
+    # fall-through said "matches neither release_date (2000) nor release_year
+    # (2000)", a self-contradicting note on a record with no defect
+    # (dictionary audit 2026-10-02; 0.68.0).
+    if reg_date.year == int(reg_year):
+        return "insufficient", "release_date and release_year agree; nothing to arbitrate"
 
     ey = ext_date.year
     d_year = reg_date.year

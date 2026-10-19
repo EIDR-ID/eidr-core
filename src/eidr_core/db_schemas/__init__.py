@@ -4,7 +4,8 @@ The contracts (generated FROM the live databases, the authoritative source —
 operator 2026-08-03) are packaged at ``eidr_core/specs/db_schemas/<db>/``:
 ``manifest.json`` (machine contract), ``schema.sql`` (human/provisioning
 form), ``CHANGES.md``. Regeneration + drift checking:
-``eidr-core/tools/dump_db_schema.py``.
+``eidr-core-ops/tools/dump_db_schema.py`` (moved out of this repo in the
+2026-08-30 split; corrected 0.68.0).
 
 Consumers use :func:`assert_tables` as a STARTUP assertion — declare only the
 tables/columns your program actually reads, and schema breakage surfaces at
@@ -20,6 +21,7 @@ query layer (register decision, reaffirmed 2026-08-03).
 """
 from __future__ import annotations
 
+import copy
 import json
 from functools import cache
 from importlib.resources import files
@@ -41,22 +43,33 @@ __all__ = [
 DATABASES = ("eidr_mirror_db", "eidr_dq_db", "language_registry", "imdb_snapshot_db")
 
 
+# The parse is cached, but the cached dict never leaves this module: until
+# 0.68.0 load_manifest returned it directly, so a caller that mutated the
+# result (clearing ["tables"]) changed the contract for every later caller in
+# the process, assert_tables included (dictionary audit 2026-10-02; 0.68.0).
 @cache
-def load_manifest(database: str) -> dict:
-    """Load a database's schema manifest. Raises KeyError for unknown names."""
+def _cached_manifest(database: str) -> dict:
     if database not in DATABASES:
         raise KeyError(f"unknown database {database!r}; known: {DATABASES}")
     p = files("eidr_core") / "specs" / "db_schemas" / database / "manifest.json"
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+def load_manifest(database: str) -> dict:
+    """Load a database's schema manifest. Raises KeyError for unknown names.
+
+    Returns a fresh deep copy on every call: the caller owns it and may
+    change it without affecting anyone else (0.68.0)."""
+    return copy.deepcopy(_cached_manifest(database))
+
+
 def contract_version(database: str) -> str:
-    return load_manifest(database)["version"]
+    return _cached_manifest(database)["version"]
 
 
 def table_columns(database: str, table: str) -> list[str]:
     """Column names of a table per the contract (KeyError if absent)."""
-    return [c["name"] for c in load_manifest(database)["tables"][table]["columns"]]
+    return [c["name"] for c in _cached_manifest(database)["tables"][table]["columns"]]
 
 
 def assert_tables(database: str, needs: dict) -> None:
@@ -64,7 +77,7 @@ def assert_tables(database: str, needs: dict) -> None:
     contract. ``needs`` = {table: [column, ...]} (empty list = table
     presence only). Raises RuntimeError listing every miss, with the
     contract version so the operator knows which schema change to look at."""
-    m = load_manifest(database)
+    m = _cached_manifest(database)   # read-only here; no copy needed
     problems = []
     for table, cols in needs.items():
         entry = m["tables"].get(table)
@@ -79,4 +92,6 @@ def assert_tables(database: str, needs: dict) -> None:
         raise RuntimeError(
             f"{database} schema contract {m['version']} does not satisfy this "
             f"consumer: " + "; ".join(problems) +
-            ". See eidr-core specs/db_schemas/" + database + "/CHANGES.md.")
+            # The packaged path, not the repo-root specs/ (which holds no
+            # db_schemas); corrected 0.68.0, dictionary audit 2026-10-02.
+            f". See eidr-core src/eidr_core/specs/db_schemas/{database}/CHANGES.md.")

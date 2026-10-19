@@ -69,6 +69,7 @@ fact-dict contract above.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import time
@@ -171,13 +172,31 @@ class JsonFactCache:
         return out
 
     def store(self, results: dict[Key, Entry]) -> None:
+        """Persist ``results``; all or nothing, on disk AND in memory.
+
+        The merge is built on a copy and becomes the cache only after the
+        file is replaced. Until 0.68.0 entries went into the live dict
+        first, so one value ``json`` cannot serialise stayed in memory and
+        made every LATER store raise too, and the partial ``.tmp`` was left
+        beside the file (dictionary audit 2026-10-02; 0.68.0). Now a failed
+        store raises, removes its ``.tmp``, and leaves the cache as it was.
+        """
         now = time.time()
+        merged = dict(self._d)
         for k, e in results.items():
-            self._d[k] = (now, e)
+            merged[k] = (now, e)
         tmp = self._path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as fh:
-            json.dump([[s, i, t, e] for (s, i), (t, e) in self._d.items()], fh)
-        os.replace(tmp, self._path)
+        try:
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump([[s, i, t, e] for (s, i), (t, e) in merged.items()], fh)
+            os.replace(tmp, self._path)
+        except BaseException:
+            # BaseException: a KeyboardInterrupt mid-dump leaves the same
+            # half-written sibling. The previous file is untouched either way.
+            with contextlib.suppress(OSError):
+                os.remove(tmp)
+            raise
+        self._d = merged
 
 
 class DictFactCache:

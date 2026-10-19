@@ -21,10 +21,18 @@ What deliberately stays OUT (per-program decisions, LOCAL tier):
 * the env-var names themselves — each consumer passes its historical names
   so operator environments keep working unchanged.
 
-Consumers (each a thin wrapper passing its env names + validator):
+Consumers of ``load_secrets`` (each a thin wrapper passing its env names +
+validator):
   eidr-dq        src/dq/secrets_loader.py
   XML_to_JSON    secrets_loader.py
   eidr-wikidata  src/eidr_wikidata/secrets.py
+  BMRtoAltID     bmr_altid/secrets.py
+  eidr-imdb      src/eidr_imdb/secrets.py (and load_local in db.py)
+Importers of ``load_local`` alone (a local file, never AWS): BMR-Review
+(resubmit_unresolved.py, validate_returned_ids.py), LanguageTool
+(src/language_tool/cli.py), ShortDOI (shortdoi.py), python-tools
+(probes/registry_probe.py).
+(Consumer list refreshed by the dictionary audit 2026-10-02; 0.68.0.)
 EIDR MCP's copy is NOT ported (standing decision: MCP is only touched when
 it independently needs a major update; its loader is noted in OVERLAPS).
 
@@ -209,11 +217,20 @@ def load_secrets(
                       f"{local_path}", file=sys.stderr)
                 cfg = load_local(local_path)
             else:
+                # The hint names only env vars the caller actually has.
+                # Indexing [0] unconditionally turned this SecretsError into
+                # an IndexError for a caller that passes an empty sequence
+                # (dictionary audit 2026-10-02; 0.68.0).
+                hint = []
+                if local_flag_envs:
+                    hint.append(f"{local_flag_envs[0]}=1")
+                if local_path_envs:
+                    hint.append(f"a valid {local_path_envs[0]}")
+                todo = (f"Set {' with '.join(hint)}, or fix" if hint
+                        else "Fix")
                 raise SecretsError(
                     f"AWS secrets unavailable ({aws_err}) and no local "
-                    f"secrets file found at {local_path}. Set "
-                    f"{local_flag_envs[0]}=1 with a valid "
-                    f"{local_path_envs[0]}, or fix the AWS "
+                    f"secrets file found at {local_path}. {todo} the AWS "
                     f"configuration.") from aws_err
 
     if validate is not None:

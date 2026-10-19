@@ -58,7 +58,7 @@ OBSOLETE_ALPHA2_TO_ALPHA4: dict[str, str] = {
 }
 
 
-def normalize_country_code(code: str) -> str:
+def normalize_country_code(code: str | int | None) -> str:
     """Return the EIDR-canonical form of one country code.
 
     Rewrites the alpha-2 form of a dissolved/renamed country to its ISO 3166-3
@@ -66,8 +66,21 @@ def normalize_country_code(code: str) -> str:
     alpha-2, existing alpha-4, M49 region integers, and "XX". Uppercased and
     whitespace-stripped; empty/None → "". Pure and year-independent, so both
     the Wikidata ingest path and the de-dupe comparators can call it.
+
+    An ``int`` is taken as an M49 region code and given in the three-digit
+    form a string carries: ``150`` → ``"150"``, ``19`` → ``"019"`` (0.68.0).
     """
-    c = (code or "").strip().upper()
+    # None and int both reach this from real callers (spreadsheet cells and
+    # JSON numbers); an int raised AttributeError on .strip() until 0.68.0
+    # (dictionary audit 2026-10-02). M49 codes are three digits with leading
+    # zeros ("019" Americas), and a numeric STRING passes through unchanged,
+    # so an int is padded to match it -- str(19) would give "19", which is no
+    # code at all. bool is an int subclass but never a country code.
+    if code is None:
+        return ""
+    if isinstance(code, int) and not isinstance(code, bool):
+        return f"{code:03d}"
+    c = str(code).strip().upper()
     if not c:
         return ""
     return OBSOLETE_ALPHA2_TO_ALPHA4.get(c, c)

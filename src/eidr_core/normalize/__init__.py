@@ -8,6 +8,8 @@ fuzzy comparison, not to be exhaustive.
 """
 import re
 import unicodedata
+from datetime import date
+from typing import overload
 
 # EIDR country code-set crosswalk (SU→SUHH, …), single-homed in eidr_core so
 # eidr-wikidata and BMR-Review share ONE map (register R1 / OVERLAPS.md 9a).
@@ -56,7 +58,17 @@ _WORDS = {
 }
 
 
-def nfkc(s: str) -> str:
+# Overloads, not a bare ``-> str | None`` (dictionary audit 2026-10-02;
+# 0.68.0): ``None`` passes through as ``None``, which the old ``-> str``
+# annotation hid, but a str caller -- nearly all of them -- must keep a
+# ``str`` result without a cast.
+@overload
+def nfkc(s: str) -> str: ...
+@overload
+def nfkc(s: None) -> None: ...
+def nfkc(s: str | None) -> str | None:
+    """NFKC-normalise ``s``. ``None`` and ``""`` come back unchanged; a
+    non-str value is stringified first."""
     if s is None or s == "":
         return s
     if not isinstance(s, str):
@@ -73,10 +85,20 @@ _LIGATURES = {
 }
 
 
-def ascii_fold(s: str) -> str:
+@overload
+def ascii_fold(s: str) -> str: ...
+@overload
+def ascii_fold(s: None) -> None: ...
+def ascii_fold(s: str | None) -> str | None:
     """Fold Latin diacritics and ligatures to ASCII (é->e, ø->o, æ->ae, ß->ss)
-    so they don't count as differences. Non-Latin scripts (CJK, Cyrillic, ...)
-    are left intact so they still compare against each other."""
+    so they don't count as differences. ``None`` and ``""`` come back
+    unchanged.
+
+    Non-Latin letters (CJK, Cyrillic, ...) are kept, so they still compare
+    against each other -- but they lose their combining marks too (が->か,
+    й->и, Ё->Е), so diacritic differences INSIDE those scripts are ignored
+    as well. (The docstring said "left intact" until the dictionary audit
+    2026-10-02; the code has always stripped every combining mark.)"""
     if not s:
         return s
     s = "".join(_LIGATURES.get(ch, ch) for ch in s)
@@ -110,7 +132,7 @@ def _tokens_around_ampersands(s: str, alias) -> tuple[list[str], bool]:
 
     Why (python-tools, 2026-09-12): the old order was "replace & with and,
     then alias every token", and the alias tables map the Romance
-    conjunctions ``e``/``y``/``a`` to "and" and the Roman numerals
+    conjunctions ``e``/``y`` to "and" and the Roman numerals
     ``i``/``v``/``x`` to digits. So ``A&E Networks`` became
     ``a and and networks``, ``V&A`` became ``5 and a`` and ``X&Y`` became
     ``10 and and`` -- and ``A&E Television Networks`` is a real production
@@ -208,13 +230,29 @@ def parse_registrant_extra(raw):
 # --- dates -----------------------------------------------------------------
 def parse_date(raw):
     """Return (year:int|None, ymd:tuple|None). Handles 'YYYY', 'YYYY-MM',
-    'YYYY-MM-DD', and slash formats 'M/D/YYYY' (US) / 'D/M/YYYY'."""
+    'YYYY-MM-DD' (anything after the day is ignored), and slash formats
+    'M/D/YYYY' (US) / 'D/M/YYYY'. A slash date is read M/D; D/M order applies
+    only when the first field is over 12.
+
+    ``ymd`` is set only for a full date that exists on the calendar. An
+    impossible one ('2006-13-45', '2006-02-30', '2/30/2006') keeps its year
+    and gets ``ymd=None``, exactly as a year-only date does, so callers that
+    do arithmetic on ``ymd`` (days_between) never see it."""
     if raw is None:
         return None, None
     s = str(raw).strip()
     m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", s)
     if m:
         y, mo, d = int(m[1]), int(m[2]), int(m[3])
+        # Validated like the slash branch below (dictionary audit 2026-10-02;
+        # 0.68.0). Unvalidated, '2006-13-45' came back as a full date and
+        # days_between raised ValueError inside compare.cmp_release_date,
+        # which does not catch it -- one malformed registry date failed the
+        # whole comparison. The year is still good evidence, so keep it.
+        try:
+            date(y, mo, d)
+        except ValueError:
+            return y, None
         return y, (y, mo, d)
     m = re.match(r"^(\d{1,2})/(\d{1,2})/(\d{4})$", s)
     if m:
@@ -224,7 +262,6 @@ def parse_date(raw):
         if mo > 12:            # both >12 shouldn't happen; clamp safely
             mo, d = d, mo
         try:
-            from datetime import date
             date(y, mo, d)
             return y, (y, mo, d)
         except ValueError:
@@ -239,7 +276,6 @@ def parse_date(raw):
 
 
 def days_between(a_ymd, b_ymd):
-    from datetime import date
     return abs((date(*a_ymd) - date(*b_ymd)).days)
 
 
@@ -288,12 +324,17 @@ def sanitize_field(s) -> str:
     """Normalise a text field for bulk loading or delimited output.
 
     - ``None`` and whitespace-only become ``""``
-    - Strip leading/trailing whitespace
     - Remove NUL bytes (PostgreSQL rejects them outright)
     - Replace tabs / CR / LF with spaces (they would break TSV, and COPY
       handles some but not all of them on its own)
     - Replace every remaining C0 control character except space with a space,
       so nothing invisible survives into the output
+    - THEN strip leading/trailing whitespace, so a space that replaced an
+      edge control character goes too (``'a\\t'`` -> ``'a'``)
+
+    DEL (0x7F) and C1 controls (0x80-0x9F) are deliberately left alone
+    (eidr-wikidata pins that they pass through), except where ``str.strip``
+    already treats one as whitespace at an edge (U+0085).
 
     Extracted from EIDR MCP ``reset_alt_ids.py::_sanitize_field`` (register R6,
     2026-08-06) — the fuller of that repo's two copies, and the canonical
@@ -302,17 +343,21 @@ def sanitize_field(s) -> str:
     this exists for NEW consumers and for the eventual port, not as a shim
     MCP imports today.
 
-    NOTE for the MCP thread: the two copies had already drifted when this was
-    extracted. ``shortdoi_audit.py``'s copy does only the strip-and-replace
-    half — no NUL removal, no C0 sweep — and that script writes TSV, so a
-    control character in registry XML can reach its output and break a
-    downstream parse. This function is the behaviour to converge on.
+    The two MCP copies had drifted when this was extracted
+    (``shortdoi_audit.py``'s lacked the NUL removal and C0 sweep); they were
+    converged on 2026-08-26, and MCP's
+    ``tests/test_schema_contract.py::test_the_three_sanitize_field_copies_agree``
+    now pins all three to each other. A behaviour change here therefore
+    means the same edit to both MCP copies (done for the 0.68.0
+    strip-last change).
     """
     if s is None:
         return ""
-    s = str(s).strip()
-    if not s:
-        return ""
-    s = s.replace("\x00", "")
+    # Replace first, strip LAST (dictionary audit 2026-10-02; 0.68.0). The
+    # old order stripped first, so an edge tab or control character was
+    # turned into a space AFTER the strip had run: 'a\t' -> 'a ' and
+    # '\ta' -> ' a', leaving padding the docstring promised was gone.
+    s = str(s).replace("\x00", "")
     s = s.replace("\t", " ").replace("\r", " ").replace("\n", " ")
-    return "".join(" " if (ord(ch) < 0x20 and ch != " ") else ch for ch in s)
+    s = "".join(" " if (ord(ch) < 0x20 and ch != " ") else ch for ch in s)
+    return s.strip()

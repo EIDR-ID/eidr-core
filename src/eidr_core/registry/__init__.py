@@ -8,10 +8,20 @@ registry API interaction goes through the Python SDK, and every SDK client is
 constructed HERE — one place for credentials precedence, registry-target
 selection (sandbox2 default; production is an explicit operator choice), the
 superparty write gate, and one import path to audit when reviewing
-registry-write changes. Consumers: eidr-wikidata (via its shim), eidr-dq's
-``registry_sync_verify`` (adoption pending, its thread's call), future
-Shim-mode services. EIDR MCP stays exempt until the SDK grows mirror-ingest
-surfaces.
+registry-write changes. Consumers (refreshed by the dictionary audit
+2026-10-02; 0.68.0):
+
+  * eidr-wikidata -- via its shim ``eidr/registry_client.py`` and the
+    registry scripts;
+  * eidr-dq -- ``registry_sync_verify``, adopted 2026-08-27 with
+    ``writable=False`` (read-only by design);
+  * BMR-Review -- ``resubmit_unresolved.py``, ``validate_returned_ids.py``;
+  * LanguageTool -- ``cli.py`` (factory) and ``runner.py``
+    (``token_operation_status``);
+  * ShortDOI -- ``shortdoi.py``;
+  * python-tools -- ``probes/registry_probe.py``.
+
+EIDR MCP stays exempt until the SDK grows mirror-ingest surfaces.
 
 Why this module exists (original rationale)
 -------------------------------------------
@@ -38,11 +48,6 @@ than constructing an ``eidr.Client`` directly. That gives us:
   * one place to opt into / out of the SDK's superparty write gate;
   * a single import path the operator can audit when reviewing
     registry-write changes.
-
-Today the module is not wired into any production call site — there
-ARE no production call sites. It's the scaffold Phase 4 / 5 / 6 work
-will plug into. Keeping the wrapper tiny means we don't lock in a
-schema before we know what the write phases need.
 
 Usage (Phase 4+ pattern)
 ------------------------
@@ -91,6 +96,7 @@ never pay for the SDK import or the httpx transport.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Literal
 
 # Re-exported so callers get the factory and the verdict reader from one
@@ -135,6 +141,26 @@ log = logging.getLogger(__name__)
 # write credentials at that point.
 DEFAULT_REGISTRY = "sandbox2"
 
+# The fields a registry credential cannot do without.
+_REQUIRED_CREDENTIAL_FIELDS = ("user_id", "party_id", "password")
+
+
+def _required_field(lower: Mapping[str, Any], field: str) -> str:
+    """``lower[field]`` stripped, or ``KeyError`` when absent, null or blank.
+
+    A JSON ``null`` used to pass through ``str()`` and reach the registry as
+    the literal string ``'None'``, failing later as an opaque authentication
+    error (code=4) instead of here, with the field named (dictionary audit
+    2026-10-02; 0.68.0). Null and blank are treated as missing because that
+    is what they are: the operator left the field unfilled.
+    """
+    value = lower.get(field)
+    text = "" if value is None else str(value).strip()
+    if not text:
+        raise KeyError(
+            f"registry credentials: {field.upper()} is missing, null or blank")
+    return text
+
 
 def build_registry_credentials(secrets: dict | None = None) -> _SDKCredentials:
     """
@@ -142,6 +168,12 @@ def build_registry_credentials(secrets: dict | None = None) -> _SDKCredentials:
     (the same shape ``load_secrets`` returns), falling back to the
     SDK's own auto-detection chain when no project-side section is
     present.
+
+    Three shapes are accepted, tried in this order: a ``"registry"``
+    section, the older ``"eidr_registry"`` section, and ``USER_ID`` /
+    ``PARTY_ID`` / ``PASSWORD`` at the TOP level of the dict (the
+    operator's live file, 2026-07-14). Every value is stripped of
+    surrounding whitespace.
 
     Project secrets convention — the operator's actual ``.secrets.json``
     (added 2026-07-14; see ``sample.secrets.json``) uses a
@@ -170,13 +202,34 @@ def build_registry_credentials(secrets: dict | None = None) -> _SDKCredentials:
 
     Raises:
         ``ImportError`` if the ``eidr`` SDK is not installed.
-        ``KeyError`` if a section is present but incomplete.
-        ``EIDRCredentialsNotFoundError`` if no source can resolve.
+        ``KeyError`` if a section is present but incomplete -- a required
+        field (USER_ID, PARTY_ID, PASSWORD) that is absent, ``null`` or
+        blank counts as missing (0.68.0; a ``null`` used to be sent as the
+        string ``'None'``).
+        ``TypeError`` if the ``"registry"`` / ``"eidr_registry"`` value is
+        not a mapping (for example a target name such as ``"sandbox2"``;
+        0.68.0, previously an ``AttributeError``).
+        ``EIDRCredentialsNotFoundError`` if no source can resolve (from
+        ``eidr.Credentials.load()``).
+        ``EIDRCredentialAmbiguityError`` if more than one source resolves
+        (from ``eidr.Credentials.load()``, SDK 1.3.0+: it refuses to pick
+        between, say, env vars and an SDK config file).
     """
     from eidr import Credentials  # lazy
 
     if secrets is not None:
         section = secrets.get("registry") or secrets.get("eidr_registry")
+        if section and not isinstance(section, Mapping):
+            # A target name in the section's slot ("registry": "sandbox2")
+            # is a plausible mistake; say so rather than fail on .items()
+            # with an AttributeError that names nothing (dictionary audit
+            # 2026-10-02; 0.68.0).
+            raise TypeError(
+                "registry credentials: the 'registry' / 'eidr_registry' "
+                "secrets value must be a mapping of USER_ID / PARTY_ID / "
+                f"PASSWORD, got {type(section).__name__}. The registry "
+                "TARGET is chosen with get_registry_client(registry=...), "
+                "never in secrets.")
         if not section:
             # Top-level fallback (2026-07-14): the operator's live
             # .secrets.json carries USER_ID / PARTY_ID / PASSWORD at
@@ -194,13 +247,15 @@ def build_registry_credentials(secrets: dict | None = None) -> _SDKCredentials:
                 "registry_client: building Credentials from the secrets "
                 "registry section"
             )
+            user_id, party_id, password = (
+                _required_field(lower, f) for f in _REQUIRED_CREDENTIAL_FIELDS)
             return Credentials(
-                # .strip(): the file is hand-edited; a stray leading/
-                # trailing space in any field yields an opaque
+                # Stripped (in _required_field): the file is hand-edited; a
+                # stray leading/trailing space in any field yields an opaque
                 # "authentication error" (code=4) from the registry.
-                user_id=str(lower["user_id"]).strip(),
-                party_id=str(lower["party_id"]).strip(),
-                password=str(lower["password"]).strip(),
+                user_id=user_id,
+                party_id=party_id,
+                password=password,
                 base_url=(str(lower["base_url"]).strip()
                           if lower.get("base_url") else None),
             )

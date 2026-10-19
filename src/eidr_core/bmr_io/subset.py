@@ -241,6 +241,10 @@ def check_sheet(src_xlsx: str, sheet_name: str) -> SheetCheck:
     into a two-second refusal. (A ``dry_run=`` flag on ``subset_rows`` was
     the other shape proposed; rejected because a dry run still needs a
     destination path and row list that mean nothing before the run.)
+
+    The sheet's declared ``<dimension>`` is ignored (0.68.0): a sheet with
+    none, or a stale one, is judged on the header row as it really is,
+    the same as ``subset_rows`` judges it.
     """
     import openpyxl  # the `bmr` extra
 
@@ -249,6 +253,14 @@ def check_sheet(src_xlsx: str, sheet_name: str) -> SheetCheck:
         raise FileNotFoundError(f"BMR sheet not found: {src_xlsx}")
     wb = openpyxl.load_workbook(src_xlsx, read_only=True, data_only=True)
     try:
+        # Read-only mode believes the sheet's declared <dimension>: absent, it
+        # made read_headers raise TypeError; stale, it hid the headers past
+        # it, so this pre-flight refused sheets subset_rows and fill_column
+        # (normal mode, which measures the sheet) accept. Discarding it makes
+        # read_headers read the header row's real width (dictionary audit
+        # 2026-10-02; 0.68.0).
+        if sheet_name in wb.sheetnames:
+            wb[sheet_name].reset_dimensions()
         return _inspect(wb, key, src_xlsx, sheet_name)
     finally:
         wb.close()

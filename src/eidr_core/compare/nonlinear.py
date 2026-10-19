@@ -37,6 +37,11 @@ __all__ = [
 
 
 def aggregate(qualities, n_opportunities, r=None, denom_basis=None):
+    """Opportunity-normalised aggregation: the geometric-weighted sum of the
+    positive qualities over the weights of ``max(n_opportunities, matches)``
+    slots. ``denom_basis`` is accepted and ignored. Nothing in eidr-core calls
+    this; it stays public because BMR-Review's ``nonlinear`` shim imports it
+    by name (dictionary audit 2026-10-02: removal is an open ruling)."""
     if r is None:
         r = config.NL_MODIFIER
     qs = sorted((q for q in qualities if q > 0), reverse=True)

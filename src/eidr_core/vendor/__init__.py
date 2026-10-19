@@ -5,7 +5,8 @@ Why this exists (python-tools proposal 2026-09-08; accepted 2026-09-10;
 python-sdk's consumer shape 2026-09-10; landed 0.31.0 on 2026-09-11)
 -------------------------------------------------------------------------
 Two portfolio deliverables must be self-contained: the Python SDK (``eidr``
-on PyPI — and eidr-core depends on IT, so the arrow cannot point back) and
+on PyPI, which eidr-core's ``registry`` module imports -- optional
+``registry`` extra -- so the arrow cannot point back) and
 the command-line tools (``.py`` files that must run with only the SDK
 installed). Both need logic that lives here — the SDK carries a second
 implementation of ``eidr_core.ids`` today (``eidr.models._checkchar``),
@@ -117,13 +118,29 @@ def _parse_flat_toml(text: str) -> dict[str, dict[str, object]]:
 
 
 def load_manifest(path: str | os.PathLike[str]) -> Manifest:
+    """Read and validate ``vendor.toml``. Every way it can be wrong -- a
+    missing or unreadable file, a TOML syntax error, a missing or invalid
+    key -- raises ``VendorError`` (the CLI's exit 2)."""
     p = Path(path)
-    text = p.read_text(encoding="utf-8")
+    # A missing file and a TOML syntax error used to escape as raw
+    # FileNotFoundError / TOMLDecodeError tracebacks, exit 1 -- the code the
+    # CLI reserves for "check found drift" (dictionary audit 2026-10-02;
+    # 0.68.0). They are manifest errors like the rest, so exit 2.
+    try:
+        text = p.read_text(encoding="utf-8")
+    except OSError as e:
+        raise VendorError(f"{p}: cannot read the vendor manifest ({e.strerror or e})") from e
+    except UnicodeDecodeError as e:
+        raise VendorError(f"{p}: not UTF-8 text ({e})") from e
     try:
         import tomllib  # Python 3.11+
-        data = tomllib.loads(text)
     except ModuleNotFoundError:
         data = _parse_flat_toml(text)
+    else:
+        try:
+            data = tomllib.loads(text)
+        except tomllib.TOMLDecodeError as e:
+            raise VendorError(f"{p}: not valid TOML: {e}") from e
     table = data.get("vendor")
     if not isinstance(table, dict):
         raise VendorError(f"{p}: no [vendor] table")
@@ -151,7 +168,13 @@ def load_manifest(path: str | os.PathLike[str]) -> Manifest:
 # ── source acquisition ───────────────────────────────────────────────────
 
 def _git(*args: str, cwd: str | os.PathLike[str] | None = None) -> str:
-    r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    # No git on PATH raised a bare FileNotFoundError traceback, exit 1, which
+    # reads as a missing FILE (dictionary audit 2026-10-02; 0.68.0).
+    try:
+        r = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    except FileNotFoundError as e:
+        raise VendorError(f"git is not installed or not on PATH (needed for "
+                          f"`git {' '.join(args)}`)") from e
     if r.returncode != 0:
         raise VendorError(f"git {' '.join(args)} failed: {r.stderr.strip()}")
     return r.stdout.strip()
@@ -342,6 +365,9 @@ def check(manifest: Manifest, *, source_path: str | os.PathLike[str] | None = No
           resync: bool = False) -> list[str]:
     """Return the list of drift problems (empty means clean).
 
+    Raises ``VendorError`` when MANIFEST.json exists but cannot be read as
+    a JSON object (0.68.0); a missing one is a returned problem.
+
     Always: MANIFEST.json present and at this contract; its commit equals
     the pin; every tracked file's hash matches; no extra or missing files;
     no residual ``eidr_core`` text. With ``resync=True`` (or a
@@ -355,7 +381,16 @@ def check(manifest: Manifest, *, source_path: str | os.PathLike[str] | None = No
     mpath = target / MANIFEST_FILE
     if not mpath.is_file():
         return [f"{mpath} missing: run sync"]
-    recorded = json.loads(mpath.read_text(encoding="utf-8"))
+    # Unparseable MANIFEST.json raised JSONDecodeError (exit 1, a traceback);
+    # it is a broken vendored tree, which the CLI reports as exit 2 with a
+    # message (dictionary audit 2026-10-02; 0.68.0).
+    try:
+        recorded = json.loads(mpath.read_text(encoding="utf-8"))
+    except (ValueError, OSError) as e:   # JSONDecodeError and UnicodeDecodeError are ValueErrors
+        raise VendorError(f"{mpath} is unreadable or not valid JSON ({e}): "
+                          f"run sync") from e
+    if not isinstance(recorded, dict):
+        raise VendorError(f"{mpath} is not a JSON object: run sync")
     if recorded.get("spec_version") != SPEC_VERSION:
         problems.append(f"MANIFEST.json is contract {recorded.get('spec_version')!r}, "
                         f"this tool is {SPEC_VERSION}: run sync")

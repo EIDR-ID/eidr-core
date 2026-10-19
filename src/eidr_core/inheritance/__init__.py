@@ -361,7 +361,10 @@ def build_full_base(
 
     ``extra`` supplies the title inputs: ``SequenceNumber`` (Season),
     ``DistributionNumber`` (Episode), ``ReleaseDate`` (the fallback for
-    both). Absent keys simply mean the corresponding pattern cannot fire.
+    both). A missing ``ReleaseDate`` falls back to the child's own
+    ``self_base['ReleaseDate']`` (never an inherited one); missing
+    ``SequenceNumber``/``DistributionNumber`` mean the numbered pattern
+    cannot fire.
 
     Returns ``(full_base, provenance)`` where provenance maps each canonical
     field present in the result to ``'self'``, ``'inherited'`` or
@@ -551,6 +554,13 @@ def build_full_record(
     Titles: elements are marked ``self_defined`` / ``system_generated``
     where the model exposes those, so the existing element-level flags stay
     truthful alongside the new field-level map.
+
+    ``attrs`` maps canonical field names to attribute names. A
+    ``ResourceName`` entry in it is ignored: the title is always decided by
+    the title logic (user-supplied test, then generation or inheritance) on
+    the model's ``titles`` attribute, never copied or reported by presence.
+    A model whose ``titles`` is ``None`` is treated as untitled; only a model
+    with no ``titles`` attribute at all skips title handling.
     """
     attrs = attrs or RECORD_ATTRS
     full = copy.deepcopy(self_rec)
@@ -565,6 +575,14 @@ def build_full_record(
 
     prov: dict[str, str] = {}
     for field, attr in attrs.items():
+        # ResourceName is skipped here and in the inheritance loop below,
+        # even when a caller's custom `attrs` maps it: titles are decided by
+        # the title logic (the user-supplied test just below, and
+        # _apply_title), never by presence. Read by presence, a
+        # system-generated title was reported 'self' -- a title nobody
+        # submitted (dictionary audit 2026-10-02; 0.68.0).
+        if field == "ResourceName":
+            continue
         if hasattr(full, attr) and not _is_empty(getattr(full, attr)):
             prov[field] = "self"
     for attr in _CREDIT_ATTRS:
@@ -617,6 +635,14 @@ def build_full_record(
     for field, attr in attrs.items():
         if field not in INHERITABLE_FIELDS or field in NEVER_INHERITED:
             continue
+        # _apply_title above already made the title decision. Copying here
+        # would hand a Season/Episode whose generation FAILED its parent's
+        # title marked 'inherited' -- the false parent-child duplicate the
+        # JSON adapter's ResourceName exemption exists to prevent. Reachable
+        # only through a custom `attrs` that maps ResourceName (dictionary
+        # audit 2026-10-02; 0.68.0).
+        if field == "ResourceName":
+            continue
         if not hasattr(full, attr) or not hasattr(parent_full, attr):
             continue
         if not _is_empty(getattr(full, attr)):
@@ -654,9 +680,10 @@ def build_full_record(
 
     _attach(full, prov)
     if title_error is not None:
-        # Inheritance has run, so the partial is complete -- including the
-        # parent's title, picked up by the loop above because generation left
-        # the field empty. Same contract as build_full_base.
+        # Inheritance has run, so the partial is complete in every field
+        # EXCEPT the title: generation failed and the loops above never copy
+        # ResourceName, so the parent's title does not stand in for the one
+        # that could not be built. Same contract as build_full_base.
         title_error.partial, title_error.provenance = full, dict(prov)
         raise title_error
     return full
@@ -673,9 +700,14 @@ def _apply_title(
     out, or `exc.partial` would hand back a base that is missing every
     inherited field.
     """
-    titles = getattr(full, "titles", None)
-    if titles is None:
+    # Only a model with NO `titles` attribute is skipped: it cannot carry a
+    # title, so there is nothing to build. A model whose `titles` is None
+    # carries none YET, which is the empty list by another name -- returning
+    # here left a Season/Episode silently untitled where build_full_base
+    # builds one or raises (dictionary audit 2026-10-02; 0.68.0).
+    if not hasattr(full, "titles"):
         return None
+    titles = full.titles or []
 
     if ctype in TITLE_EXEMPT_TYPES:
         # A USER-SUPPLIED title is kept. A system-generated one is not the

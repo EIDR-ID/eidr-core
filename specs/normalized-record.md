@@ -143,8 +143,8 @@ Title Class. For placement, Title Class is ignored except Internal (operator
 ruling 2026-10-19: "Ignore title classes, except for Internal and
 transliterated"): an AlternateResourceName of class Release, Resource or any
 other non-Internal class is an ordinary bucket-2 alternate. `transliterated`
-(EIDR's own transliterations) has no ordering treatment defined; it orders as
-an ordinary alternate. (v1.1)
+(EIDR's own transliterations) has no ordering treatment and orders as an
+ordinary alternate; the operator confirmed this the same day: "Titles classed internal sort to the end of a list. Everything else just sorts by title. The only thing special about transliterated is that the language API tool creates transliterated titles when they don't already exist." (v1.1)
 
 In the display, SystemGenerated and Internal titles are visually marked to
 indicate their limited impact on de-duplication.

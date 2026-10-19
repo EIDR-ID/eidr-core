@@ -4633,7 +4633,7 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 **Returns** `int` -- 0 for the ResourceName, 1 for a non-Internal alternate, 2 for an Internal alternate.
 <!-- /dict -->
 
-**Does.** Returns the three-bucket rank of a title: ResourceName, then non-Internal alternates, then Internal alternates. Only the structural `is_resource` flag puts a title in bucket 0 (since 0.69.0, operator ruling 2026-10-19: a Title Class never places a title, except Internal); a Release-class alternate is an ordinary alternate. `Internal` sends an alternate to bucket 2 and never demotes the ResourceName. Class `transliterated` has no ordering effect today. Pure.
+**Does.** Returns the three-bucket rank of a title: ResourceName, then non-Internal alternates, then Internal alternates. Only the structural `is_resource` flag puts a title in bucket 0 (since 0.69.0, operator ruling 2026-10-19: a Title Class never places a title, except Internal); a Release-class alternate is an ordinary alternate. `Internal` sends an alternate to bucket 2 and never demotes the ResourceName. Class `transliterated` has no ordering effect, by the operator's confirmation of 2026-10-19 (only Internal is special; the language tool creates transliterated titles when none exists). Pure.
 
 ### `title_sort_key`
 

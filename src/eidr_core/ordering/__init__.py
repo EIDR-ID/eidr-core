@@ -62,9 +62,10 @@ def title_bucket(title_class, is_resource: bool = False) -> int:
     puts a title in bucket 0 -- an alternate of class Release or Resource is
     an ordinary alternate (bucket 1). Of the classes, only Internal moves a
     title, and never the ResourceName. ``transliterated`` (EIDR's own
-    transliterations) is the ruling's other named exception, but neither
-    spec defines an ordering treatment for it, so it orders as an ordinary
-    alternate (operator ruling 2026-10-19; 0.69.0).
+    transliterations) orders as an ordinary alternate: the operator
+    confirmed on 2026-10-19 that only Internal is special for ordering, and
+    that what sets transliterated titles apart is only that the language
+    tool creates them when none exists.
 
     A caller that passes only a class gets bucket 1 or 2, never 0: such a
     caller must pin its ResourceName itself, as XML_to_JSON's star mode does

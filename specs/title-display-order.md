@@ -29,9 +29,10 @@ Which title is the ResourceName is a fact about the record's structure, never
 about its class: an AlternateResourceName of class Release, Resource or any
 other class except Internal is an ordinary bucket-2 alternate, and does not
 move ahead of the ResourceName. Internal sends an alternate to bucket 3 and
-is visually marked. The ruling's other named exception, `transliterated`
-(EIDR's own transliterations), has no ordering treatment in this spec: it
-orders as an ordinary alternate.
+is visually marked. `transliterated` (EIDR's own transliterations)
+has no ordering treatment and orders as an ordinary alternate; the operator
+confirmed this the same day: "Titles classed internal sort to the end of a list. Everything else just sorts by title. The only thing special about transliterated is that the language API tool creates transliterated titles when they don't already exist." Transliterated titles otherwise match
+like any other title.
 
 Two display annotations ride along (they do not affect order):
 

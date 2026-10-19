@@ -26,12 +26,23 @@ only; Wikidata's triples only; one request at a time at least 1 s apart for
 every caller (``sparql_pacer`` on the machine-wide ``SPARQL_SCOPE``, the
 scope name eidr-wikidata chose); its values are Wikidata's. ``SPARQL_CHAIN``
 is that order. The entity mapping is ``external.wikidata``.
+
+SPARQL transport (0.66.0, C8 part 3), extracted from eidr-dq
+``external/wikidata.py``, the portable stdlib client: ``sparql_request``
+picks GET or POST per host (QLever answers POST with a 308 and serves GET;
+WDQS takes POST, safer for a long VALUES clause), asks for gzip and decodes
+it; ``classify_sparql_http`` reads urllib's structure after the shared
+outage signatures; ``sparql_select`` runs one query across the chain under
+the pacer and returns the endpoint that answered, so a caller can record
+which values QLever served (eidr-metadata-sources' design ask, OD-49).
+Queries must carry ``SPARQL_PREFIXES``: QLever does not predeclare them.
 """
 from __future__ import annotations
 
 import gzip
 import json
 import re
+import socket
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -40,9 +51,12 @@ from typing import Any
 
 from eidr_core.external.failover import (
     FATAL,
+    NEXT_ENDPOINT,
+    OUTAGE,
     RETRY,
     RequestPacer,
     call_with_failover,
+    classify_sparql_error,
     http_status,
     retry_after_seconds,
 )
@@ -55,14 +69,19 @@ __all__ = [
     "MIN_429_WAIT_SECONDS",
     "QLEVER_WIKIDATA_ENDPOINTS",
     "SPARQL_CHAIN",
+    "SPARQL_ENDPOINT_METHODS",
     "SPARQL_MIN_INTERVAL",
+    "SPARQL_PREFIXES",
     "SPARQL_SCOPE",
     "WDQS_ENDPOINT",
     "MaxLag",
     "action_api_json",
     "action_api_pacer",
     "classify_action_api",
+    "classify_sparql_http",
     "sparql_pacer",
+    "sparql_request",
+    "sparql_select",
     "user_agent",
 ]
 
@@ -78,6 +97,31 @@ SPARQL_CHAIN = (WDQS_ENDPOINT, QLEVER_WIKIDATA_ENDPOINTS[0])
 # QAC4: one SPARQL request at a time, at least 1 s apart, for every caller.
 SPARQL_SCOPE = "wikidata-sparql"
 SPARQL_MIN_INTERVAL = 1.0
+
+# Transport per endpoint HOST (eidr-dq, 2026-09-23): QLever 308-redirects a
+# POST and serves GET; WDQS takes POST. Unlisted hosts get POST.
+SPARQL_ENDPOINT_METHODS: dict[str, str] = {
+    "query.wikidata.org": "POST",
+    "qlever.dev": "GET",
+    "qlever.cs.uni-freiburg.de": "GET",
+}
+
+# WDQS predeclares these and QLever does not; a query relying on
+# predeclaration is "Invalid SPARQL" on the fallback, so prepend them.
+SPARQL_PREFIXES = """PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX p: <http://www.wikidata.org/prop/>
+PREFIX ps: <http://www.wikidata.org/prop/statement/>
+PREFIX pq: <http://www.wikidata.org/prop/qualifier/>
+PREFIX psv: <http://www.wikidata.org/prop/statement/value/>
+PREFIX wikibase: <http://wikiba.se/ontology#>
+PREFIX schema: <http://schema.org/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+"""
+
+_TRANSIENT_HTTP = (429, 500, 502, 503, 504)
+_NEXT_ENDPOINT_HTTP = (400, 414)   # this host will not serve it; another may
+_FATAL_HTTP = (401, 403)           # no endpoint in the chain will help
 
 # The machine-wide pacer scope every EIDR Action API client uses (AC9:
 # EIDR counts as one operator). One name, so eidr-wikidata and BMR-Review
@@ -205,3 +249,81 @@ def action_api_json(params: Mapping[str, Any], *, user_agent: str, pacer: Reques
     if data is None:
         raise exc if exc is not None else RuntimeError("Action API request failed")
     return data
+
+
+def classify_sparql_http(exc: Exception) -> str:
+    """Retry, next endpoint, outage or stop, for a urllib SPARQL failure.
+
+    The shared outage signatures win first (an outage message can contain
+    "429", and treating it as transient burns the retry budget re-confirming
+    a known outage); then urllib's status: 429/5xx retry, 400/414 try the
+    next endpoint, 401/403 stop; a transport failure (DNS, reset, TLS,
+    timeout) retries; anything unnamed takes the shared default. Extracted
+    from eidr-dq ``_classify_wdqs_error``.
+    """
+    if classify_sparql_error(exc) == OUTAGE:
+        return OUTAGE
+    if isinstance(exc, urllib.error.HTTPError):
+        if exc.code in _TRANSIENT_HTTP:
+            return RETRY
+        if exc.code in _FATAL_HTTP:
+            return FATAL
+        return NEXT_ENDPOINT
+    if isinstance(exc, (urllib.error.URLError, socket.timeout, TimeoutError)):
+        return RETRY
+    return classify_sparql_error(exc)
+
+
+def sparql_request(endpoint: str, query: str, *, user_agent: str, timeout: float = 60.0,
+                   opener: Callable[..., Any] | None = None) -> dict:
+    """One SPARQL request, GET or POST by host, gzip asked for and decoded.
+    Raises on a ``null`` body: ``call_with_failover`` reserves None."""
+    headers = {"User-Agent": user_agent, "Accept": "application/sparql-results+json",
+               **GZIP_HEADERS}
+    host = (urllib.parse.urlsplit(endpoint).hostname or "").lower()
+    if SPARQL_ENDPOINT_METHODS.get(host, "POST") == "GET":
+        req = urllib.request.Request(endpoint + "?" + urllib.parse.urlencode({"query": query}),
+                                     headers=headers, method="GET")
+    else:
+        data = urllib.parse.urlencode({"query": query, "format": "json"}).encode("utf-8")
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+        req = urllib.request.Request(endpoint, data=data, headers=headers, method="POST")
+    open_url = opener if opener is not None else urllib.request.urlopen
+    with open_url(req, timeout=timeout) as resp:
+        raw = resp.read()
+        if (resp.headers.get("Content-Encoding") or "").strip().lower() in ("gzip", "x-gzip"):
+            raw = gzip.decompress(raw)
+    payload = json.loads(raw.decode("utf-8"))
+    if payload is None:
+        raise ValueError("SPARQL endpoint returned a null JSON body")
+    return payload
+
+
+def sparql_select(query: str, *, user_agent: str, pacer: RequestPacer | None = None,
+                  chain: tuple[str, ...] | list[str] = SPARQL_CHAIN, timeout: float = 60.0,
+                  max_retries: int = 3, outage_endpoints: set[str] | None = None,
+                  cooldowns: dict[str, float] | None = None, op_label: str = "sparql",
+                  opener: Callable[..., Any] | None = None
+                  ) -> tuple[list[dict], str | None]:
+    """Run one SELECT across the chain: ``(bindings, endpoint_used)``.
+
+    Every attempt goes through ``pacer`` (default: a new ``sparql_pacer()``,
+    the machine-wide one), so QLever's one-at-a-time, 1-s rule holds for every
+    caller. ``endpoint_used`` says which endpoint answered: record it when
+    QLever did. ``outage_endpoints`` and ``cooldowns`` are the cross-call
+    memos of ``call_with_failover``. Returns ``([], None)`` when the whole
+    chain fails, so a batch loop can skip one batch and carry on.
+    """
+    pace = pacer if pacer is not None else sparql_pacer()
+
+    def attempt(endpoint: str) -> dict:
+        with pace.request():
+            return sparql_request(endpoint, query, user_agent=user_agent,
+                                  timeout=timeout, opener=opener)
+
+    payload, used, _exc = call_with_failover(
+        list(chain), attempt, classify_sparql_http, max_retries=max_retries,
+        outage_endpoints=outage_endpoints, cooldowns=cooldowns, op_label=op_label)
+    if payload is None:
+        return [], None
+    return list((payload.get("results") or {}).get("bindings") or []), used

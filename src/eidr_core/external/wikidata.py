@@ -48,6 +48,7 @@ from collections.abc import Iterable, Mapping
 from typing import Any, NamedTuple
 
 from eidr_core.codes import normalize_country_code
+from eidr_core.external.failover import RequestPacer
 
 __all__ = [
     "P_CAST_MEMBER",
@@ -72,6 +73,7 @@ __all__ = [
     "claims",
     "duration_minutes",
     "external_ids",
+    "imdb_qids",
     "item_ids",
     "label",
     "references",
@@ -376,3 +378,50 @@ def external_ids(entity: Mapping[str, Any], prop: str) -> list[tuple[str, str]]:
         else:
             out[value] = ""
     return list(out.items())
+
+
+_QID = re.compile(r"Q\d+")
+
+
+def imdb_qids(imdb_ids: Iterable[str], *, user_agent: str, pacer: RequestPacer | None = None,
+              batch_size: int = 200, timeout: float = 60.0,
+              outage_endpoints: set[str] | None = None,
+              cooldowns: dict[str, float] | None = None,
+              opener: Any = None) -> dict[str, str]:
+    """``{tt id: QID}`` for the IMDb IDs Wikidata carries as P345.
+
+    Batched SPARQL (200 per query) over ``wikimedia.SPARQL_CHAIN`` under the
+    machine-wide SPARQL pacer. When several items claim one IMDb ID the
+    lowest QID wins, for determinism. A failed batch is skipped, so an
+    outage costs coverage for one run rather than aborting it. The tt id is
+    only a foreign key: what comes back is Wikidata's. Extracted from eidr-dq
+    ``resolve_imdb_batch``; BMR-Review looks the same thing up one ID at a
+    time through the Action API search.
+    """
+    from eidr_core.external import wikimedia as W
+
+    clean: list[str] = []
+    for raw in imdb_ids:
+        tt = str(raw or "").strip().lower()
+        if tt.startswith("tt") and tt[2:].isdigit() and tt not in clean:
+            clean.append(tt)
+    memo = outage_endpoints if outage_endpoints is not None else set()
+    cooling = cooldowns if cooldowns is not None else {}
+    pace = pacer if pacer is not None else W.sparql_pacer()
+    out: dict[str, str] = {}
+    for i in range(0, len(clean), batch_size):
+        values = " ".join(f'"{tt}"' for tt in clean[i:i + batch_size])
+        query = (W.SPARQL_PREFIXES + "SELECT ?imdb ?item WHERE { VALUES ?imdb { "
+                 + values + " } ?item wdt:P345 ?imdb . }")
+        bindings, _used = W.sparql_select(
+            query, user_agent=user_agent, pacer=pace, timeout=timeout,
+            outage_endpoints=memo, cooldowns=cooling, op_label="wikidata imdb_qids",
+            opener=opener)
+        for b in bindings:
+            tt = (b.get("imdb") or {}).get("value", "")
+            qid = (b.get("item") or {}).get("value", "").rsplit("/", 1)[-1]
+            if tt and _QID.fullmatch(qid or ""):
+                prev = out.get(tt)
+                if prev is None or int(qid[1:]) < int(prev[1:]):
+                    out[tt] = qid
+    return out

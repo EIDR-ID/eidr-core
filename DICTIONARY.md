@@ -976,7 +976,7 @@ Scan of 2026-10-18; regenerated at each release from the consumer trees.
 * **BMR-Review**: `identity_relation_sql`, `is_identity_relation`
 * **BMRtoAltID**: `AltIdRow`, `emission_problem`, `format_line`, `multi_form_domains`
 * **eidr-dq**: `identity_relation_sql`
-* **eidr-imdb**: `AltIdRow`, `format_line`, `parse_line`, `write_lines`
+* **eidr-imdb**: `AltIdRow`, `format_line`, `is_identity_relation`, `parse_line`, `write_lines`
 * **eidr-wikidata**: `format_line`, `multi_form_domains`, `parse_line`
 * **python-tools**: (vendors the module, pin `cc13c83`)
 <!-- /dict-usedby -->

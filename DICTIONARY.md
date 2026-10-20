@@ -3222,7 +3222,7 @@ Source `src/eidr_core/external/__init__.py`. Public names: 3 functions, 5 classe
 **Used by.**
 <!-- dict-usedby:eidr_core.external -->
 Scan of 2026-10-19; regenerated at each release from the consumer trees.
-* **eidr-dq**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `Entry`, `FactCache`, `FATAL`, `Key`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
+* **eidr-dq**: `call_with_failover`, `DictFactCache`, `endpoint_chain`, `Entry`, `FactCache`, `Key`, `NullFactCache`, `RequestPacer`, `RETRY`
 * **eidr-imdb**: `call_with_failover`, `endpoint_chain`, `FATAL`, `NEXT_ENDPOINT`, `OUTAGE`, `RETRY`
 * **eidr-wikidata**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `FactCache`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
 <!-- /dict-usedby -->
@@ -6662,6 +6662,7 @@ Source `src/eidr_core/external/wikimedia.py`. Public names: 8 functions, 1 class
 <!-- dict-usedby:eidr_core.external.wikimedia -->
 Scan of 2026-10-19; regenerated at each release from the consumer trees.
 * **BMR-Review**: `action_api_json`, `action_api_pacer`, `ACTION_API_SCOPE`, `user_agent`, (the module)
+* **eidr-dq**: `SPARQL_CHAIN`, `sparql_pacer`, `SPARQL_PREFIXES`, `sparql_request`, `sparql_select`
 * **eidr-wikidata**: `ACTION_API`, `action_api_json`, `action_api_pacer`, `ACTION_API_SCOPE`, `sparql_pacer`, (the module)
 <!-- /dict-usedby -->
 
@@ -6967,6 +6968,7 @@ Source `src/eidr_core/external/wikidata.py`. Public names: 11 functions, 1 class
 <!-- dict-usedby:eidr_core.external.wikidata -->
 Scan of 2026-10-19; regenerated at each release from the consumer trees.
 * **BMR-Review**: (the module)
+* **eidr-dq**: `imdb_qids`
 * **eidr-wikidata**: `RETIRED_ID_REASONS`
 <!-- /dict-usedby -->
 

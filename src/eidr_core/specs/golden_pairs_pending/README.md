@@ -30,21 +30,8 @@ test would go red for a change nobody has landed. So it waits here.
 
 ## Waiting now
 
-* `episode-part-one-sided-corroborated-stays-in-review` (2026-10-19) --
-  waiting on a **ruling**, not on an engine version, which is the exception
-  to rule 1: it PASSES on compare-spec 2.21.0 and fails on 2.20.0. It pins
-  that a one-sided Episode part ("The Long Night Part 2" vs "The Long Night")
-  stays in Review at 79.0 even with two agreeing identity Alt ID sources:
-  since 2.21.0 the pair takes BMR-Review's part-ambiguous cap, where it used
-  to take the part-number override (>= ALT_CORROBORATION_STRONG_MIN sources,
-  no cap) and Accept at 99.6. That override's own comment names this very
-  case ("a series title's volume designation is often carried by only one
-  side"), so whether the ambiguous branch should honour the same
-  corroboration is BMR-Review's scorer decision. If BMR-Review keeps the cap,
-  the fixture moves into `../golden_pairs/` and is regenerated; the
-  behaviour belongs to 2.21.0, so whether moving it needs a stamp of its own
-  is this repo's call under golden-pairs.md section 7. If it honours
-  corroboration, this repo deletes or inverts the fixture in the cycle that
-  lands that change. Mutation evidence is in its `why`.
+Nothing.
+
+`episode-part-one-sided-corroborated-stays-in-review` moved into `golden_pairs/` on 2026-10-19 (eidr-core 0.69.1), when BMR-Review chose to keep the part-ambiguous cap; it pins compare-spec 2.21.0 behaviour, so it moved without a version of its own.
 
 The last four (`internal-title-bridges-languages`, `internal-title-second-pair-earns-no-bonus`, `internal-title-carried-match-needs-alt-id-to-accept` and `sibling-title-lookalike-altid-anchor-is-held`) moved into `golden_pairs/` with compare-spec 2.18.0 (2026-10-02).

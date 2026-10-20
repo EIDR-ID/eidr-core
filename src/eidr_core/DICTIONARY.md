@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.69.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.69.1<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,14 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.69.1 (2026-10-19)
+
+* **Golden pairs:** `episode-part-one-sided-corroborated-stays-in-review`
+  moved from `golden_pairs_pending` into the corpus (46 fixtures), now that
+  BMR-Review keeps the part-ambiguous cap (option a). It pins compare-spec
+  2.21.0 behaviour, so the spec version is unchanged; a conformance suite
+  that globs the corpus runs one more pair.
 
 ### 0.69.0 (2026-10-19)
 

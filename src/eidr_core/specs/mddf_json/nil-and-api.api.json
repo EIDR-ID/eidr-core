@@ -1,0 +1,25 @@
+{
+  "_xmlns": "http://www.eidr.org/schema",
+  "_xmlns:md": "http://www.movielabs.com/schema/md/v2.8/md",
+  "_xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
+  "_xsi:schemaLocation": "http://www.eidr.org/schema common.xsd",
+  "BaseObjectData": {
+    "ID": "10.5240/0000-0000-0000-0000-0002-X",
+    "StructuralType": "Abstraction",
+    "Mode": "AudioVisual",
+    "ReferentType": "Series",
+    "ResourceName": {
+      "value": "Example Series",
+      "_lang": "en"
+    },
+    "OriginalLanguage": [
+      "en"
+    ],
+    "ReleaseDate": null,
+    "Status": "valid",
+    "RegistrantExtra": {
+      "_xsi:nil": "1",
+      "_lang": "en"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "label": "EIDR 2.7.0 with EIDR's md 2.8",
+  "source": "python-sdk src/eidr/schemas/bundled (commit 172098b), the copies of schema.eidr.org 2.7.0 with the correct targetNamespace; the root-level files on schema.eidr.org carried a hosting address as targetNamespace on 2026-11-11",
+  "files": {
+    "api-common.xsd": {
+      "bytes": 6874,
+      "sha256": "32ef7bfc30834f81b85d774ead3c094de53cc426fe4c688468e968a396865cca"
+    },
+    "api.xsd": {
+      "bytes": 37081,
+      "sha256": "860e827b5a34cf2fbe64e7195848ac5cabc3d3025269f8ef75acff7b1b95cde2"
+    },
+    "common.xsd": {
+      "bytes": 83763,
+      "sha256": "2e410e51abefb15ce3fb07bce09adaf7b0d13d9135580d6a839c2a4396c128b0"
+    },
+    "doi.xsd": {
+      "bytes": 29775,
+      "sha256": "4381583d087a1fee630785c642f70f911b48ca3200ec66c1219924a24999b003"
+    },
+    "doiavs.xsd": {
+      "bytes": 58277,
+      "sha256": "7e7f4c0e7383421a44a78b422f3f0c2f4e5f7d2146a43038dcecd358631678b8"
+    },
+    "iso3166a2.xsd": {
+      "bytes": 37457,
+      "sha256": "f674f9d58acfd15e059212f06e4a220a74a4a9d444863c9555acbfc0a64c520c"
+    },
+    "md-v28-eidr.xsd": {
+      "bytes": 218696,
+      "sha256": "1f6859a76c5c120a10d57cb2df1faf8e7e9c52ca34067ee3997973383c7da1d2"
+    },
+    "service.xsd": {
+      "bytes": 8538,
+      "sha256": "08c972c92b493ff0559a9a7bee61447527d4cc95bb859279b7262f7b1261d0ec"
+    }
+  }
+}

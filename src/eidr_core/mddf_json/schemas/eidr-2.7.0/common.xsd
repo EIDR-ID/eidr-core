@@ -1,0 +1,1892 @@
+<?xml version="1.0" encoding="UTF-8"?><xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:doi="http://www.doi.org/2010/DOISchema" xmlns:doiavs="http://www.doi.org/2010/DOISchemaAVS" xmlns:eidr="http://www.eidr.org/schema" xmlns:iso3166a2="http://www.doi.org/2010/iso3166a2" xmlns:md="http://www.movielabs.com/schema/md/v2.8/md" attributeFormDefault="unqualified" elementFormDefault="qualified" targetNamespace="http://www.eidr.org/schema" version="2.7.0-localimport">
+  <xs:import namespace="http://www.doi.org/2010/DOISchema" schemaLocation="doi.xsd"/>
+  <xs:import namespace="http://www.doi.org/2010/DOISchemaAVS" schemaLocation="doiavs.xsd"/>
+  <xs:import namespace="http://www.doi.org/2010/iso3166a2" schemaLocation="iso3166a2.xsd"/>
+  <xs:import namespace="http://www.movielabs.com/schema/md/v2.8/md" schemaLocation="md-v28-eidr.xsd"/>
+  <xs:annotation>
+    <xs:documentation> </xs:documentation>
+  </xs:annotation>
+  <xs:element name="CreateBasic" type="eidr:createBasicDataType"/>
+  <xs:element name="CreateSeries" type="eidr:createSeriesDataType"/>
+  <xs:element name="CreateSeason" type="eidr:createSeasonDataType"/>
+  <xs:element name="CreateEpisode" type="eidr:createEpisodeDataType"/>
+  <xs:element name="CreateComposite" type="eidr:createCompositeDataType"/>
+  <xs:element name="CreateCompilation" type="eidr:createCompilationDataType"/>
+  <xs:element name="CreateClip" type="eidr:createClipDataType"/>
+  <xs:element name="CreateEdit" type="eidr:createEditDataType"/>
+  <xs:element name="CreateManifestation" type="eidr:createManifestationDataType"/>
+  <xs:element name="ResolvedFullGeneral" type="eidr:fullObjectInfoType"/>
+  <xs:element name="ResolvedSelfGeneral" type="eidr:allSelfDefinedInfoType"/>
+  <xs:element name="ResolvedInheritedGeneral" type="eidr:allInheritedInfoType"/>
+  <xs:element name="SimpleInfo" type="eidr:simpleInfoType"/>
+  <!-- self-defined fields -->
+  <xs:complexType name="allSelfDefinedInfoType">
+    <xs:annotation>
+      <xs:documentation> Contains all the fields defined on the object itself. This is the
+				return value for a request for resolution of a DOI to its 'own' information.
+			</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:selfDefinedBaseObjectInfoType"/>
+      <xs:element minOccurs="0" name="ExtraObjectMetadata" type="eidr:extraObjectMetadataType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="selfDefinedBaseObjectInfoType">
+    <xs:annotation>
+      <xs:documentation> This is what you get when you do a resolution for self-defined
+				metadata. ID and Administrators must be defined on every object.
+				AlternateIDs, RegistrantExtra are never inherited, but can be
+				optionally provided. Everything else can come from self or parent, and hence is
+				optional here. VersionLanguages are only those defined on the object, rather than
+				constructed from a Manifestation </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <!-- ID is required for every object -->
+      <xs:element name="ID" type="eidr:assetDOIType"/>
+      <xs:group ref="eidr:selfDefinedFieldsGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- helper group for self-defined fields -->
+  <xs:group name="selfDefinedFieldsGroup">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="StructuralType" type="doiavs:creationStructuralType"/>
+      <xs:element minOccurs="0" name="Mode" type="eidr:modeType"/>
+      <xs:element minOccurs="0" name="ReferentType" type="eidr:referentType"/>
+      <xs:element minOccurs="0" name="ResourceName" type="eidr:titleType"/>
+      <xs:element maxOccurs="128" minOccurs="0" name="AlternateResourceName" type="eidr:titleType"/>
+      <xs:element maxOccurs="32" minOccurs="0" name="OriginalLanguage" type="eidr:languageType"/>
+      <xs:element maxOccurs="64" minOccurs="0" name="VersionLanguage" type="eidr:languageType"/>
+      <xs:element maxOccurs="16" minOccurs="0" name="AssociatedOrg" type="md:AssociatedOrg-type"/>
+      <xs:element minOccurs="0" name="ReleaseDate" type="eidr:dateType"/>
+      <xs:element maxOccurs="32" minOccurs="0" name="CountryOfOrigin" type="eidr:countryType"/>
+      <xs:element minOccurs="0" name="Status" type="eidr:statusType"/>
+      <xs:element minOccurs="0" name="ApproximateLength" type="xs:duration"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="AlternateID" type="eidr:alternateIDType"/>
+      <!-- Administrators must be defined on every object because it contains the registrant -->
+      <xs:element name="Administrators" type="eidr:administratorsInfoType"/>
+      <xs:element minOccurs="0" name="Credits" type="eidr:creditsType"/>
+      <xs:element minOccurs="0" name="RegistrantExtra" type="eidr:registrantExtraDataType"/>
+      <xs:element minOccurs="0" name="Description" type="eidr:descriptionType"/>
+    </xs:sequence>
+  </xs:group>
+  <!-- inherited fields -->
+  <xs:complexType name="allInheritedInfoType">
+    <xs:annotation>
+      <xs:documentation> This includes fields that are inherited. No data in
+				ExtraObjectMetadata is ever inherited. This is the return value for a request to
+				resolve a DOI to its inherited values. See API overview for languages and titles.
+				Alternate IDs and RegistrantExtra are never inherited. </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:inheritedBaseObjectInfoType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="inheritedBaseObjectInfoType">
+    <xs:annotation>
+      <xs:documentation> ID, Administrators, AlternateIDs, and
+				Description can never be inherited. ResourceName and AlternateResourceName are never
+				inherited for Seasons or Episodes. Everything else can be, but doesn't have to be.
+			</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="ID" type="eidr:assetDOIType"/>
+      <xs:group ref="eidr:inheritedBaseObjectInfoGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:group name="inheritedBaseObjectInfoGroup">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="StructuralType" type="doiavs:creationStructuralType"/>
+      <xs:element minOccurs="0" name="Mode" type="eidr:modeType"/>
+      <xs:element minOccurs="0" name="ReferentType" type="eidr:referentType"/>
+      <xs:element minOccurs="0" name="ResourceName" type="eidr:titleType"/>
+      <xs:element maxOccurs="128" minOccurs="0" name="AlternateResourceName" type="eidr:titleType"/>
+      <xs:element maxOccurs="32" minOccurs="0" name="OriginalLanguage" type="eidr:languageType"/>
+      <xs:element maxOccurs="64" minOccurs="0" name="VersionLanguage" type="eidr:languageType"/>
+      <xs:element maxOccurs="16" minOccurs="0" name="AssociatedOrg" type="md:AssociatedOrg-type"/>
+      <xs:element minOccurs="0" name="ReleaseDate" type="eidr:dateType"/>
+      <xs:element maxOccurs="32" minOccurs="0" name="CountryOfOrigin" type="eidr:countryType"/>
+      <xs:element minOccurs="0" name="Status" type="eidr:statusType"/>
+      <xs:element minOccurs="0" name="ApproximateLength" type="xs:duration"/>
+      <!-- AlternateIDs are never inherited -->
+      <!-- <xs:element name="AlternateID" type="eidr:alternateIDType" minOccurs="0" maxOccurs="0"/> -->
+      <!-- Administrators isn't inherited because it contains the registrant -->
+      <!-- <xs:element minOccurs="0" maxOccurs="0" name="Administrators" type="eidr:administratorsInfoType" /> -->
+      <xs:element minOccurs="0" name="Credits" type="eidr:creditsType"/>
+      <!-- RegistrantExtra and Descriptions are never inherited -->
+      <!-- <xs:element name="RegistrantExtra" type="eidr:registrantExtraDataType" minOccurs="0" /> -->
+      <!-- <xs:element name="Description" type="eidr:descriptionType" minOccurs="0" maxOccurs="0"/> -->
+    </xs:sequence>
+  </xs:group>
+  <!-- tiny information returned by queries and traversals -->
+  <xs:complexType name="simpleInfoType">
+    <xs:sequence>
+      <xs:annotation>
+        <xs:documentation> This is returned by queries and traversals. </xs:documentation>
+      </xs:annotation>
+      <xs:element name="ID" type="eidr:assetDOIType"/>
+      <xs:element name="StructuralType" type="doiavs:creationStructuralType"/>
+      <xs:element name="ReferentType" type="eidr:referentType"/>
+      <xs:element name="ResourceName" type="eidr:titleType"/>
+      <xs:element maxOccurs="32" name="OriginalLanguage" type="eidr:languageType"/>
+      <xs:element maxOccurs="64" minOccurs="0" name="VersionLanguage" type="eidr:languageType"/>
+      <xs:element name="ReleaseDate" type="eidr:dateType"/>
+      <xs:element name="Status" type="eidr:statusType"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="Relationship" type="eidr:relationshipInfoType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- alternate IDs only -->
+  <xs:complexType name="alternateIDsType">
+    <xs:annotation>
+      <xs:documentation> An asset's AlternateIDs only. </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="ID" type="eidr:assetDOIType"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="AlternateID" type="eidr:alternateIDType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="linkedAlternateIDsType">
+    <xs:annotation>
+      <xs:documentation> An asset's AlternateIDs and associated URLs. </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="ID" type="eidr:assetDOIType"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="LinkedAlternateID" type="eidr:linkedAlternateIDType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="linkedAlternateIDType">
+    <xs:annotation>
+      <xs:documentation> An AlternateID together with 0 or more URL elements. </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="AlternateID" type="eidr:alternateIDType"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="URL" type="eidr:linkedAlternateIDURLType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="linkedAlternateIDURLType">
+    <xs:simpleContent>
+      <xs:extension base="xs:anyURI">
+        <xs:attribute name="type" type="xs:string"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <!-- complete fields, combined from inherited and self-defined -->
+  <xs:complexType name="fullObjectInfoType">
+    <xs:annotation>
+      <xs:documentation> This contains all the information about the object. This is the
+				return value for a request for full resolution of an asset DOI. In baseObjectData
+				all mandatory fields are provided (either by inheritance or actual presence.) The
+				languages fields are fuly realized, based on the inheritance, add, and replace chain
+				from all ancestors. ExtraObjectmetadata contains metadata for any described type
+				information or relationships or relationships that are present. (See
+				extraObjectMetadataType for the legal combinations.) </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:baseObjectInfoType"/>
+      <xs:element minOccurs="0" name="ExtraObjectMetadata" type="eidr:extraObjectMetadataType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="baseObjectInfoType">
+    <xs:sequence>
+      <xs:annotation>
+        <xs:documentation> This contains all the base metadata that could be on the object,
+					inherited, self-defined, or generated. </xs:documentation>
+      </xs:annotation>
+      <xs:element name="ID" type="eidr:assetDOIType"/>
+      <xs:group ref="eidr:baseObjectInfoGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:group name="baseObjectInfoGroup">
+    <xs:sequence>
+      <xs:element name="StructuralType" type="doiavs:creationStructuralType"/>
+      <xs:element name="Mode" type="eidr:modeType"/>
+      <xs:element name="ReferentType" type="eidr:referentType"/>
+      <xs:element name="ResourceName" type="eidr:titleType"/>
+      <xs:element maxOccurs="128" minOccurs="0" name="AlternateResourceName" type="eidr:titleType"/>
+      <xs:element maxOccurs="32" name="OriginalLanguage" type="eidr:languageType"/>
+      <xs:element maxOccurs="64" minOccurs="0" name="VersionLanguage" type="eidr:languageType"/>
+      <xs:element maxOccurs="16" minOccurs="0" name="AssociatedOrg" type="md:AssociatedOrg-type"/>
+      <xs:element name="ReleaseDate" type="eidr:dateType"/>
+      <xs:element maxOccurs="32" name="CountryOfOrigin" type="eidr:countryType"/>
+      <xs:element name="Status" type="eidr:statusType"/>
+      <xs:element name="ApproximateLength" type="xs:duration"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="AlternateID" type="eidr:alternateIDType"/>
+      <xs:element name="Administrators" type="eidr:administratorsInfoType"/>
+      <xs:element minOccurs="0" name="Credits" type="eidr:creditsType"/>
+      <xs:element minOccurs="0" name="RegistrantExtra" type="eidr:registrantExtraDataType"/>
+      <xs:element minOccurs="0" name="Description" type="eidr:descriptionType"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:complexType name="extraObjectMetadataType">
+    <xs:annotation>
+      <xs:documentation> Metadata for child objects and derived objects. This schema enforces
+				the following rules for what extra metadata can be present ((0 or 1 of compilation,
+				season, series, interactive material, episode, episode+composite, or composite) OR
+				(0 or 1 of Edit,Manifestation, or Clip)) AND (0 or more of each of Promotion,
+				Supplement, AlternateContent, Packaging) </xs:documentation>
+    </xs:annotation>
+    <xs:sequence minOccurs="0">
+      <xs:choice>
+        <!-- 0-1 of compilation season, series, interactive material, episode, episode+composite, or composite -->
+        <xs:choice minOccurs="0">
+          <xs:element name="CompilationInfo" type="md:CompObj-type"/>
+          <xs:element name="SeasonInfo" type="eidr:seasonInfoType"/>
+          <xs:element name="SeriesInfo" type="eidr:seriesInfoType"/>
+          <xs:element name="InteractiveMaterialInfo" type="md:DigitalAssetInteractiveBaseData-type"/>
+          <xs:sequence>
+            <xs:element name="EpisodeInfo" type="eidr:episodeInfoType"/>
+            <xs:element minOccurs="0" name="CompositeInfo" type="eidr:compositeInfoType"/>
+          </xs:sequence>
+          <xs:element name="CompositeInfo" type="eidr:compositeInfoType"/>
+        </xs:choice>
+        <!-- OR (0 or 1 of Edit, Manifestation, Clip) -->
+        <xs:sequence minOccurs="0">
+          <xs:choice minOccurs="0">
+            <xs:element name="EditInfo" type="eidr:editInfoType"/>
+            <xs:element name="ManifestationInfo" type="eidr:manifestationInfoType"/>
+            <xs:element name="ClipInfo" type="eidr:clipInfoType"/>
+          </xs:choice>
+        </xs:sequence>
+      </xs:choice>
+      <!-- AND (0 or more of promotion, supplementalContent, alternateContent, packaging -->
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="PromotionInfo" type="eidr:promotionInfoType"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="SupplementalContentInfo" type="eidr:supplementalContentInfoType"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="AlternateContentInfo" type="eidr:alternateContentInfoType"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="PackagingInfo" type="eidr:packagingInfoType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="provenanceInfoType">
+    <xs:annotation>
+      <xs:documentation>Returned by provenance resolution</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="ID" type="eidr:assetDOIType"/>
+      <xs:element name="IssueNumber" type="xs:integer"/>
+      <xs:element name="Status" type="eidr:statusType"/>
+      <xs:element name="Administrators" type="eidr:administratorsInfoType"/>
+      <xs:element minOccurs="0" name="CreatedBy" type="eidr:userDOIType"/>
+      <xs:element name="CreationDate" type="xs:dateTime"/>
+      <xs:element minOccurs="0" name="LastModifiedBy" type="eidr:userDOIType"/>
+      <xs:element name="LastModificationDate" type="xs:dateTime"/>
+      <xs:element minOccurs="0" name="PublicationDate" type="xs:dateTime"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="administratorsInfoType">
+    <xs:annotation>
+      <xs:documentation> Used in provenanceInfoType, baseObjectInfoType, and
+				selfDefinedBaseObjectInfoType </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Registrant" type="eidr:registrantType"/>
+      <xs:element maxOccurs="4" minOccurs="0" name="MetadataAuthority" type="eidr:metadataAuthorityType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- Series, Season, Episode -->
+  <xs:complexType name="seriesInfoType">
+    <xs:annotation>
+      <xs:documentation> Series must supply base object ReferentType, StructuralType,
+				OriginalLanguage, and ReleaseDate. baseObjectData.ApproximateLength must be 0 (zero)
+				or the typical length of an episode </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element minOccurs="0" name="EndDate" type="eidr:dateType"/>
+      <xs:element minOccurs="0" name="SeriesClass" type="eidr:seriesClassType"/>
+      <xs:element minOccurs="0" name="NumberRequired" type="xs:boolean"/>
+      <xs:element minOccurs="0" name="DateRequired" type="xs:boolean"/>
+      <xs:element minOccurs="0" name="OriginalTitleRequired" type="xs:boolean"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="seriesClassType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Episodic"/>
+      <xs:enumeration value="Anthology"/>
+      <xs:enumeration value="LimitedSeries"/>
+      <xs:enumeration value="Mini-series"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="seasonInfoType">
+    <xs:annotation>
+      <xs:documentation> Season must supply base object ReferentType, StructuralType, and
+				ReleaseDate. baseObjectData.ApproximateLength must be 0 (zero) the typical length of
+				an episode.
+				baseObjectData.ResourceName is used to provide a season title and is required, but
+				may be submitted empty or replaced with a system-generated name under special
+				circumstances. </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Parent" type="eidr:assetDOIType"/>
+      <xs:element minOccurs="0" name="EndDate" type="eidr:dateType"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="SeasonClass" type="eidr:seasonClassType"/>
+      <xs:element minOccurs="0" name="NumberRequired" type="xs:boolean"/>
+      <xs:element minOccurs="0" name="DateRequired" type="xs:boolean"/>
+      <xs:element minOccurs="0" name="OriginalTitleRequired" type="xs:boolean"/>
+      <xs:element minOccurs="0" name="SequenceNumber" type="xs:positiveInteger"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="seasonClassType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Adjunct"/>
+      <xs:enumeration value="Enhanced"/>
+      <xs:enumeration value="LimitedSeries"/>
+      <xs:enumeration value="Main"/>
+      <xs:enumeration value="Mini-series"/>
+      <xs:enumeration value="Pro Forma"/>
+      <xs:enumeration value="Recut"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="episodeInfoType">
+    <xs:annotation>
+      <xs:documentation> Episode must supply base object, ReferentType, StructuralType,
+				ReleaseDate. If Episode is a child of a Season, it inherits the Season's TimeSlot.
+				baseObjectData.ApproximateLength is used for the length of the episode
+				baseObjectData.ResourceName is used to provide an episode title and is required, but
+				may be submitted empty or replaced with a system-generated name under special
+				circumstances. </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Parent" type="eidr:assetDOIType"/>
+      <xs:element minOccurs="0" name="SequenceInfo" type="md:ContentSequenceInfo-type"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="EpisodeClass" type="eidr:episodeClassType"/>
+      <!-- TimeSlot must specify UTC or a time zone -->
+      <xs:element minOccurs="0" name="TimeSlot" type="xs:time"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="episodeClassType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Main"/>
+      <xs:enumeration value="Pilot"/>
+      <xs:enumeration value="Standalone"/>
+      <xs:enumeration value="Special"/>
+      <xs:enumeration value="Omnibus"/>
+      <xs:enumeration value="Recut"/>
+      <xs:enumeration value="Segment"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- End of Series, Season, Episode -->
+  <!-- Composites -->
+  <xs:complexType name="compositeInfoType">
+    <xs:sequence>
+      <xs:element name="CompositeClass" type="eidr:compositeClassType"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="Element" type="eidr:compositeElementType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="compositeClassType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Mashup"/>
+      <xs:enumeration value="Omnibus"/>
+      <xs:enumeration value="Excerpt"/>
+      <xs:enumeration value="Inclusion"/>
+      <xs:enumeration value="Other"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="compositeElementType">
+    <xs:sequence>
+      <xs:choice>
+        <xs:element name="ID" type="eidr:assetDOIType"/>
+        <xs:element name="OtherID" type="eidr:alternateIDType"/>
+      </xs:choice>
+      <!-- starting point of this element within its source -->
+      <xs:element minOccurs="0" name="SourceStart" type="eidr:startingPointType"/>
+      <!-- duration of this element within its source -->
+      <xs:element minOccurs="0" name="SourceDuration" type="xs:duration"/>
+      <xs:element minOccurs="0" name="ComponentsMode" type="eidr:componentsModeType"/>
+      <!-- where this element occurs in the composite -->
+      <xs:element minOccurs="0" name="DestStart" type="eidr:startingPointType"/>
+      <!-- how long this element lasts within the composite -->
+      <xs:element minOccurs="0" name="DestDuration" type="xs:duration"/>
+      <xs:element minOccurs="0" name="Description" type="eidr:string128Type"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="startingPointType">
+    <xs:annotation>
+      <xs:documentation> This is for defining where something starts in a Composite or Clip.
+				It is a duration rather than a time to to make doing math on starts and durations a
+				little easier. It can be viewed as 'the duration from the start of the thing in
+				question after which something happens.' </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:duration"/>
+  </xs:simpleType>
+  <!-- End of Composites -->
+  <!-- Compilation -->
+  <!-- all taken from md: and redefinitions -->
+  <!-- end of Compilation -->
+  <!-- Edits, Clips -->
+  <xs:complexType name="editInfoType">
+    <xs:annotation>
+      <xs:documentation> An edit must provide, rather than inherit, Description,
+				ApproximateLength, and ReleaseDate on baseRegistrationData. </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Parent" type="eidr:assetDOIType"/>
+      <xs:element name="EditUse" type="eidr:editUseType"/>
+      <xs:element maxOccurs="8" minOccurs="0" name="EditClass" type="eidr:editClassType"/>
+      <xs:element maxOccurs="8" minOccurs="0" name="MadeForRegion" type="eidr:madeForRegionType"/>
+      <xs:element maxOccurs="8" minOccurs="0" name="EditDetails" type="eidr:usageDetailsType"/>
+      <xs:element name="ColorType" type="md:ColorType-type"/>
+      <xs:element name="ThreeD" type="xs:boolean"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="editUseType">
+    <xs:annotation>
+      <xs:documentation> These are intended to capture the original, primary, intended use for
+				the Edit. In many cases, the actual uses will be different, e.g., iTunes using the
+				Theatrical cut. </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Airline"/>
+      <xs:enumeration value="Broadcast"/>
+      <xs:enumeration value="Home Video"/>
+      <xs:enumeration value="Hospitality"/>
+      <xs:enumeration value="Multiuse"/>
+      <xs:enumeration value="Preservation Master"/>
+      <xs:enumeration value="Streaming"/>
+      <xs:enumeration value="Theatrical"/>
+      <xs:enumeration value="Web"/>
+      <xs:enumeration value="Unknown"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="editClassType">
+    <xs:annotation>
+      <xs:documentation> These are intended to enumerate the primary, distinguishing
+				characteristics of the Edit. </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Alternate Ending"/>
+      <xs:enumeration value="Anniversary"/>
+      <xs:enumeration value="Censored"/>
+      <xs:enumeration value="Colorized"/>
+      <xs:enumeration value="Content Break"/>
+      <xs:enumeration value="Creative"/>
+      <xs:enumeration value="Credits"/>
+      <xs:enumeration value="Dialog"/>
+      <xs:enumeration value="Director's Cut"/>
+      <xs:enumeration value="Dubbing Credits"/>
+      <xs:enumeration value="Exit"/>
+      <xs:enumeration value="Extended"/>
+      <xs:enumeration value="Interactive Platform"/>
+      <xs:enumeration value="Intermission"/>
+      <xs:enumeration value="Logos"/>
+      <xs:enumeration value="Music"/>
+      <xs:enumeration value="Original"/>
+      <xs:enumeration value="Overture"/>
+      <xs:enumeration value="Product Placement"/>
+      <xs:enumeration value="Promotional"/>
+      <xs:enumeration value="Recap"/>
+      <xs:enumeration value="Regionalized"/>
+      <xs:enumeration value="Rereleased"/>
+      <xs:enumeration value="Restored Audio"/>
+      <xs:enumeration value="Restored Picture"/>
+      <xs:enumeration value="Restored"/>
+      <xs:enumeration value="Sanitized Audio"/>
+      <xs:enumeration value="Sanitized Picture"/>
+      <xs:enumeration value="Sanitized"/>
+      <xs:enumeration value="Shortened"/>
+      <xs:enumeration value="Sound Effects"/>
+      <xs:enumeration value="Split"/>
+      <xs:enumeration value="Substitutions"/>
+      <xs:enumeration value="Syndication"/>
+      <xs:enumeration value="Textless"/>
+      <xs:enumeration value="Three-D"/>
+      <xs:enumeration value="Unrated"/>
+      <xs:enumeration value="Other"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="madeForRegionType">
+    <xs:annotation>
+      <xs:documentation> These are intended to enumerate the primary, distinguishing
+				characteristics of the Edit. </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="md:MadeForRegion-type"/>
+  </xs:simpleType>
+  <xs:simpleType name="constrainedURIType">
+    <xs:restriction base="xs:anyURI">
+      <xs:annotation>
+        <xs:documentation>
+					2-256 characters
+					any number of non-whitespace characters, then a '.' then any number of non-whitespace chracters
+					Not perfect, but will catch some common cases, particularly (present but empty), (all blanks) and  (no '.' character)
+				</xs:documentation>
+      </xs:annotation>
+      <xs:minLength value="4"/>
+      <xs:maxLength value="256"/>
+      <xs:pattern value="[\S]+[.][\S]+"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="usageDetailsType">
+    <xs:simpleContent>
+      <xs:extension base="eidr:string128Type">
+        <xs:attribute name="domain" type="eidr:constrainedURIType" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <!-- the start/duration in composites and clips could be turned into a type  -->
+  <xs:complexType name="clipInfoType">
+    <xs:annotation>
+      <xs:documentation> A clip can be just an ID, an ID with start and duration, or an ID
+				with just duration. </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Parent" type="eidr:assetDOIType"/>
+      <xs:element name="ComponentsMode" type="eidr:componentsModeType"/>
+      <xs:choice minOccurs="0">
+        <xs:sequence>
+          <xs:element name="Start" type="eidr:startingPointType"/>
+          <xs:element name="Duration" type="xs:duration"/>
+        </xs:sequence>
+        <xs:element name="Duration" type="xs:duration"/>
+      </xs:choice>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- End of Edits, Clips -->
+  <!-- Manifestations -->
+  <xs:complexType name="manifestationInfoType">
+    <xs:sequence>
+      <xs:element name="Parent" type="eidr:assetDOIType"/>
+      <xs:element maxOccurs="8" name="ManifestationClass" type="eidr:manifestationClassType"/>
+      <xs:element maxOccurs="8" minOccurs="0" name="MadeForRegion" type="eidr:madeForRegionType"/>
+      <xs:element maxOccurs="8" minOccurs="0" name="ManifestationDetails" type="eidr:usageDetailsType"/>
+      <xs:choice minOccurs="0">
+        <xs:element name="Digital" type="eidr:digitalTracksType"/>
+        <xs:element name="Film" type="eidr:filmTracksType"/>
+        <xs:element name="Tape" type="eidr:tapeTracksType"/>
+      </xs:choice>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="digitalTracksType">
+    <xs:choice maxOccurs="unbounded" minOccurs="0">
+      <xs:element name="Track" type="md:DigitalAssetMetadata-type"/>
+      <xs:element name="Container" type="md:ContainerMetadata-type"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="filmTracksType"/>
+  <xs:complexType name="tapeTracksType"/>
+  <xs:simpleType name="manifestationClassType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Adaptation Set"/>
+      <xs:enumeration value="Blu-ray"/>
+      <xs:enumeration value="Broadcast Package"/>
+      <xs:enumeration value="CMP"/>
+      <xs:enumeration value="CPL"/>
+      <xs:enumeration value="DVD"/>
+      <xs:enumeration value="EST"/>
+      <xs:enumeration value="Game Machine"/>
+      <xs:enumeration value="HD"/>
+      <xs:enumeration value="IMF"/>
+      <xs:enumeration value="Master"/>
+      <xs:enumeration value="Mezzanine"/>
+      <xs:enumeration value="Mobile"/>
+      <xs:enumeration value="Presentation"/>
+      <xs:enumeration value="Proxy"/>
+      <xs:enumeration value="Representation"/>
+      <xs:enumeration value="SD"/>
+      <xs:enumeration value="Screener"/>
+      <xs:enumeration value="UHD"/>
+      <xs:enumeration value="VOD"/>
+      <xs:enumeration value="Version Language"/>
+      <xs:enumeration value="Web"/>
+      <xs:enumeration value="Other"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Lightweights -->
+  <xs:complexType name="promotionInfoType">
+    <xs:sequence>
+      <xs:element name="ID" type="eidr:assetDOIType"/>
+      <xs:element name="PromotionClass" type="eidr:promotionClassType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="promotionClassType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Broadcast Ad"/>
+      <xs:enumeration value="DVD Trailer"/>
+      <xs:enumeration value="EPK"/>
+      <xs:enumeration value="Infomercial"/>
+      <xs:enumeration value="Mobile"/>
+      <xs:enumeration value="Preview"/>
+      <xs:enumeration value="Radio Spot"/>
+      <xs:enumeration value="Sizzle Reel"/>
+      <xs:enumeration value="Teaser"/>
+      <xs:enumeration value="Theatrical Trailer"/>
+      <xs:enumeration value="UGC Site"/>
+      <xs:enumeration value="Web"/>
+      <xs:enumeration value="Other"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="supplementalContentInfoType">
+    <xs:sequence>
+      <xs:element name="ID" type="eidr:assetDOIType"/>
+      <xs:element name="SupplementalContentClass" type="eidr:supplementalContentClassType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="supplementalContentClassType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="B-roll"/>
+      <xs:enumeration value="Behind the scenes"/>
+      <xs:enumeration value="Deleted Scene"/>
+      <xs:enumeration value="Featurette"/>
+      <xs:enumeration value="Interactivity"/>
+      <xs:enumeration value="Interview"/>
+      <xs:enumeration value="Making Of"/>
+      <xs:enumeration value="Music Video"/>
+      <xs:enumeration value="Music"/>
+      <xs:enumeration value="Outtake"/>
+      <xs:enumeration value="Screen Test"/>
+      <xs:enumeration value="Selected Clips"/>
+      <xs:enumeration value="Other"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="alternateContentInfoType">
+    <xs:sequence>
+      <xs:element name="ID" type="eidr:assetDOIType"/>
+      <xs:element name="AlternateContentClass" type="eidr:alternateContentClassType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="alternateContentClassType">
+    <xs:restriction base="xs:string">
+      <xs:annotation>
+        <xs:documentation> "Descriptive Audio" is intended for audio description/narrative
+					audio tracks for the visually impaired </xs:documentation>
+      </xs:annotation>
+      <xs:enumeration value="Alternate Scene"/>
+      <xs:enumeration value="Camera Angle"/>
+      <xs:enumeration value="Censored"/>
+      <xs:enumeration value="Commentary (Director)"/>
+      <xs:enumeration value="Commentary (Other)"/>
+      <xs:enumeration value="Descriptive Audio"/>
+      <xs:enumeration value="Parental Control"/>
+      <xs:enumeration value="Sing Along"/>
+      <xs:enumeration value="Trivia Track"/>
+      <xs:enumeration value="Other"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="packagingInfoType">
+    <xs:sequence>
+      <xs:element name="ID" type="eidr:assetDOIType"/>
+      <xs:element name="PackagingClass" type="eidr:packagingClassType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="packagingClassType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="DVD"/>
+      <xs:enumeration value="BD"/>
+      <xs:enumeration value="HD"/>
+      <xs:enumeration value="SD"/>
+      <xs:enumeration value="Streaming"/>
+      <xs:enumeration value="Streaming (Web)"/>
+      <xs:enumeration value="Streaming (Mobile)"/>
+      <xs:enumeration value="Download (Web)"/>
+      <xs:enumeration value="Download (Mobile)"/>
+      <xs:enumeration value="VOD"/>
+      <xs:enumeration value="Broadcast"/>
+      <xs:enumeration value="Digital Cinema"/>
+      <xs:enumeration value="Other"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- End of lightweights -->
+  <!-- Utility Types -->
+  <xs:simpleType name="referentType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Series">
+        <xs:annotation>
+          <xs:documentation> Use for an item that consists of separate pieces. The pieces
+						can be ordered or unordered.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Podcast">
+        <xs:annotation>
+          <xs:documentation> A variant of Series with distinct de-duplication behavior.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Season">
+        <xs:annotation>
+          <xs:documentation> Convolutedly defined, this is a container for items that
+						belong together and are released separately over a defined period of time.
+						(Defined by example, this is a season of a TV series.) The items can be
+						ordered or unordered </xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="TV">
+        <xs:annotation>
+          <xs:documentation>Use for anything that was first aired on any form of TV
+						(broadcast, cable, satellite.)</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Movie">
+        <xs:annotation>
+          <xs:documentation>Use for a work that was first seen in a theatrical
+						setting</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Short">
+        <xs:annotation>
+          <xs:documentation>Use for shorter works. Ideally, a TV show should not be
+						described with this, but ads, outtakes, bonus content, and theatrical shorts
+						can be. </xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Web">
+        <xs:annotation>
+          <xs:documentation>Use for work that was first presented on the
+						web</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Compilation">
+        <xs:annotation>
+          <xs:documentation>Used for an item that contains mutiple entire other objects.
+						See CompilationClassType for examples. </xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Interactive Material">
+        <xs:annotation>
+          <xs:documentation>Use for interactive material, such as DVD menus or on-line
+						games. ‘abstract’ could be used for interactive material that is the
+						conceptual basis for different implementations. </xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Supplemental">
+        <xs:annotation>
+          <xs:documentation>Use for trailers, value-added material, and other promotional
+						material, which are otherwise cannot be made children of assets.
+					</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="countryType">
+    <xs:restriction base="doiavs:territoryCode"/>
+  </xs:simpleType>
+  <xs:complexType name="languagesType">
+    <xs:sequence>
+      <xs:element maxOccurs="unbounded" name="Language" type="md:language-redefine"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="statusType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="valid"/>
+      <xs:enumeration value="in development"/>
+      <xs:enumeration value="alias"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="languageType">
+    <xs:simpleContent>
+      <xs:extension base="md:language-redefine">
+        <xs:attribute name="mode" type="eidr:doiModeRestricted" use="required"/>
+        <xs:attribute name="type" type="eidr:languageTrackTypeType"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:simpleType name="languageTrackTypeType">
+    <xs:restriction base="xs:string">
+      <!-- flatten-union: enums taken from 'string-Audio-Type' -->
+      <xs:enumeration value="commentary"/>
+      <xs:enumeration value="dialogcentric"/>
+      <xs:enumeration value="narration"/>
+      <xs:enumeration value="primary"/>
+      <xs:enumeration value="silent"/>
+      <xs:enumeration value="silent-omitted"/>
+      <xs:enumeration value="other"/>
+      <!-- flatten-union: enums taken from 'string-Subtitle-Type' -->
+      <xs:enumeration value="easyreader"/>
+      <xs:enumeration value="forced"/>
+      <xs:enumeration value="large"/>
+      <xs:enumeration value="noforced"/>
+      <xs:enumeration value="normal"/>
+      <xs:enumeration value="SDH"/>
+      <xs:enumeration value="singalong"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="titleType">
+    <xs:simpleContent>
+      <xs:extension base="eidr:string256Type">
+        <xs:attribute name="titleClass" type="eidr:titleClassType" use="optional"/>
+        <xs:attribute name="lang" type="md:language-redefine" use="required"/>
+        <xs:attribute name="systemGenerated" type="xs:boolean" use="optional"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:simpleType name="titleClassType">
+    <xs:annotation>
+      <xs:documentation> XXX update this list....
+				release: title as released
+				abbreviated: Prince Caspian for The Chronicles of Narnia: Prince Caspian
+				working: working title
+				acronym: SATC for Sex and the City
+				fan-based: what fans call it
+				internal: any
+				internal or code name
+				series numeric: episodes are identified by number, not name or original broadcast date
+				series date: episodes are identified by original broadcast date, not name or number
+				regional: regional title that may be in the samelanguage as the original broadcast: if a broadcast release has a different name
+				broadcast: the title if it was different when broadcast for the first time, e.g. for a movie shown on TV
+				AKA: also known as
+				FKA: formerly known as
+				transliterated: the title rendered in a script other than the original (e.g. various romanization schemes)
+				other:
+			</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="release"/>
+      <xs:enumeration value="abbreviated"/>
+      <xs:enumeration value="working"/>
+      <xs:enumeration value="acronym"/>
+      <xs:enumeration value="fan-based"/>
+      <xs:enumeration value="internal"/>
+      <xs:enumeration value="series numeric"/>
+      <xs:enumeration value="series date"/>
+      <xs:enumeration value="regional"/>
+      <xs:enumeration value="broadcast"/>
+      <xs:enumeration value="AKA"/>
+      <xs:enumeration value="FKA"/>
+      <xs:enumeration value="transliterated"/>
+      <xs:enumeration value="other"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="descriptionType">
+    <xs:simpleContent>
+      <xs:extension base="eidr:string128Type">
+        <xs:attribute name="lang" type="md:language-redefine" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:simpleType name="languageManifestationType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="audio"/>
+      <xs:enumeration value="subtitle"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:annotation>
+    <xs:documentation> Username and PartyAccountName are properly formatted for use after the
+			DOI prefix in userDOIType and partyDOIType. Generally, prefix/username and
+			prefix/partyaccountname are referred to as IDs, rather than names. </xs:documentation>
+  </xs:annotation>
+  <!-- is there any way to define the user and party name patterns, and re-use them in the DOI types wihtout having ot resort to cut and paste? -->
+  <xs:element name="PartyAccountName" type="eidr:partyAccountNameType"/>
+  <xs:element name="Username" type="eidr:usernameType"/>
+  <xs:simpleType name="partyAccountNameType">
+    <xs:annotation>
+      <xs:documentation> Used when creating accounts. This needs to match the suffix part of
+				partyDOIType. </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-zA-Z_# \.\-\(\)]{2,64}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="partyDOIType">
+    <xs:annotation>
+      <xs:documentation> Used for associated orgs, encoding agents, administrative parties,
+				prefix is 10.5237 suffix is XXXX-XXXX or 'superparty' </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="10\.5237/[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"/>
+      <xs:pattern value="10\.5237/superparty"/>
+      <!-- uncomment to allow non-DOI handle prefixes -->
+      <!-- <xs:pattern value="[^/]+/[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"/> -->
+      <!-- <xs:pattern value="[^/]+/superparty"/> -->
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="usernameType">
+    <xs:annotation>
+      <xs:documentation> Used when creating accounts. This needs to match the suffix part of
+				userDOIType. </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-zA-Z_#\.\-\(\)]{3,32}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="userDOIType">
+    <xs:annotation>
+      <xs:documentation> Used for individuals who have done things, requested things, etc
+				prefix is 10.5238 suffix is 3-32 characters from 0-9 a-z A-Z _ # . - ( )
+			</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="10\.5238/[0-9a-zA-Z_#\.\-\(\)]{3,32}"/>
+      <!-- uncomment to allow non-DOI handle prefixes -->
+      <!-- <xs:pattern value="[^/]+/[0-9a-zA-Z_#\.\-\(\)]{3,32}"/> -->
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:group name="partyGroup">
+    <xs:annotation>
+      <xs:documentation> Describes a Party that is mentioned in the system. Currently uses
+				Common Metadata components to avoid defining yet another form of party identifier.
+				We expect that eidr will always base its definition on outside standards.
+			</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="PartyName" type="md:OrgName-type"/>
+      <xs:element maxOccurs="20" minOccurs="0" name="AlternatePartyName" type="eidr:string256Type"/>
+      <xs:element name="ContactInfo" type="md:ContactInfo-type"/>
+      <xs:element name="Active" type="xs:boolean"/>
+      <xs:element minOccurs="0" name="PartyAccountName" type="eidr:partyAccountNameType"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="AllowedRoles" type="eidr:administratorTypeType"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:complexType name="partyResolutionType">
+    <xs:annotation>
+      <xs:documentation> Returned when resolving a party; Used when modifying a party.
+				Passwords are modified with a separate call, and not returned when resolving.
+			</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="ID" type="eidr:partyDOIType"/>
+      <xs:group ref="eidr:partyGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="partyCreationType">
+    <xs:annotation>
+      <xs:documentation> Used when creating a party, which is the only time the password is
+				handed around. </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:group ref="eidr:partyGroup"/>
+      <xs:element name="Password" type="eidr:simplePasswordType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="partyAliasContinuationType">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="LastAliased" type="eidr:partyDOIType"/>
+      <xs:element name="TargetOfLastAliased" type="eidr:partyDOIType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:group name="userGroup">
+    <xs:annotation>
+      <xs:documentation> Describes a user in the system; a user is always associated with a
+				particular group. Currently uses Common Metadata components to avoid defining yet
+				another form of party identifier. We expect that eidr will always base its
+				definition on outside standards. </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="ParentParty" type="eidr:partyDOIType"/>
+      <xs:element name="ContactInfo" type="md:ContactInfo-type"/>
+      <xs:element name="Active" type="xs:boolean"/>
+      <xs:element name="Username" type="eidr:usernameType"/>
+    </xs:sequence>
+  </xs:group>
+  <xs:complexType name="userResolutionType">
+    <xs:annotation>
+      <xs:documentation> Returned when resolving a user; Used when modifying a user. Passwords
+				are modified with a separate call, and not returned when resolving.
+			</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="ID" type="eidr:userDOIType"/>
+      <xs:group ref="eidr:userGroup"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="userCreationType">
+    <xs:annotation>
+      <xs:documentation> Used when creating a user, which is the only time the password is
+				handed around. </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:group ref="eidr:userGroup"/>
+      <xs:element name="Password" type="eidr:simplePasswordType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:simpleType name="simplePasswordType">
+    <xs:restriction base="xs:string">
+      <xs:minLength value="6"/>
+      <xs:maxLength value="32"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!--
+	<xs:complexType name="associatedOrgType">
+		<xs:complexContent>
+			<xs:extension base="md:OrgName-type">
+				<xs:attribute name="role" type="eidr:associatedOrgRoleType" use="required"/>
+			</xs:extension>
+		</xs:complexContent>
+	</xs:complexType>
+	<xs:simpleType name="associatedOrgRoleType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="producer"/>
+			<xs:enumeration value="distributor"/>
+			<xs:enumeration value="broadcaster"/>
+			<xs:enumeration value="editor"/>
+			<xs:enumeration value="encoder"/>
+			<xs:enumeration value="other"/>
+		</xs:restriction>
+	</xs:simpleType>
+	<xs:simpleType name="orgNameIDType">
+		<xs:restriction base="xs:string">
+			<xs:enumeration value="EIDRPartyID"/>
+			<xs:enumeration value="ISNI"/>
+		</xs:restriction>
+	</xs:simpleType>
+	-->
+  <xs:simpleType name="administratorTypeType">
+    <xs:annotation>
+      <xs:documentation>See Chapter 7 of the spec for details on these.</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="AssociatedOrg">
+        <xs:annotation>
+          <xs:documentation>Identifies a party that can be listed as an AssociatedOrg for
+						an asset.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Registrant">
+        <xs:annotation>
+          <xs:documentation>Identifies a party that is registering or has registered a
+						work</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="MetadataAuthority">
+        <xs:annotation>
+          <xs:documentation>Identifies a party who has asserted that they possess complete
+						and correct metadata for the record and who has agreed to maintain the
+						record.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="EncodingAgent">
+        <xs:annotation>
+          <xs:documentation>Identifies a partythat can be listed as EncodingAgent for a
+						regustered encoding</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Writer">
+        <xs:annotation>
+          <xs:documentation>Identifies a party that can write to objects, but not create,
+						delete, or promote them -- e.g. a clean-up crew</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="Reader">
+        <xs:annotation>
+          <xs:documentation>Identifies a party that is allowed to see information that
+						would otherwise be hidden</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="ServiceAdmin">
+        <xs:annotation>
+          <xs:documentation>Identifies a party that is allowed to create, modify, delete,
+						or alias video services information</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="AltIDWriter">
+        <xs:annotation>
+          <xs:documentation>Identifies a party that is allowed to modify
+						AlternateID information on any record</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="registrantType">
+    <xs:simpleContent>
+      <xs:extension base="eidr:partyDOIType"/>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="metadataAuthorityType">
+    <xs:simpleContent>
+      <xs:extension base="eidr:partyDOIType"/>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="creditsType">
+    <xs:sequence>
+      <xs:element maxOccurs="2" minOccurs="0" name="Director" type="md:PersonName-type"/>
+      <xs:element maxOccurs="4" minOccurs="0" name="Actor" type="md:PersonName-type"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="relationshipsInfoType">
+    <xs:sequence>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="Relationship" type="eidr:relationshipInfoType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="relationshipInfoType">
+    <xs:annotation>
+      <xs:documentation>
+         a relationship is described with "
+        <Relationship type="eidr:isSeasonOf">assetDOI</Relationship>
+        " isCompositeOf and isCompilation
+				of can occur multiple times in a relationship list (see SimpleMetadata), once for
+				each item in the composite. The lightweight relationships ca occur multiple times.
+				Other relationships occur once on any given object.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:extension base="eidr:assetDOIType">
+        <xs:attribute name="type" type="eidr:relationshipType" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:simpleType name="relationshipType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="isSeasonOf"/>
+      <xs:enumeration value="isEpisodeOf"/>
+      <xs:enumeration value="isEditOf"/>
+      <xs:enumeration value="isManifestationOf"/>
+      <xs:enumeration value="isClipOf"/>
+      <xs:enumeration value="isCompositeOf"/>
+      <xs:enumeration value="isCompilationOf"/>
+      <xs:enumeration value="isPackagingOf"/>
+      <xs:enumeration value="isPromotionFor"/>
+      <xs:enumeration value="isSupplementTo"/>
+      <xs:enumeration value="isAlternateContentFor"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="dateType">
+    <xs:annotation>
+      <xs:documentation>allows YYYY or YYYY-MM-DD</xs:documentation>
+    </xs:annotation>
+    <xs:union memberTypes="xs:gYear xs:date"/>
+  </xs:simpleType>
+  <xs:simpleType name="string64Type">
+    <xs:restriction base="xs:string">
+      <xs:maxLength value="64"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="string128Type">
+    <xs:restriction base="xs:string">
+      <xs:maxLength value="128"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="string256Type">
+    <xs:restriction base="xs:string">
+      <xs:maxLength value="256"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="string1024Type">
+    <xs:restriction base="xs:string">
+      <xs:maxLength value="1024"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="registrantExtraDataType">
+    <xs:restriction base="eidr:string128Type"/>
+  </xs:simpleType>
+  <xs:simpleType name="componentsModeType">
+    <xs:annotation>
+      <xs:documentation> These are a superset of an object's possible mode types; they cover
+				individual components and combinations of components. "Other" covers combinations not
+				otherwise described </xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <!-- flatten-union: enums taken from 'doiModeRestricted' -->
+      <xs:enumeration value="Audio"/>
+      <xs:enumeration value="Visual"/>
+      <!-- flatten-union: enums taken from an anonymous union -->
+      <xs:enumeration value="AudioVisual"/>
+      <xs:enumeration value="Other"/>
+      <!-- flatten-union: enums taken from an anonymous union -->
+      <xs:enumeration value="InteractiveMaterial"/>
+      <xs:enumeration value="All"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="doiModeRestricted">
+    <xs:restriction base="doiavs:mode">
+      <xs:enumeration value="Audio"/>
+      <xs:enumeration value="Visual"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="modeType">
+    <xs:annotation>
+      <xs:documentation> use DOI types where possible; use Other for InteractiveMaterial;
+				AudioVisual is included for compatibility with DOI 2004 modes</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <!-- flatten-union: enums taken from 'doiModeRestricted' -->
+      <xs:enumeration value="Audio"/>
+      <xs:enumeration value="Visual"/>
+      <!-- flatten-union: enums taken from an anonymous union -->
+      <xs:enumeration value="AudioVisual"/>
+      <xs:enumeration value="Other"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- Alternate IDs  -->
+  <!-- things to fix in the alternate IDs:
+		Need  patterns for TVG, AMG, MUZE, TRIB, SMPTE UMID.
+-->
+  <xs:complexType abstract="true" name="alternateIDType">
+    <xs:annotation>
+      <xs:documentation>
+         Since this is abstract, any field using it has to provide one of the
+				derived types as an xsi:type attribute, e.g.
+				"
+        <AlternateID xs:type="eidr:DOI">10.123/456</AlternateID>
+        "
+				This would be easier (and more controlled) under W3C
+				schema 1.1 using conditional type assignment.
+				Note: xs: in the example above should be xsi: but some validators don't like that unless the namespace is declared,
+				even inside the documentation element.
+      </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:extension base="eidr:string1024Type">
+        <xs:attribute name="relation" type="eidr:alternateIDRelationType"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:simpleType name="alternateIDRelationType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="ContainsAllOf"/>
+      <xs:enumeration value="ContainsPartOf"/>
+      <xs:enumeration value="DepictsEvent"/>
+      <xs:enumeration value="Deprecated"/>
+      <xs:enumeration value="Duplicate"/>
+      <xs:enumeration value="HasCueSheet"/>
+      <xs:enumeration value="HasSoundRecording"/>
+      <xs:enumeration value="IsDerivedFrom"/>
+      <xs:enumeration value="IsEntirelyContainedBy"/>
+      <xs:enumeration value="IsPartiallyContainedBy"/>
+      <xs:enumeration value="IsSameAs"/>
+      <xs:enumeration value="IsSourceOf"/>
+      <xs:enumeration value="Other"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="Ad-ID">
+    <xs:annotation>
+      <xs:documentation> 4 alpha chars -- company code 7 alphanumeric -- generated code
+				optional 'H' -- for HD version </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[A-Z]{4}[\dA-Z]{7}[HD]?"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="AFI">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[\d]+"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="AMG">
+    <xs:annotation>
+      <xs:documentation> AMG IDs from the V (video) or E (DVD) spaces. Can be the letter
+				followed by up to 9 digits Future: may want to support othe letter followed by 1-9
+				digits left-padded to force field size to be 10 </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:maxLength value="10"/>
+        <xs:pattern value="[VE][\d]{1,9}"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="Baseline">
+    <xs:annotation>
+      <xs:documentation> This is an ID from the Project ID space, which covers Film, TV,
+				Season, Episode, and DVD. To use this ID within the Baseline system you may need to
+				look at the EIDR ReferentType and/or the Baseline IDs of any ancestors.
+			</xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[\d]{7}"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="BFI">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[\d]{9}"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="cIDF">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType"/>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="CRID">
+    <xs:annotation>
+      <xs:documentation> a CRID is crid://dns name/data (see rfc 4078) 'crid' is
+				case-insensitive this regular expression for the domain requires at least one . in
+				the domain, and supports 2-4 character top level domains the other pieces of the
+				domain are alphanumeric first char, alphanumeric or dash in the middle, alphanumeric
+				last char, maximum 63 characters data: doesn't include ? or # sections yet, and may
+				be too restrictive </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:maxLength value="1023"/>
+        <xs:pattern value="[cC][rR][iI][dD]://([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,4}/(([a-zA-Z0-9\._\-~]|%[0-9a-fA-F]{2})+/?)+"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="DOI">
+    <xs:annotation>
+      <xs:documentation>DOI from outside the eidr system </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="10\.[^\./@]+(\.[^\./@]+)*/.+"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="EAN">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[\d]{8}"/>
+        <xs:pattern value="[\d]{13}"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="GRid">
+    <xs:annotation>
+      <xs:documentation> GRid is 2 char (identifier scheme), 5 char (issuer code), 10 char
+				(release number), 1 char (check character) Letters must be upper case. Either all
+				dashes are present, or none are </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[\dA-Z]{2}-[\dA-Z]{5}-[\dA-Z]{10}-[\dA-Z]{1}"/>
+        <xs:pattern value="[\dA-Z]{2}[\dA-Z]{5}[\dA-Z]{10}[\dA-Z]{1}"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="GTIN">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[\d]{8}"/>
+        <xs:pattern value="[\d]{13}"/>
+        <xs:pattern value="[\d]{14}"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="IMDB">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="tt[\d]{7,8}"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="ISAN">
+    <xs:annotation>
+      <xs:documentation> ISAN in form 4-4-4-4, 4-4-4-4-C (C is a checkdigit), 4-4-4-4-C-4-4-C,
+				or 4-4-4-4-4-4 Hex digits and check digits must be upper case All occurrences in a
+				string of "-" must be one of dash, space or nothing. The 24-digit forms must have
+				both check digits, or neither. </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}(-[\dA-Z])?"/>
+        <xs:pattern value="[\dA-F]{4} [\dA-F]{4} [\dA-F]{4} [\dA-F]{4}( [\dA-Z])?"/>
+        <xs:pattern value="[\dA-F]{16}[\dA-Z]?"/>
+        <xs:pattern value="[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}-[\dA-Z]-[\dA-F]{4}-[\dA-F]{4}-[\dA-Z]"/>
+        <xs:pattern value="[\dA-F]{4} [\dA-F]{4} [\dA-F]{4} [\dA-F]{4} [\dA-Z] [\dA-F]{4} [\dA-F]{4} [\dA-Z]"/>
+        <xs:pattern value="[\dA-F]{16}[\dA-Z][\dA-F]{8}[\dA-Z]"/>
+        <xs:pattern value="[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}"/>
+        <xs:pattern value="[\dA-F]{4} [\dA-F]{4} [\dA-F]{4} [\dA-F]{4} [\dA-F]{4} [\dA-F]{4}"/>
+        <xs:pattern value="[\dA-F]{24}"/>
+      </xs:restriction>
+      <!-- ISAN with and without check digits -->
+      <!-- V-ISAN with check digits -->
+      <!-- V-ISAN without check digits -->
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="ISRC">
+    <xs:annotation>
+      <xs:documentation> An ISRC is 2-char (non-digit) country code, 3 char (alpha or digit)
+				registrant code, 2 digit year of reference, 5 digit designation code, with optional
+				separating dashes. Letters are upper case. Either all dashes are present, or none
+				are. </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[A-Z]{2}-[\dA-Z]{3}-[\d]{2}-[\d]{5}"/>
+        <xs:pattern value="[A-Z]{2}[\dA-Z]{3}[\d]{2}[\d]{5}"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="ISTC">
+    <xs:annotation>
+      <xs:documentation>3 hex digits, 4 digits, 8 hex digits, ISO 7064 MOD16-3 check digit
+				(The groups can be separated by nothing, a space, or a hyphen. The same separator
+				must be used for the whole ID.) </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[\dA-F]{3} [\d]{4} [\dA-F]{8} [\dA-F]{1}"/>
+        <xs:pattern value="[\dA-F]{3}-[\d]{4}-[\dA-F]{8}-[\dA-F]{1}"/>
+        <xs:pattern value="[\dA-F]{3}[\d]{4}[\dA-F]{8}[\dA-F]{1}"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="IVA">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[1-9][0-9]{0,6}"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="Lumiere">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[\d]+"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="MUZE">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType"/>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="ShortDOI">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="10/[\dA-Za-z]+"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="SMPTE-UMID">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType"/>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="TRIB">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType"/>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="TVG">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType"/>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="UPC">
+    <xs:annotation>
+      <xs:documentation> UPC is twelve decimal digits. </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[\d]{12}"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="URI">
+    <xs:annotation>
+      <xs:documentation> a URI for us is scheme://dns name/data [# query] [#fragment] scheme
+				starts with a character, then (char digit + - .)* limited to total of 12 the regular
+				expression for the domain requires at least one . in the domain, and supports 2-4
+				character top level domains the other pieces of the domain are alphanumeric first
+				char, alphanumeric or dash in the middle, alphanumeric last char, maximum 63
+				characters data is slash-separated, with an optional trailing slash. legal
+				characters are 0-9a-zA-Z _ - . ~ ! $ ampersand ' ( ) * + , ; = @ : optional query is
+				as data, with the addition of / and ? optional fragment is as query data differences
+				from full URI: -- limit on scheme length -- must have domain name, can't have
+				userinfo@host:port -- dns names only, not IP addresses -- there must be /something
+				after the domain </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:maxLength value="1023"/>
+        <xs:pattern value="[a-zA-Z][\da-zA-Z]{0,11}://([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,4}/(([a-zA-Z0-9_\-\.~$&amp;'\(\)\*\+,;=@:]|%[0-9a-fA-F]{2})+/?)+(\?([a-zA-Z0-9_\-\.~$&amp;'\(\)\*\+,;=@:/\?]|%[0-9a-fA-F]{2})*)?(#([a-zA-Z0-9_\-\.~$&amp;'\(\)\*\+,;=@:/\?]|%[0-9a-fA-F]{2})*)?"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="URN">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[uU][rR][nN]:[A-Za-z0-9][A-Za-z0-9-]{0,31}:[A-Za-z0-9()+,\.:=@;$_!*'%/?#-]+"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="UUID">
+    <xs:annotation>
+      <xs:documentation> UUID in form 8-4-4-4-12. Both upper and lowercase hex digits allowed.
+			</xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:alternateIDType">
+        <xs:pattern value="[\dA-Fa-f]{8}-[\dA-Fa-f]{4}-[\dA-Fa-f]{4}-[\dA-Fa-f]{4}-[\dA-Fa-f]{12}"/>
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="Proprietary">
+    <xs:annotation>
+      <xs:documentation>
+         Any value allowed. Required attribute for domain of reference, e.g.
+					"
+        <AlternateID domain="http://www.colossalcave.com" xs:type="eidr:Proprietary">XYZZY</AlternateID>
+        "
+      </xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:extension base="eidr:alternateIDType">
+        <xs:attribute name="domain" type="eidr:constrainedURIType" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:simpleType name="alternateIDTypeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Ad-ID"/>
+      <xs:enumeration value="AFI"/>
+      <xs:enumeration value="AMG"/>
+      <xs:enumeration value="Baseline"/>
+      <xs:enumeration value="BFI"/>
+      <xs:enumeration value="cIDF"/>
+      <xs:enumeration value="CRID"/>
+      <xs:enumeration value="DOI"/>
+      <xs:enumeration value="EAN"/>
+      <xs:enumeration value="GRid"/>
+      <xs:enumeration value="GTIN"/>
+      <xs:enumeration value="IMDB"/>
+      <xs:enumeration value="ISAN"/>
+      <xs:enumeration value="ISRC"/>
+      <xs:enumeration value="ISTC"/>
+      <xs:enumeration value="IVA"/>
+      <xs:enumeration value="Lumiere"/>
+      <xs:enumeration value="MUZE"/>
+      <xs:enumeration value="ShortDOI"/>
+      <xs:enumeration value="SMPTE-UMID"/>
+      <xs:enumeration value="TRIB"/>
+      <xs:enumeration value="TVG"/>
+      <xs:enumeration value="UPC"/>
+      <xs:enumeration value="URI"/>
+      <xs:enumeration value="URN"/>
+      <xs:enumeration value="UUID"/>
+      <xs:enumeration value="Proprietary"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <!-- the next set are arguments and returns valus for the public API
+	 query bases are eidr:fullObjectInfoType and eidr:provenanceInfoType
+-->
+  <!-- these relationships can be used in add/remove/replace -->
+  <xs:simpleType name="targetRelationshipType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="CompositeRelationship"/>
+      <xs:enumeration value="PackagingRelationship"/>
+      <xs:enumeration value="SupplementalRelationship"/>
+      <xs:enumeration value="PromotionalRelationship"/>
+      <xs:enumeration value="AlternateContentRelationship"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="creationType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="CreateBasic"/>
+      <xs:enumeration value="CreateSeason"/>
+      <xs:enumeration value="CreateInteractive"/>
+      <xs:enumeration value="CreateSeries"/>
+      <xs:enumeration value="CreateManifestation"/>
+      <xs:enumeration value="CreateEdit"/>
+      <xs:enumeration value="CreateClip"/>
+      <xs:enumeration value="CreateComposite"/>
+      <xs:enumeration value="CreateCompilation"/>
+      <xs:enumeration value="CreateEpisode"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:annotation>
+    <xs:documentation> A CreateXXXDataType based on selfDefinedBaseObjectInfoGroup is allowed to
+			inherit information from their parents. A CreateXXXDataType based on baseObjectInfoGroup
+			can't inherit. The schema does not enforce type-based value restrictions or fields that
+			are required to be non-inherited; that is done in the validation rules in the registry.
+			See the Validation rules document for details. The base metadata for these is based on
+			the groups rather than the resolution types because no ID is present in a creation
+			request. Rather than referencing bare groups, the schema wraps them in the
+			creationFullInfo and creationSelfDefinedInfo types, which produces better class
+			structure in the generated Java bindings. </xs:documentation>
+  </xs:annotation>
+  <xs:complexType name="creationFullInfo">
+    <xs:group ref="eidr:baseObjectInfoGroup"/>
+  </xs:complexType>
+  <xs:complexType name="creationSelfDefinedInfo">
+    <xs:group ref="eidr:selfDefinedFieldsGroup"/>
+  </xs:complexType>
+  <xs:complexType name="createBasicDataType">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:creationFullInfo"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="modifyBasicDataType">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:creationSelfDefinedInfo"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="createSeasonDataType">
+    <xs:annotation>
+      <xs:documentation>A Season must be the child of a Series.</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:creationSelfDefinedInfo"/>
+      <xs:element name="ExtraObjectMetadata">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="SeasonInfo" type="eidr:seasonInfoType"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="createInteractiveDataType">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:creationSelfDefinedInfo"/>
+      <xs:element name="ExtraObjectMetadata">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="InteractiveMaterialInfo" type="md:DigitalAssetInteractiveBaseData-type"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="createSeriesDataType">
+    <xs:annotation>
+      <xs:documentation> A Series is a root, and can't inherit from anything
+			</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:creationFullInfo"/>
+      <xs:element name="ExtraObjectMetadata">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="SeriesInfo" type="eidr:seriesInfoType"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="createManifestationDataType">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:creationSelfDefinedInfo"/>
+      <xs:element name="ExtraObjectMetadata">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="ManifestationInfo" type="eidr:manifestationInfoType"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="createEditDataType">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:creationSelfDefinedInfo"/>
+      <xs:element name="ExtraObjectMetadata">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="EditInfo" type="eidr:editInfoType"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="createCompilationDataType">
+    <xs:annotation>
+      <xs:documentation> A Compilation is a root, and can't inherit from anything
+			</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:creationFullInfo"/>
+      <xs:element name="ExtraObjectMetadata">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="CompilationInfo" type="md:CompObj-type"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="createClipDataType">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:creationSelfDefinedInfo"/>
+      <xs:element name="ExtraObjectMetadata">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="ClipInfo" type="eidr:clipInfoType"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="createCompositeDataType">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:creationFullInfo"/>
+      <xs:element name="ExtraObjectMetadata">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="CompositeInfo" type="eidr:compositeInfoType"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="modifyCompositeDataType">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:creationSelfDefinedInfo"/>
+      <xs:element name="ExtraObjectMetadata">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="CompositeInfo" type="eidr:compositeInfoType"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="createEpisodeDataType">
+    <xs:annotation>
+      <xs:documentation>An Episode must be the child of a Series or a Season.
+			</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BaseObjectData" type="eidr:creationSelfDefinedInfo"/>
+      <xs:element name="ExtraObjectMetadata">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="EpisodeInfo" type="eidr:episodeInfoType"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="aliasContinuationType">
+    <xs:annotation>
+      <xs:documentation> </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="LastAliased" type="eidr:assetDOIType"/>
+      <xs:element name="TargetOfLastAliased" type="eidr:assetDOIType"/>
+    </xs:sequence>
+  </xs:complexType>
+  <!-- See API spec for how to use this -->
+  <xs:complexType name="seriesAncestryType">
+    <xs:sequence>
+      <xs:element name="Origin" type="eidr:simpleInfoType"/>
+      <xs:sequence minOccurs="0">
+        <xs:element minOccurs="0" name="EpisodeBasicData" type="eidr:simpleInfoType"/>
+        <xs:element minOccurs="0" name="EpisodeInfo" type="eidr:episodeInfoType"/>
+      </xs:sequence>
+      <xs:sequence minOccurs="0">
+        <xs:element minOccurs="0" name="SeasonBasicData" type="eidr:simpleInfoType"/>
+        <xs:element minOccurs="0" name="SeasonInfo" type="eidr:seasonInfoType"/>
+      </xs:sequence>
+      <xs:sequence minOccurs="0">
+        <xs:element minOccurs="0" name="SeriesBasicData" type="eidr:simpleInfoType"/>
+        <xs:element minOccurs="0" name="SeriesInfo" type="eidr:seriesInfoType"/>
+      </xs:sequence>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="virtualFieldsType">
+    <xs:sequence>
+      <xs:element name="ID" type="eidr:assetDOIType"/>
+      <xs:element minOccurs="0" name="Full" type="xs:string"/>
+      <xs:element minOccurs="0" name="SelfDefined" type="xs:string"/>
+      <xs:element minOccurs="0" name="Alias" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="Resolutions" type="eidr:resolutionSetType"/>
+  <xs:complexType name="resolutionSetType">
+    <xs:annotation>
+      <xs:documentation>
+        				This is used by the SDK and atomic tools to return a set of resolutions as a valid piece of XML; the Registry only supports doing resolutions
+				one at a time, and all of the results are put in a Resolutions element of this type.
+				Most of the tools will generate only a single kind of Resolution at a time.  As of 1.2.1, GraphTool and ResolveTool are the only exceptions to this.
+				If the "singleType" attribute is present, it contains the name of the single type of resolution contained by
+        <Resolutions/>
+      </xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:choice maxOccurs="unbounded" minOccurs="0">
+        <xs:element name="SimpleMetadata" type="eidr:simpleInfoType"/>
+        <xs:element name="SelfDefinedMetadata" type="eidr:allSelfDefinedInfoType"/>
+        <xs:element name="InheritedMetadata" type="eidr:allInheritedInfoType"/>
+        <xs:element name="FullMetadata" type="eidr:fullObjectInfoType"/>
+        <xs:element name="ProvenanceMetadata" type="eidr:provenanceInfoType"/>
+        <xs:element name="kernelMetadata" type="doi:kernelMetadata"/>
+      </xs:choice>
+    </xs:sequence>
+    <xs:attribute name="singleType" type="eidr:resolutionTypeType" use="optional"/>
+  </xs:complexType>
+  <xs:simpleType name="resolutionTypeType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="DOIKernel"/>
+      <xs:enumeration value="Full"/>
+      <xs:enumeration value="SelfDefined"/>
+      <xs:enumeration value="Simple"/>
+      <xs:enumeration value="Provenance"/>
+      <xs:enumeration value="Inherited"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="baseAssetDOIType">
+    <xs:simpleContent>
+      <xs:extension base="xs:string"/>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="assetDOIType">
+    <xs:annotation>
+      <xs:documentation>
+				other files use redefine with eidr-base.xsd and redefine assetDOIType
+				see assetDOIType.xsd for the canonical forms
+			</xs:documentation>
+    </xs:annotation>
+    <xs:simpleContent>
+      <xs:restriction base="eidr:baseAssetDOIType">
+        <xs:annotation>
+          <xs:documentation>
+							Restrict assetDOIType to be only proper DOIs, stripping out the special bulk ingestion pattern
+						</xs:documentation>
+        </xs:annotation>
+        <xs:pattern value="10\.5240/[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}-[\dA-Z]"/>
+        <xs:pattern value="10\.5240/[\dA-F]{20}[\dA-Z]"/>
+        <!-- uncomment to allow non-DOI handle prefixes -->
+        <!-- <xs:pattern value="[^/]+/[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}-[\dA-F]{4}-[\dA-Z]"/> -->
+        <!-- <xs:pattern value="[^/]+/[\dA-F]{20}[\dA-Z]"/> -->
+      </xs:restriction>
+    </xs:simpleContent>
+  </xs:complexType>
+</xs:schema>

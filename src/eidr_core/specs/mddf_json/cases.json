@@ -1,0 +1,19 @@
+{
+  "spec": "specs/mddf-json.md",
+  "version": "1.0.0",
+  "schema": "EIDR 2.7.0",
+  "cases": [
+    {
+      "id": "registry-edit-full",
+      "why": "A record as the registry serves it (an Edit, FullMetadata): default EIDR namespace plus md; schema-driven arrays (OriginalLanguage, AssociatedOrg, CountryOfOrigin, AlternateName, Director, Actor, EditClass, MadeForRegion) and singles (md:DisplayName in an org name, Parent)."
+    },
+    {
+      "id": "values-and-empties",
+      "why": "Trimming of element content and attribute values (space, tab, CR, LF only; interior kept); empty attribute -> null; empty element and white-space-only element -> null; attribute-only element -> object of attributes; one occurrence of a repeatable element -> array; xsi:type kept as _xsi:type; text with attributes under \"value\"."
+    },
+    {
+      "id": "nil-and-api",
+      "why": "xsi:nil=\"true\" alone -> null; xsi:nil=\"1\" with another attribute -> object including _xsi:nil; root attributes (xsi:schemaLocation) kept; the .api.json form removes the root element and keeps its declarations and attributes."
+    }
+  ]
+}

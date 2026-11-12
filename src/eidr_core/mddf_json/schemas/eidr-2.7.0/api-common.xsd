@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:eidr="http://www.eidr.org/schema"
+    xmlns:doi="http://www.doi.org/2010/DOISchema"
+    targetNamespace="http://www.eidr.org/schema" elementFormDefault="qualified"
+    attributeFormDefault="unqualified" version="2.7.0">
+
+    <xs:annotation>
+        <xs:documentation>
+            This schema includes all the status codes and types that may be returned. There are three classes of statuses:
+            (1) Success or failure state of the request at the API level
+            (2) State of a submitted batch in the registry
+            (3) State of each of the operation requests bundled together in a batch
+        </xs:documentation>
+    </xs:annotation>
+
+    <xs:simpleType name="statusCodeType">
+        <xs:annotation>
+            <xs:documentation>
+                The status codes that correspond to the first class of statuses: success or failure state of the request at the API level
+            </xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:nonNegativeInteger">
+            <xs:enumeration value="0"/>
+            <xs:enumeration value="1"/>
+            <xs:enumeration value="2"/>
+            <xs:enumeration value="3"/>
+            <xs:enumeration value="4"/>
+            <xs:enumeration value="5"/>
+            <xs:enumeration value="6"/>
+            <xs:enumeration value="7"/>
+            <xs:enumeration value="8"/>
+            <xs:enumeration value="9"/>
+            <xs:enumeration value="10"/>
+            <xs:enumeration value="11"/>
+            <xs:enumeration value="12"/>
+            <xs:enumeration value="13"/>
+            <xs:enumeration value="14"/>
+            <xs:enumeration value="15"/>
+            <xs:enumeration value="16"/>
+            <xs:enumeration value="17"/>
+            <xs:enumeration value="18"/>
+            <xs:enumeration value="19"/>
+            <xs:enumeration value="20"/>
+            <xs:enumeration value="21"/>
+            <xs:enumeration value="22"/>
+            <xs:enumeration value="23"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="statusTypeType">
+        <xs:annotation>
+            <xs:documentation>
+                The status types that correspond to the first class of statuses: success or failure state of the request at the API level
+            </xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="success"/>
+            <xs:enumeration value="system error"/>
+            <xs:enumeration value="registry in read-only error"/>
+            <xs:enumeration value="invalid request"/>
+            <xs:enumeration value="authentication error"/>
+            <xs:enumeration value="authorization error"/>
+            <xs:enumeration value="bad token error"/>
+            <xs:enumeration value="bad query error"/>
+            <xs:enumeration value="bad id error"/>
+            <xs:enumeration value="syntax error"/>
+            <xs:enumeration value="result too long"/>
+            <xs:enumeration value="duplicate party"/>
+            <xs:enumeration value="duplicate user"/>
+            <xs:enumeration value="bad party"/>
+            <xs:enumeration value="bad user"/>
+            <xs:enumeration value="all valid"/>
+            <xs:enumeration value="wrong group"/>
+            <xs:enumeration value="invalid"/>
+            <xs:enumeration value="no parent"/>
+            <xs:enumeration value="no children"/>
+            <xs:enumeration value="has dependents"/>
+            <xs:enumeration value="duplicate service"/>
+            <xs:enumeration value="bad service"/>
+            <xs:enumeration value="compatibility error"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="batchStatusCodeType">
+        <xs:annotation>
+            <xs:documentation>
+                The status codes that correspond to the second class of statuses: state of a submitted batch in the registry
+            </xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:nonNegativeInteger">
+            <xs:enumeration value="1"/>
+            <xs:enumeration value="2"/>
+            <xs:enumeration value="3"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="batchStatusTypeType">
+        <xs:annotation>
+            <xs:documentation>
+                The status types that correspond to the second class of statuses: state of a submitted batch in the registry
+            </xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="batch received"/>
+            <xs:enumeration value="batch queued"/>
+            <xs:enumeration value="invalid batch"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="operationStatusCodeType">
+        <xs:annotation>
+            <xs:documentation>
+                The status codes that correspond to the third class of statuses: state of each of the operation requests bundled together in a batch
+            </xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:nonNegativeInteger">
+            <xs:enumeration value="0"/>
+            <xs:enumeration value="1"/>
+            <xs:enumeration value="2"/>
+            <xs:enumeration value="3"/>
+            <xs:enumeration value="4"/>
+            <xs:enumeration value="5"/>
+            <xs:enumeration value="6"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="operationStatusTypeType">
+        <xs:annotation>
+            <xs:documentation>
+                The status types that correspond to the third class of statuses: state of each of the operation requests bundled together in a batch
+            </xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="success"/>
+            <xs:enumeration value="duplicate"/>
+            <xs:enumeration value="pending"/>
+            <xs:enumeration value="authorization error"/>
+            <xs:enumeration value="validation error"/>
+            <xs:enumeration value="other error"/>
+            <xs:enumeration value="rejected"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="operationStatusDetailsCodeType">
+        <xs:annotation>
+            <xs:documentation>
+                The status codes that correspond to the third class of statuses, but at a more granular level.
+                These codes are details code presented in the context of operation status code.
+                The various validation errors for instance would be listed here in the future for a validation error operation status
+            </xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:nonNegativeInteger">
+        </xs:restriction>
+    </xs:simpleType>
+
+</xs:schema>

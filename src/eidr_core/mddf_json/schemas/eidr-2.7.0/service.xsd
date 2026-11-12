@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:eidr="http://www.eidr.org/schema"
+    xmlns:md="http://www.movielabs.com/schema/md/v2.8/md" targetNamespace="http://www.eidr.org/schema"
+    elementFormDefault="qualified" attributeFormDefault="unqualified" version="2.7.0-localimport">
+    <xs:include schemaLocation="common.xsd"/>
+    <xs:include schemaLocation="api.xsd"/>
+    <xs:import namespace="http://www.movielabs.com/schema/md/v2.8/md" schemaLocation="md-v28-eidr.xsd"/>
+
+    <xs:group name="serviceGroup">
+        <xs:annotation>
+            <xs:documentation>
+              Provides Video Service Information
+              - Abbreviation is usually the call sign or other acronym
+              - PrimaryTimeZone is the time zone that the service schedules for
+              - Region is usually a DMA
+              - PrimaryAudioLangauge is a language code, e.g. en or en-GB
+              - DeliveryModel is one or more of Linear, VOD and Other
+            </xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="ServiceName" type="eidr:serviceNameType"/>
+            <xs:element name="AlternateServiceName" type="eidr:altServiceNameType" minOccurs="0" maxOccurs="10"/>
+            <xs:element name="AlternateID" type="eidr:serviceAlternateIdType" minOccurs="0" maxOccurs="10"/>
+            <xs:element name="Description" type="eidr:string128Type" minOccurs="0"/>
+            <xs:element name="Parent" type="eidr:serviceDOIType" minOccurs="0"/>
+            <xs:element name="OtherAffiliation" type="eidr:serviceOrPartyDOIType" minOccurs="0" maxOccurs="10"/>
+            <xs:element name="Active" type="xs:boolean"/>
+            <xs:element name="PrimaryTimeZone" type="eidr:timeZoneType" minOccurs="0"/>
+            <xs:element name="Region" type="eidr:string128Type" minOccurs="0"/>
+            <xs:element name="PrimaryAudioLanguage" type="md:language-redefine" minOccurs="0"/>
+            <xs:element name="DeliveryModel" type="eidr:deliveryModelType" minOccurs="0" maxOccurs="4"/>
+        </xs:sequence>
+    </xs:group>
+
+     <xs:complexType name="serviceNameType">
+          <xs:complexContent>
+              <xs:extension base="md:OrgName-type">
+                   <xs:attribute name="abbreviation" type="xs:boolean" use="optional"/>
+              </xs:extension>
+          </xs:complexContent>
+     </xs:complexType>
+
+     <xs:complexType name="altServiceNameType">
+          <xs:simpleContent>
+              <xs:extension base="eidr:string128Type">
+                   <xs:attribute name="abbreviation" type="xs:boolean" use="optional"/>
+              </xs:extension>
+          </xs:simpleContent>
+     </xs:complexType>
+
+     <xs:complexType name="serviceAlternateIdType">
+        <xs:simpleContent>
+            <xs:extension base="xs:string">
+                <xs:attribute name="domain" use="required" type="eidr:constrainedURIType"/>
+            </xs:extension>
+        </xs:simpleContent>
+     </xs:complexType>
+
+     <xs:simpleType name="timeZoneType">
+          <xs:annotation>
+               <xs:documentation>
+                  Primary standard timezone for a service
+              </xs:documentation>
+          </xs:annotation>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="IDLW"/>
+            <xs:enumeration value="NUT"/>
+            <xs:enumeration value="HST"/>
+            <xs:enumeration value="MIT"/>
+            <xs:enumeration value="AKST"/>
+            <xs:enumeration value="PST"/>
+            <xs:enumeration value="MST"/>
+            <xs:enumeration value="CST"/>
+            <xs:enumeration value="EST"/>
+            <xs:enumeration value="AST"/>
+            <xs:enumeration value="NST"/>
+            <xs:enumeration value="BRT"/>
+            <xs:enumeration value="FNT"/>
+            <xs:enumeration value="CVT"/>
+            <xs:enumeration value="UTC"/>
+            <xs:enumeration value="GMT"/>
+            <xs:enumeration value="WAT"/>
+            <xs:enumeration value="CET"/>
+            <xs:enumeration value="EET"/>
+            <xs:enumeration value="MSK"/>
+            <xs:enumeration value="IRST"/>
+            <xs:enumeration value="GST"/>
+            <xs:enumeration value="AFT"/>
+            <xs:enumeration value="PKT"/>
+            <xs:enumeration value="IST"/>
+            <xs:enumeration value="NPT"/>
+            <xs:enumeration value="BST"/>
+            <xs:enumeration value="CCT"/>
+            <xs:enumeration value="MMT"/>
+            <xs:enumeration value="THA"/>
+            <xs:enumeration value="SGT"/>
+            <xs:enumeration value="AWST"/>
+            <xs:enumeration value="JST"/>
+            <xs:enumeration value="ACST"/>
+            <xs:enumeration value="AEST"/>
+            <xs:enumeration value="LHST"/>
+            <xs:enumeration value="NCT"/>
+            <xs:enumeration value="NZST"/>
+            <xs:enumeration value="CHAST"/>
+            <xs:enumeration value="TOT"/>
+            <xs:enumeration value="LINT"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="deliveryModelType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Linear"/>
+            <xs:enumeration value="VOD"/>
+            <xs:enumeration value="Other"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="serviceResolutionType">
+        <xs:annotation>
+            <xs:documentation>
+               Returned when resolving a service; Used when modifying a service.
+            </xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:serviceDOIType"/>
+            <xs:group ref="eidr:serviceGroup"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="serviceCreationType">
+        <xs:annotation>
+            <xs:documentation>
+                Used when creating a service.
+            </xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:group ref="eidr:serviceGroup"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="serviceAliasContinuationType">
+        <xs:annotation>
+            <xs:documentation> </xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="LastAliased" type="eidr:serviceDOIType"/>
+            <xs:element name="TargetOfLastAliased" type="eidr:serviceDOIType"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="serviceQueryType">
+        <xs:sequence>
+            <xs:element name="ServiceName" type="xs:string"/>
+            <xs:element name="ActiveFilter" type="eidr:activeFilterType" default="all"/>
+            <xs:element name="PageNumber" type="xs:unsignedInt" default="1"/>
+            <xs:element name="PageSize" type="xs:unsignedInt" default="20"/>
+            <xs:element name="ContinuationToken" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="expressionServiceQueryType">
+        <xs:sequence>
+            <xs:element name="Expression" type="xs:string"/>
+            <xs:element name="PageNumber" type="xs:unsignedInt" default="1"/>
+            <xs:element name="PageSize" type="xs:unsignedInt" default="20"/>
+            <xs:element name="ContinuationToken" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="serviceQueryResultsType">
+        <xs:sequence>
+            <xs:element name="CurrentSize" type="xs:unsignedInt"/>
+            <xs:element name="TotalMatches" type="xs:unsignedInt"/>
+            <xs:element name="ContinuationToken" type="xs:string" minOccurs="0"/>
+            <xs:element name="Service" type="eidr:serviceResolutionType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:simpleType name="serviceDOIType">
+        <xs:annotation>
+            <xs:documentation>
+            </xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:string">
+            <xs:pattern value="10\.5239/[\dA-F]{4}-[\dA-F]{4}"/>
+            <!-- uncomment to allow non-DOI handle prefixes -->
+            <!-- <xs:pattern value="[^/]+/[\dA-F]{4}-[\dA-F]{4}"/> -->
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="serviceOrPartyDOIType">
+        <xs:annotation>
+            <xs:documentation>
+            </xs:documentation>
+        </xs:annotation>
+        <xs:union memberTypes="eidr:serviceDOIType eidr:partyDOIType"/>
+    </xs:simpleType>
+</xs:schema>

@@ -4,6 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eidr-core"
+# 0.70.0 (2026-11-12): new MODULE eidr_core.mddf_json (additive). One XML<->JSON
+# converter under the MovieLabs MDDF JSON practice (specs/mddf-json.md 1.0.0)
+# for XML_to_JSON, python-sdk and python-tools; arrays per parent type from the
+# bundled EIDR 2.7.0 schema set; conformance corpus specs/mddf_json/.
 # 0.48.0 (2026-10-03): compare-spec 2.19.0 (T42, the operator's Medium-review
 # rules): +4 gate values, three cross-type candidate rules (feature-length
 # episode / short series / theatrical serial meet Basic, capped into Review),
@@ -108,7 +112,7 @@ name = "eidr-core"
 # moved, but T6 makes this repo's CI gate the precondition for consumers
 # pinning @main, so WHICH checker verified the py.typed annotations is part
 # of what that version identifies.
-version = "0.69.1"
+version = "0.70.0"
 description = "Shared library, specifications, and reference data contracts for the EIDR tool portfolio"
 readme = "README.md"
 # Floor set by the oldest consumer (eidr-dq targets 3.10+); other consumers
@@ -231,7 +235,10 @@ where = ["src"]
 "eidr_core" = ["py.typed", "DICTIONARY.md", "specs/*.json", "specs/golden_pairs/*.json",
                "specs/db_schemas/*/manifest.json",
                "specs/db_schemas/*/schema.sql",
-               "specs/db_schemas/*/CHANGES.md"]
+               "specs/db_schemas/*/CHANGES.md",
+               "specs/mddf_json/*.xml", "specs/mddf_json/*.json"]
+# The EIDR 2.7.0 schema set mddf_json reads its cardinality from (0.70.0).
+"eidr_core.mddf_json" = ["schemas/*/*.xsd", "schemas/*/MANIFEST.json"]
 # word_alias.csv ships with the normalize package (aliases.py loads it
 # relative to its own file; degrades gracefully if absent).
 "eidr_core.normalize" = ["data/*.csv"]

@@ -1,0 +1,83 @@
+{
+  "_xmlns": "http://www.eidr.org/schema",
+  "_xmlns:md": "http://www.movielabs.com/schema/md/v2.8/md",
+  "BaseObjectData": {
+    "ID": "10.5240/6D2C-8F7E-F41E-AA7E-027E-H",
+    "StructuralType": "Performance",
+    "Mode": "AudioVisual",
+    "ReferentType": "Movie",
+    "ResourceName": {
+      "value": "The Black Rose",
+      "_lang": "en",
+      "_titleClass": "release"
+    },
+    "OriginalLanguage": [
+      {
+        "value": "en",
+        "_mode": "Audio",
+        "_type": "primary"
+      }
+    ],
+    "AssociatedOrg": [
+      {
+        "_idType": "EIDRPartyID",
+        "_organizationID": "10.5237/2FE2-24F2",
+        "_role": "producer",
+        "DisplayName": "20th Century Fox Film Corporation",
+        "AlternateName": [
+          "Twentieth Century Fox Film Corporation",
+          "Twentieth Century Fox",
+          "Twentieth Century-Fox"
+        ]
+      }
+    ],
+    "ReleaseDate": "1950",
+    "CountryOfOrigin": [
+      "GB",
+      "US"
+    ],
+    "Status": "valid",
+    "ApproximateLength": "PT2H0M",
+    "Administrators": {
+      "Registrant": "10.5237/superparty"
+    },
+    "Credits": {
+      "Director": [
+        {
+          "DisplayName": "Henry Hathaway"
+        },
+        {
+          "DisplayName": "Abe Steinberg"
+        }
+      ],
+      "Actor": [
+        {
+          "DisplayName": "Tyrone Power"
+        },
+        {
+          "DisplayName": "Orson Welles"
+        },
+        {
+          "DisplayName": "Cecile Aubrey"
+        },
+        {
+          "DisplayName": "Jack Hawkins"
+        }
+      ]
+    }
+  },
+  "ExtraObjectMetadata": {
+    "EditInfo": {
+      "Parent": "10.5240/E831-D743-68D0-ED9C-5890-F",
+      "EditUse": "Theatrical",
+      "EditClass": [
+        "Original"
+      ],
+      "MadeForRegion": [
+        "Domestic"
+      ],
+      "ColorType": "color",
+      "ThreeD": "false"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SelfDefinedMetadata xmlns="http://www.eidr.org/schema" xmlns:md="http://www.movielabs.com/schema/md/v2.8/md" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <BaseObjectData>
+    <ID>10.5240/0000-0000-0000-0000-0001-X</ID>
+    <StructuralType>Abstraction</StructuralType>
+    <Mode>AudioVisual</Mode>
+    <ReferentType>Movie</ReferentType>
+    <ResourceName lang=" en " titleClass="release">
+      Paperman  &amp; Friends
+    </ResourceName>
+    <AlternateResourceName lang="">Paperman "short"</AlternateResourceName>
+    <OriginalLanguage mode="Audio">en</OriginalLanguage>
+    <AssociatedOrg idType="EIDRPartyID" organizationID="10.5237/0000-0000" role="producer"/>
+    <ReleaseDate/>
+    <CountryOfOrigin>US</CountryOfOrigin>
+    <Status>   </Status>
+    <ApproximateLength>PT7M14.375S</ApproximateLength>
+    <AlternateID xsi:type="Proprietary" domain="example.com" relation="IsSameAs">A-1</AlternateID>
+    <Administrators>
+      <Registrant>10.5237/superparty</Registrant>
+    </Administrators>
+    <Credits>
+      <Director>
+        <md:DisplayName>Jane Doe</md:DisplayName>
+      </Director>
+    </Credits>
+    <Description lang="en">Line one.
+Line two, tab:	end.</Description>
+  </BaseObjectData>
+</SelfDefinedMetadata>

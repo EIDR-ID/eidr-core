@@ -1,0 +1,63 @@
+{
+  "_xmlns": "http://www.eidr.org/schema",
+  "_xmlns:md": "http://www.movielabs.com/schema/md/v2.8/md",
+  "_xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
+  "BaseObjectData": {
+    "ID": "10.5240/0000-0000-0000-0000-0001-X",
+    "StructuralType": "Abstraction",
+    "Mode": "AudioVisual",
+    "ReferentType": "Movie",
+    "ResourceName": {
+      "value": "Paperman  & Friends",
+      "_lang": "en",
+      "_titleClass": "release"
+    },
+    "AlternateResourceName": [
+      {
+        "value": "Paperman \"short\"",
+        "_lang": null
+      }
+    ],
+    "OriginalLanguage": [
+      {
+        "value": "en",
+        "_mode": "Audio"
+      }
+    ],
+    "AssociatedOrg": [
+      {
+        "_idType": "EIDRPartyID",
+        "_organizationID": "10.5237/0000-0000",
+        "_role": "producer"
+      }
+    ],
+    "ReleaseDate": null,
+    "CountryOfOrigin": [
+      "US"
+    ],
+    "Status": null,
+    "ApproximateLength": "PT7M14.375S",
+    "AlternateID": [
+      {
+        "value": "A-1",
+        "_xsi:type": "Proprietary",
+        "_domain": "example.com",
+        "_relation": "IsSameAs"
+      }
+    ],
+    "Administrators": {
+      "Registrant": "10.5237/superparty"
+    },
+    "Credits": {
+      "Director": [
+        {
+          "DisplayName": "Jane Doe"
+        }
+      ]
+    },
+    "Description": {
+      "value": "Line one.\nLine two, tab:\tend.",
+      "_lang": "en"
+    }
+  }
+}

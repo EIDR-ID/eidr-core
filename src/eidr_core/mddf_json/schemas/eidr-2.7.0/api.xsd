@@ -1,0 +1,679 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:eidr="http://www.eidr.org/schema" xmlns:md="http://www.movielabs.com/schema/md/v2.8/md"
+    xmlns:doiavs="http://www.doi.org/2010/DOISchemaAVS"
+    xmlns:doi="http://www.doi.org/2010/DOISchema" targetNamespace="http://www.eidr.org/schema"
+    elementFormDefault="qualified" attributeFormDefault="unqualified" version="2.7.0-localimport">
+    <xs:include schemaLocation="common.xsd"/>
+    <xs:include schemaLocation="service.xsd"/>
+    <xs:include schemaLocation="api-common.xsd"/>
+    <xs:import namespace="http://www.doi.org/2010/DOISchema" schemaLocation="doi.xsd"/>
+    <xs:import namespace="http://www.doi.org/2010/DOISchemaAVS" schemaLocation="doiavs.xsd"/>
+    <xs:import namespace="http://www.movielabs.com/schema/md/v2.8/md" schemaLocation="md-v28-eidr.xsd"/>
+    <xs:annotation>
+        <xs:documentation> This schema matches the functionality and schema expectations discussed
+            in the EIDR API Summary document (version 0.86) and EIDR 1.0 REST Public API Reference
+            document (version 0.95) </xs:documentation>
+    </xs:annotation>
+    <!-- Registry Request -->
+    <xs:element name="Request" type="eidr:requestType"/>
+    <xs:complexType name="requestType">
+        <xs:sequence>
+            <!-- The upper limit on the number of operations in a batch would be benchmarked and adjusted during the QA and Beta period. -->
+            <xs:element name="Operation" type="eidr:operationType" maxOccurs="100"/>
+        </xs:sequence>
+        <xs:attribute name="userToken" type="eidr:tokenType"/>
+    </xs:complexType>
+    <xs:complexType name="operationType">
+        <xs:sequence>
+            <xs:annotation>
+                <xs:documentation> This element encapsulates only one of the following kinds of
+                    operations: (1) creating and modifying objects (2) traversing objects graphs (3)
+                    querying (4) status checks All other operations namely resolutions are handled
+                    directly by the transport layer (e.g., HTTP) </xs:documentation>
+            </xs:annotation>
+            <xs:choice>
+                <xs:sequence>
+                    <xs:annotation>
+                        <xs:documentation> This choice is used when creating or modifying objects
+                        </xs:documentation>
+                    </xs:annotation>
+                    <xs:choice>
+                        <xs:element name="Create" type="eidr:createType"/>
+                        <xs:element name="AddRelationship" type="eidr:addRelationshipType"/>
+                        <xs:element name="RemoveRelationship" type="eidr:removeRelationshipType"/>
+                        <xs:element name="ReplaceRelationship" type="eidr:replaceRelationshipType"/>
+                        <xs:element name="Modify" type="eidr:modifyType"/>
+                        <xs:element name="Delete" type="eidr:deleteType"/>
+                        <xs:element name="Alias" type="eidr:aliasType"/>
+                        <xs:element name="Promote" type="eidr:promoteType"/>
+                    </xs:choice>
+                </xs:sequence>
+                <xs:sequence>
+                    <xs:annotation>
+                        <xs:documentation> This choice is used when traversing objects
+                        </xs:documentation>
+                    </xs:annotation>
+                    <xs:choice>
+                        <xs:element name="FindAncestors" type="eidr:findAncestorsType"/>
+                        <xs:element name="FindDescendants" type="eidr:findDescendantsType"/>
+                        <xs:element name="GetDependents" type="eidr:getDependantsType"/>
+                        <xs:element name="GetSeriesAncestry" type="eidr:getSeriesAncestryType"/>
+                        <xs:element name="GetLightweightRelationships" type="eidr:getLightweightRelationshipsType"/>
+                        <xs:element name="GetRemotestAncestor" type="eidr:getRemotestAncestorType"/>
+                        <xs:element name="GetLeafDescendants" type="eidr:getLeafDescendantsType"/>
+                        <xs:element name="GetParent" type="eidr:getParentType"/>
+                        <xs:element name="GetChildren" type="eidr:getChildrenType"/>
+                    </xs:choice>
+                </xs:sequence>
+                <xs:sequence>
+                    <xs:annotation>
+                        <xs:documentation> This choice is used when querying </xs:documentation>
+                    </xs:annotation>
+                    <xs:choice>
+                        <xs:element name="Query" type="eidr:queryType"/>
+                    </xs:choice>
+                </xs:sequence>
+                <xs:sequence>
+                    <xs:annotation>
+                        <xs:documentation> This choice is used when requesting status
+                        </xs:documentation>
+                    </xs:annotation>
+                    <xs:choice>
+                        <xs:element name="StatusRequest" type="eidr:requestStatusType"/>
+                        <xs:element name="TokenCancellationRequest" type="eidr:tokenCancellationRequestType"/>
+                    </xs:choice>
+                </xs:sequence>
+            </xs:choice>
+        </xs:sequence>
+        <xs:attribute name="userToken" type="eidr:tokenType"/>
+        <xs:attribute name="override" type="xs:boolean" use="optional"/>
+        <xs:attribute name="dedupMode" type="eidr:dedupModeType" use="optional"/>
+    </xs:complexType>
+    <xs:complexType name="createType">
+        <xs:sequence>
+            <xs:choice>
+                <xs:element name="Basic" type="eidr:createBasicDataType"/>
+                <xs:element name="Series" type="eidr:createSeriesDataType"/>
+                <xs:element name="Interactive" type="eidr:createInteractiveDataType"/>
+                <xs:element name="Season" type="eidr:createSeasonDataType"/>
+                <xs:element name="Episode" type="eidr:createEpisodeDataType"/>
+                <xs:element name="Manifestation" type="eidr:createManifestationDataType"/>
+                <xs:element name="Edit" type="eidr:createEditDataType"/>
+                <xs:element name="Clip" type="eidr:createClipDataType"/>
+                <xs:element name="Compilation" type="eidr:createCompilationDataType"/>
+                <xs:element name="Composite" type="eidr:createCompositeDataType"/>
+            </xs:choice>
+        </xs:sequence>
+        <xs:attribute name="type" type="eidr:creationType" use="optional"/>
+    </xs:complexType>
+    <xs:complexType name="addRelationshipType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+            <xs:choice>
+                <xs:element name="CompositeInfo" type="eidr:compositeInfoType"/>
+                <xs:element name="PromotionInfo" type="eidr:promotionInfoType"/>
+                <xs:element name="SupplementalContentInfo" type="eidr:supplementalContentInfoType"/>
+                <xs:element name="AlternateContentInfo" type="eidr:alternateContentInfoType"/>
+                <xs:element name="PackagingInfo" type="eidr:packagingInfoType"/>
+            </xs:choice>
+        </xs:sequence>
+        <xs:attribute name="type" type="eidr:targetRelationshipType" use="required"/>
+    </xs:complexType>
+    <xs:complexType name="removeRelationshipType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+            <xs:element name="TargetID" type="eidr:assetDOIType" minOccurs="0"/>
+        </xs:sequence>
+        <xs:attribute name="type" type="eidr:targetRelationshipType" use="required"/>
+    </xs:complexType>
+    <xs:complexType name="replaceRelationshipType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+            <xs:element name="TargetID" type="eidr:assetDOIType" minOccurs="0"/>
+            <xs:choice>
+                <xs:element name="CompositeInfo" type="eidr:compositeInfoType"/>
+            </xs:choice>
+        </xs:sequence>
+        <xs:attribute name="type" type="eidr:targetRelationshipType" use="required"/>
+    </xs:complexType>
+    <xs:complexType name="modifyType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+            <xs:choice>
+                <xs:element name="Basic" type="eidr:modifyBasicDataType"/>
+                <xs:element name="Series" type="eidr:createSeriesDataType"/>
+                <xs:element name="Interactive" type="eidr:createInteractiveDataType"/>
+                <xs:element name="Season" type="eidr:createSeasonDataType"/>
+                <xs:element name="Episode" type="eidr:createEpisodeDataType"/>
+                <xs:element name="Manifestation" type="eidr:createManifestationDataType"/>
+                <xs:element name="Edit" type="eidr:createEditDataType"/>
+                <xs:element name="Clip" type="eidr:createClipDataType"/>
+                <xs:element name="Compilation" type="eidr:createCompilationDataType"/>
+                <xs:element name="Composite" type="eidr:modifyCompositeDataType"/>
+            </xs:choice>
+        </xs:sequence>
+        <xs:attribute name="type" type="eidr:creationType" use="optional"/>
+    </xs:complexType>
+    <xs:complexType name="deleteType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="aliasType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+            <xs:element name="TargetID" type="eidr:assetDOIType"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="promoteType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="findAncestorsType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+            <xs:element name="ReferentType" type="eidr:referentType" minOccurs="0" maxOccurs="8"/>
+            <xs:element name="StructuralType" type="doiavs:creationStructuralType" minOccurs="0" maxOccurs="5"/>
+            <xs:element name="RelationshipType" type="eidr:relationshipType" minOccurs="0" maxOccurs="12"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="findDescendantsType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+            <xs:element name="ReferentType" type="eidr:referentType" minOccurs="0" maxOccurs="8"/>
+            <xs:element name="StructuralType" type="doiavs:creationStructuralType" minOccurs="0" maxOccurs="5"/>
+            <xs:element name="RelationshipType" type="eidr:relationshipType" minOccurs="0" maxOccurs="12"/>
+        </xs:sequence>
+        <xs:attribute name="extendedFamily" type="xs:boolean"/>
+    </xs:complexType>
+    <xs:complexType name="getDependantsType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="getSeriesAncestryType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="getLightweightRelationshipsType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="getRemotestAncestorType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="getLeafDescendantsType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+        </xs:sequence>
+        <xs:attribute name="extendedFamily" type="xs:boolean"/>
+    </xs:complexType>
+    <xs:complexType name="getParentType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="getChildrenType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+        </xs:sequence>
+        <xs:attribute name="extendedFamily" type="xs:boolean"/>
+    </xs:complexType>
+    <xs:complexType name="queryType">
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType" minOccurs="0"/>
+            <xs:element name="Expression" type="xs:string"/>
+            <xs:element name="PageNumber" type="xs:unsignedInt"/>
+            <xs:element name="PageSize" type="xs:unsignedInt"/>
+            <xs:element name="ContinuationToken" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+        <xs:attribute name="extendedFamily" type="xs:boolean"/>
+    </xs:complexType>
+    <xs:complexType name="requestStatusType">
+        <xs:sequence>
+            <xs:choice>
+                <xs:sequence>
+                    <xs:element name="Token" type="eidr:tokenType"/>
+                </xs:sequence>
+                <xs:sequence>
+                    <xs:choice minOccurs="0">
+                        <xs:element name="UserID" type="eidr:userDOIType"/>
+                        <xs:element name="Registrant" type="eidr:registrantType"/>
+                    </xs:choice>
+                    <xs:element name="Status" type="eidr:operationStatusTypeType" minOccurs="0"/>
+                    <xs:choice minOccurs="0">
+                        <xs:sequence>
+                            <xs:element name="From" type="xs:dateTime"/>
+                            <xs:element name="To" type="xs:dateTime"/>
+                        </xs:sequence>
+                        <xs:sequence>
+                            <xs:element name="After" type="xs:dateTime"/>
+                        </xs:sequence>
+                    </xs:choice>
+                </xs:sequence>
+            </xs:choice>
+            <xs:element name="PageNumber" type="xs:unsignedInt" minOccurs="0"/>
+            <xs:element name="PageSize" type="xs:unsignedInt" minOccurs="0"/>
+            <xs:element name="ContinuationToken" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="tokenCancellationRequestType">
+        <xs:sequence>
+            <xs:element name="Token" type="eidr:tokenType" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:simpleType name="tokenType">
+        <xs:restriction base="xs:string">
+        </xs:restriction>
+    </xs:simpleType>
+    <xs:simpleType name="dedupModeType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="normal"/>
+            <xs:enumeration value="manual"/>
+            <xs:enumeration value="accept"/>
+            <xs:enumeration value="review"/>
+        </xs:restriction>
+    </xs:simpleType>
+    <!-- Find parties API elements-->
+    <xs:element name="FindPartiesByName">
+        <xs:complexType>
+            <xs:complexContent>
+                <xs:extension base="eidr:partyQueryType">
+                    <xs:attribute name="includeAlternateNames" type="xs:boolean" default="false"/>
+                </xs:extension>
+            </xs:complexContent>
+        </xs:complexType>
+    </xs:element>
+    <xs:element name="FindPartiesFromCatalog" type="eidr:partyQueryType"/>
+    <xs:element name="FindParties" type="eidr:expressionPartyQueryType"/>
+    <!-- Find parties queries type definitions -->
+    <xs:complexType name="partyQueryType">
+        <xs:sequence>
+            <xs:element name="PartyName" type="xs:string"/>
+            <xs:element name="RoleFilter" type="eidr:administratorTypeType" minOccurs="0" maxOccurs="7"/>
+            <xs:element name="ActiveFilter" type="eidr:activeFilterType" default="all"/>
+            <xs:element name="PageNumber" type="xs:unsignedInt" default="1"/>
+            <xs:element name="PageSize" type="xs:unsignedInt" default="20"/>
+            <xs:element name="ContinuationToken" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="expressionPartyQueryType">
+        <xs:sequence>
+            <xs:element name="Expression" type="xs:string"/>
+            <xs:element name="PageNumber" type="xs:unsignedInt" default="1"/>
+            <xs:element name="PageSize" type="xs:unsignedInt" default="20"/>
+            <xs:element name="ContinuationToken" type="xs:string" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+    <!-- End of  parties queries type definitions -->
+    <xs:element name="CreateParty" type="eidr:partyCreationType"/>
+    <xs:element name="CreateUser" type="eidr:userCreationType"/>
+    <xs:element name="Party" type="eidr:partyResolutionType"/>
+    <xs:element name="PartyAliasContinuation" type="eidr:partyAliasContinuationType"/>
+    <xs:element name="User" type="eidr:userResolutionType"/>
+    <xs:complexType name="reportQueryType">
+        <xs:sequence>
+            <xs:element name="From" type="xs:dateTime"/>
+            <xs:element name="To" type="xs:dateTime"/>
+            <xs:element name="Registrant" type="eidr:registrantType" minOccurs="0"/>
+            <xs:element name="ReferentType" type="eidr:referentType" minOccurs="0" maxOccurs="8"/>
+            <xs:element name="StructuralType" type="doiavs:creationStructuralType" minOccurs="0" maxOccurs="5"/>
+            <xs:element name="RelationshipType" type="eidr:relationshipType" minOccurs="0" maxOccurs="12"/>
+	    <xs:element name="Status" type="eidr:statusType" minOccurs="0" maxOccurs="3"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:element name="SummaryReport" type="eidr:reportQueryType"/>
+    <xs:element name="DetailReport" type="eidr:reportQueryType"/>
+    <xs:element name="FindServicesByName" type="eidr:serviceQueryType"/>
+    <xs:element name="FindServicesFromCatalog" type="eidr:serviceQueryType"/>
+    <xs:element name="FindServices" type="eidr:expressionServiceQueryType"/>
+
+    <xs:simpleType name="activeFilterType">
+        <xs:annotation>
+            <xs:documentation> The string is used as a filter to specify the status of a registrant
+            </xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="active"/>
+            <xs:enumeration value="inactive"/>
+            <xs:enumeration value="all"/>
+        </xs:restriction>
+    </xs:simpleType>
+    <!-- End of Registry Request -->
+    <!-- Registry Response -->
+    <!-- Elements for responding to resolution requests -->
+    <xs:element name="SimpleMetadata" type="eidr:simpleInfoType"/>
+    <xs:element name="SelfDefinedMetadata" type="eidr:allSelfDefinedInfoType"/>
+    <xs:element name="FullMetadata" type="eidr:fullObjectInfoType"/>
+    <xs:element name="InheritedMetadata" type="eidr:allInheritedInfoType"/>
+    <xs:element name="ProvenanceMetadata" type="eidr:provenanceInfoType"/>
+    <xs:element name="AliasContinuation" type="eidr:aliasContinuationType"/>
+    <xs:element name="Relationships" type="eidr:relationshipsInfoType"/>
+    <xs:element name="AlternateIDs" type="eidr:alternateIDsType"/>
+    <xs:element name="LinkedAlternateIDs" type="eidr:linkedAlternateIDsType"/>
+    <!-- And for DOI Kernel Metadata, the one in comments as its element is already defined elsewhere -->
+    <!-- <xs:element ref="doi:kernelMetadata"/> -->
+    <xs:element name="Response" type="eidr:responseType"/>
+    <xs:complexType name="responseType">
+        <xs:sequence>
+            <xs:annotation>
+                <xs:documentation> This is used to inform the overall status of the request. All
+                    errors are captured here and only here.   The rest of the structure is a choice among the various
+                    request-specific replies.
+                </xs:documentation>
+            </xs:annotation>
+            <xs:element name="Status" type="eidr:statusDetailsType"/>
+            <xs:choice minOccurs="0">
+                <xs:sequence>
+                    <xs:annotation>
+                        <xs:documentation> This choice is for returning the status of requests and
+                            includes both of the following cases: (1) When the user requested the
+                            status of previously submitted requests either using a batch token, an
+                            operation token, based on user, or based on group (2) When the user
+                            submitted a request with an immediate pass/fail flag.
+                        </xs:documentation>
+                    </xs:annotation>
+                    <xs:element name="RequestStatus" type="eidr:requestStatusType"/>
+                    <xs:element name="RequestStatusResults" type="eidr:requestStatusResultsType"/>
+                </xs:sequence>
+                <xs:sequence>
+                    <xs:annotation>
+                        <xs:documentation> This choice is for responding to a token cancellation request
+                        </xs:documentation>
+                    </xs:annotation>
+                    <xs:element name="TokenCancellationResults" type="eidr:tokenCancellationResultsType"/>
+                </xs:sequence>
+                <xs:sequence>
+                    <xs:annotation>
+                        <xs:documentation>
+                            This choice is used for responding to get modification base request
+                        </xs:documentation>
+                    </xs:annotation>
+                    <xs:choice>
+                        <xs:element name="Basic" type="eidr:modifyBasicDataType"/>
+                        <xs:element name="Series" type="eidr:createSeriesDataType"/>
+                        <xs:element name="Interactive" type="eidr:createInteractiveDataType"/>
+                        <xs:element name="Season" type="eidr:createSeasonDataType"/>
+                        <xs:element name="Episode" type="eidr:createEpisodeDataType"/>
+                        <xs:element name="Manifestation" type="eidr:createManifestationDataType"/>
+                        <xs:element name="Edit" type="eidr:createEditDataType"/>
+                        <xs:element name="Clip" type="eidr:createClipDataType"/>
+                        <xs:element name="Compilation" type="eidr:createCompilationDataType"/>
+                        <xs:element name="Composite" type="eidr:modifyCompositeDataType"/>
+                    </xs:choice>
+                </xs:sequence>
+                <xs:sequence>
+                    <xs:annotation>
+                        <xs:documentation> This choice is used for responding to traversal requests.
+                            The choices are
+                            (0) SeriesAncestry: SeriesAncestry element
+                            (1) Find Ancestors: (SimpleMetadata + GenerationsAbove) multiple times
+                            (2) Find Descendants: (SimpleMetadata + GenerationsBelow)multiple times
+                            (3) Get Lightweight Relationships: (SimpleMetadata + RelationshipType and RelationshipClass)
+                            (4) Get Remotest Ancestor: (SimpleMetadata + GenerationsAbove)
+                            (5) Get Leaf Descendants: (SimpleMetadata + GenerationsBelow)multiple times
+                            (6) Get Parent: (SimpleMetadata)
+                            (7) GetChildren: (SimpleMetadata) multiple times
+                            This reduces to returning
+                            SeriesAncestry
+                            OR
+                            one SimpleMetadata, followed by RelationshipType and RelationshipClass (this schema allows multiple, not just one)
+                            OR
+                            one or more SimpleMetadata, followed by optional GenerationsAbove or GenerationsBelow
+                        </xs:documentation>
+                    </xs:annotation>
+                    <xs:choice>
+                        <xs:element name="SeriesAncestry" type="eidr:seriesAncestryType"/>
+                        <xs:sequence maxOccurs="unbounded">
+                                <xs:choice>
+                                    <xs:element name="SimpleMetadata" type="eidr:simpleInfoType"/>
+                                    <xs:element name="ID" type="eidr:assetDOIType"/>
+                                </xs:choice>
+                                <xs:choice>
+                                    <xs:element name="GenerationsAbove" type="xs:nonNegativeInteger" minOccurs="0"/>
+                                    <xs:element name="GenerationsBelow" type="xs:nonNegativeInteger" minOccurs="0"/>
+                                    <xs:sequence minOccurs="0" maxOccurs="unbounded">
+                                        <xs:element name="RelationshipType" type="eidr:targetRelationshipType"/>
+                                        <xs:element name="RelationshipClass">
+                                            <xs:simpleType>
+                                                <xs:union memberTypes="eidr:supplementalContentClassType eidr:alternateContentClassType eidr:packagingClassType eidr:promotionClassType"/>
+                                            </xs:simpleType>
+                                        </xs:element>
+                                    </xs:sequence>
+                                </xs:choice>
+                        </xs:sequence>
+                    </xs:choice>
+                </xs:sequence>
+                <xs:sequence>
+                    <xs:annotation>
+                        <xs:documentation> This choice is used for responding to queries
+                        </xs:documentation>
+                    </xs:annotation>
+                    <xs:element name="Query" type="eidr:queryType"/>
+                    <xs:element name="QueryResults" type="eidr:queryResultsType"/>
+                </xs:sequence>
+                <xs:sequence>
+                    <xs:annotation>
+                        <xs:documentation> This choice is used for responding to virtual fields
+                            retrieval requests </xs:documentation>
+                    </xs:annotation>
+                    <xs:element name="VirtualFields" type="eidr:virtualFieldsType"/>
+                </xs:sequence>
+                <xs:sequence>
+                    <xs:annotation>
+                        <xs:documentation> This choice is used for responding to report requests
+                        </xs:documentation>
+                    </xs:annotation>
+                    <xs:element name="ReportQuery" type="eidr:reportQueryType"/>
+                    <xs:element name="ReportResults" type="eidr:reportResultsType"/>
+                </xs:sequence>
+            </xs:choice>
+        </xs:sequence>
+        <xs:attribute name="version" type="xs:string" use="required"/>
+    </xs:complexType>
+    <xs:complexType name="statusDetailsType">
+        <xs:sequence>
+            <!-- update these with error and status codes and descriptions -->
+            <!-- Bind status codes to types for tighter control. Since the registry is the one producing code and type, it's not essential to bind them in a schema as long as we have tested that the registry only yields correct combinations of code and type. -->
+            <xs:element name="Code" type="eidr:statusCodeType"/>
+            <xs:element name="Type" type="eidr:statusTypeType"/>
+            <xs:element name="Details" type="eidr:detailsType" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="queryResultsType">
+        <xs:sequence>
+            <xs:element name="CurrentSize" type="xs:unsignedInt"/>
+            <xs:element name="TotalMatches" type="xs:unsignedInt"/>
+            <xs:element name="ContinuationToken" type="xs:string" minOccurs="0"/>
+            <xs:choice minOccurs="0" maxOccurs="unbounded">
+                <xs:element name="SimpleMetadata" type="eidr:simpleInfoType"/>
+                <xs:element name="ID" type="eidr:assetDOIType"/>
+            </xs:choice>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="requestStatusResultsType">
+        <xs:sequence>
+            <xs:element name="CurrentSize" type="xs:unsignedInt"/>
+            <xs:element name="TotalMatches" type="xs:unsignedInt"/>
+            <xs:element name="ContinuationToken" type="xs:string" minOccurs="0"/>
+            <xs:element name="BatchStatus" type="eidr:batchStatusDetailsType" minOccurs="0"/>
+            <xs:element name="OperationStatus" type="eidr:operationStatusType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="tokenCancellationResultsType">
+        <xs:sequence>
+            <xs:element name="CancelledTokenCount" type="xs:unsignedInt"/>
+            <xs:element name="CancelledToken" type="eidr:tokenType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="batchStatusDetailsType">
+        <xs:sequence>
+            <!-- update these with error and status codes and descriptions -->
+            <xs:element name="Code" type="eidr:batchStatusCodeType"/>
+            <xs:element name="Type" type="eidr:batchStatusTypeType"/>
+            <xs:element name="Details" type="eidr:detailsType" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="operationStatusType">
+        <xs:annotation>
+            <xs:documentation> This element type is used to return the status of an operation. The
+                elements within this type are (1) Token: the token of the operation (2) Status: the
+                status of the operation (3) ID: an optional DOI returned only when the request is to
+                create an object. The DOI corresponds to the object created (4) Duplicate: Optional,
+                but possibly multiple, duplicates are returned when the metadata in the request is
+                found not to be unique </xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="Token" type="eidr:tokenType"/>
+            <xs:element name="Status" type="eidr:operationStatusDetailsType" minOccurs="0"/>
+            <xs:element name="ID" type="eidr:assetDOIType" minOccurs="0"/>
+            <xs:element name="Duplicate" type="eidr:duplicateType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="operationStatusDetailsType">
+        <xs:sequence>
+            <!-- update these with error and status codes and descriptions -->
+            <xs:element name="Code" type="eidr:operationStatusCodeType"/>
+            <xs:element name="Type" type="eidr:operationStatusTypeType"/>
+            <xs:element name="DetailsCode" type="eidr:operationStatusDetailsCodeType" minOccurs="0"/>
+            <xs:element name="Details" type="eidr:detailsType" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:attributeGroup name="scoreAttributeGroup">
+        <xs:attribute name="score" type="eidr:scoreType" />
+        <xs:attribute name="lowThreshold" type="eidr:scoreType" />
+        <xs:attribute name="highThreshold" type="eidr:scoreType" />
+    </xs:attributeGroup>
+    <xs:complexType name="duplicateType">
+        <xs:annotation>
+            <xs:documentation>
+                This element captures the IDs of the duplicates. Textual details
+                about the reason for identifying as a duplicate may optionally be returned.
+            </xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="ID" type="eidr:assetDOIType"/>
+            <xs:element name="Details" type="eidr:detailsType" minOccurs="0"/>
+        </xs:sequence>
+        <xs:attribute name="score" type="eidr:scoreType" />
+        <xs:attribute name="lowThreshold" type="eidr:scoreType" />
+        <xs:attribute name="highThreshold" type="eidr:scoreType" />
+    </xs:complexType>
+    <xs:simpleType name="scoreType">
+        <xs:restriction base="eidr:percentageType">
+        </xs:restriction>
+    </xs:simpleType>
+    <xs:simpleType name="percentageType">
+        <xs:restriction base="xs:nonNegativeInteger">
+            <xs:minInclusive value="0"/>
+            <xs:maxInclusive value="100"/>
+        </xs:restriction>
+    </xs:simpleType>
+    <xs:simpleType name="detailsType">
+        <xs:restriction base="xs:string">
+            <xs:maxLength value="256"/>
+        </xs:restriction>
+    </xs:simpleType>
+    <xs:element name="AssetIDList" type="eidr:assetDOIListType"/>
+    <xs:element name="UserIDList" type="eidr:userDOIListType"/>
+    <xs:element name="PartyIDList" type="eidr:partyDOIListType"/>
+    <xs:element name="AdminResponse" type="eidr:statusDetailsType"/>
+    <xs:element name="PartyQueryResults" type="eidr:partyQueryResultsType"/>
+    <!--  A list of asset DOIs -->
+    <xs:complexType name="assetDOIListType">
+        <xs:sequence>
+            <xs:element name="AssetID" type="eidr:assetDOIType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    <!--  A list of user DOIs -->
+    <xs:complexType name="userDOIListType">
+        <xs:sequence>
+            <xs:element name="UserID" type="eidr:userDOIType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    <!--  A list of party DOIs -->
+    <xs:complexType name="partyDOIListType">
+        <xs:sequence>
+            <xs:element name="PartyID" type="eidr:partyDOIType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    <!-- Party query results -->
+    <xs:complexType name="partyQueryResultsType">
+        <xs:sequence>
+            <xs:element name="CurrentSize" type="xs:unsignedInt"/>
+            <xs:element name="TotalMatches" type="xs:unsignedInt"/>
+            <xs:element name="ContinuationToken" type="xs:string" minOccurs="0"/>
+            <xs:choice>
+                <xs:element name="PartyID" type="eidr:partyDOIType" minOccurs="0" maxOccurs="unbounded"/>
+                <xs:element name="Party" type="eidr:partyResolutionType" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:choice>
+        </xs:sequence>
+    </xs:complexType>
+    <!-- Report results -->
+    <xs:complexType name="reportResultsType">
+        <xs:sequence>
+            <xs:element name="StatusSummary" type="eidr:statusSummaryType" minOccurs="0"/>
+            <xs:element name="RegistrationSummary" type="eidr:registrationSummaryType" minOccurs="0"/>
+            <xs:element name="Registrations" type="eidr:registrationsType" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="statusSummaryType">
+        <xs:sequence>
+            <xs:element name="StatusSummaryItem" type="eidr:statusListElementType" minOccurs="0" maxOccurs="6"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="registrationSummaryType">
+        <xs:sequence>
+            <xs:element name="RegistrationSummaryItem" type="eidr:reportCreationListElementType" minOccurs="0" maxOccurs="12"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="registrationsType">
+        <xs:sequence>
+            <xs:element name="Registration" type="eidr:simpleInfoWithProvenanceInfoType" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="statusListElementType">
+        <xs:sequence>
+            <xs:element name="Code" type="eidr:operationStatusCodeType"/>
+            <xs:element name="Count" type="xs:unsignedInt"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="simpleInfoWithProvenanceInfoType">
+        <xs:sequence>
+            <xs:element name="SimpleMetadata" type="eidr:simpleInfoType" minOccurs="0"/>
+            <xs:element name="ProvenanceMetadata" type="eidr:provenanceInfoType" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:simpleType name="reportCreationType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="BasicMovie"/>
+            <xs:enumeration value="BasicOther"/>
+            <xs:enumeration value="Season"/>
+            <xs:enumeration value="Interactive"/>
+            <xs:enumeration value="Series"/>
+            <xs:enumeration value="Encoding"/>
+            <xs:enumeration value="Edit"/>
+            <xs:enumeration value="Clip"/>
+            <xs:enumeration value="Composite"/>
+            <xs:enumeration value="Compilation"/>
+            <xs:enumeration value="Episode"/>
+            <xs:enumeration value="Manifestation"/>
+        </xs:restriction>
+    </xs:simpleType>
+    <xs:complexType name="reportCreationListElementType">
+        <xs:sequence>
+            <xs:element name="Type" type="eidr:reportCreationType"/>
+            <xs:element name="Count" type="xs:unsignedInt"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:element name="ServiceQueryResults" type="eidr:serviceQueryResultsType"/>
+    <xs:element name="CreateService" type="eidr:serviceCreationType"/>
+    <xs:element name="Service" type="eidr:serviceResolutionType"/>
+    <xs:element name="ServiceAliasContinuation" type="eidr:serviceAliasContinuationType"/>
+    <!-- End of Registry Response -->
+</xs:schema>

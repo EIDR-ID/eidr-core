@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.69.1<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.70.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,20 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.70.0 (2026-11-12)
+
+* **New module `eidr_core.mddf_json`** (additive): XML <-> JSON under the
+  MovieLabs MDDF JSON Encoding Best Practice, Draft 3 with EIDR's redline.
+  `xml_to_json`, `json_to_xml`, `embed_xml`, `is_signed`, `dumps`,
+  `eidr_schema`, `SchemaSet`. Arrays are decided per parent type from the
+  bundled EIDR 2.7.0 schema set (with EIDR's md 2.8), so `md:DisplayName` in
+  an org name and `Parent` are single where python-sdk's name list made them
+  arrays. Signed XML is refused unless `allow_signed=True`.
+* **New spec `specs/mddf-json.md` 1.0.0** and conformance corpus
+  `src/eidr_core/specs/mddf_json/` (`cases.json`; per case `.xml`, `.json`,
+  `.api.json`). XML_to_JSON, python-sdk and python-tools adopt it next; the
+  star JSONL is excluded (locked).
 
 ### 0.69.1 (2026-10-19)
 
@@ -922,6 +936,16 @@ edition's Changes entry.
 | [`eidr_core.lookup.AliasResult`](#aliasresult-class) | class | Where an EIDR ID points, the IDs on the way, and why the chain stopped there. |
 | [`eidr_core.lookup.Claimant`](#claimant-class) | class | A record carrying a source ID as an identity Alt ID. |
 | [`eidr_core.lookup.OUTCOMES`](#outcomes-constant) | constant | why an alias chain stopped: only `live` names a usable record. |
+| [`eidr_core.mddf_json.dumps`](#dumps) | function | `json.dumps` with the corpus's fixed settings, so two consumers produce identical bytes. |
+| [`eidr_core.mddf_json.eidr_schema`](#eidr_schema) | function | Loads common, api-common, api, service, md-v28-eidr, doi, doiavs and iso3166a2. |
+| [`eidr_core.mddf_json.embed_xml`](#embed_xml) | function | Keeps the XML byte for byte, white space included, so a signature over it still verifies. |
+| [`eidr_core.mddf_json.is_signed`](#is_signed) | function | Parses the document and looks for `{http://www.w3.org/2000/09/xmldsig#}Signature` at any depth. |
+| [`eidr_core.mddf_json.json_to_xml`](#json_to_xml) | function | Writes children in schema order, a null element as `<X/>`, a null attribute as `x=""`, `"value"` as text, `_xmlns` keys as declarations; numbers and booleans as their text. |
+| [`eidr_core.mddf_json.xml_to_json`](#xml_to_json) | function | Applies the 13 XML->JSON rules of `specs/mddf-json.md`: local-name keys, `_attr`, declarations on the declaring element, wildcard elements keep their prefix, strings, trimming of space/tab/CR/LF, null for empty, `value` with attributes, xsi:nil, arrays by effective maxOccurs in the parent type (xsi:type honoured), schemaLocation/namespace version agreement. |
+| [`eidr_core.mddf_json.MddfJsonError`](#mddfjsonerror-class) | class | A `ValueError` subclass: the message names the element or key and the rule. |
+| [`eidr_core.mddf_json.MddfJsonWarning`](#mddfjsonwarning-class) | class | A `UserWarning` subclass, so callers can filter or escalate it. |
+| [`eidr_core.mddf_json.SchemaSet`](#schemaset-class) | class | Reads complexType, sequence/choice/all, group refs, element refs, xs:any, complexContent extension (base first) and restriction, simpleContent. |
+| [`eidr_core.mddf_json.SignedXmlError`](#signedxmlerror-class) | class | A `MddfJsonError` subclass, so a caller can treat it apart from other failures. |
 | [`eidr_core.normalize.ascii_fold`](#ascii_fold) | function | Folds Latin diacritics and ligatures to ASCII so they do not count as differences. |
 | [`eidr_core.normalize.cmp_key`](#cmp_key) | function | Builds the canonical comparison key; equal keys are treated as a match. |
 | [`eidr_core.normalize.days_between`](#days_between) | function | Returns the absolute number of days between two `(year, month, day)` tuples. |
@@ -1021,7 +1045,7 @@ Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 8 functions, 2 cl
 
 **Used by.**
 <!-- dict-usedby:eidr_core.altidtool_io -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `identity_relation_sql`, `is_identity_relation`
 * **BMRtoAltID**: `AltIdRow`, `emission_problem`, `format_line`, `multi_form_domains`
 * **eidr-dq**: `identity_relation_sql`
@@ -1251,7 +1275,7 @@ Source `src/eidr_core/bmr_io/__init__.py`. Public names: 21 functions, 9 classes
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `families_for`, `header_map`, `index_rows`, `read_headers`, `resolve_parent`, `template_for_creation_type`, `write_sheet`
 * **BMRtoAltID**: `ASSIGNED_ID_COLUMN`, `check_sheet`, `DATA_START`, `family_layout`, `fill_column`, `HEADER_ROW`, `open_sheet`, `ROW_ID_COLUMN`, `SHEET_TO_TEMPLATE`, `subset_rows`, `TemplateMismatch`, `TEMPLATES`
 * **eidr-dq**: `pad_groups`, `RepeatPlan`
@@ -1986,7 +2010,7 @@ Source `src/eidr_core/bmr_io/subset.py`. Public names: 1 function (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_io.subset -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `required_headers`
 <!-- /dict-usedby -->
 
@@ -2032,7 +2056,7 @@ Source `src/eidr_core/codes/__init__.py`. Public names: 2 functions, 2 constants
 
 **Used by.**
 <!-- dict-usedby:eidr_core.codes -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **eidr-imdb**: `country_list`
 * **eidr-wikidata**: `normalize_country_code`
 <!-- /dict-usedby -->
@@ -2112,7 +2136,7 @@ Source `src/eidr_core/compare/__init__.py`. Public names: 20 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `cmp_alt_ids`, `COMPARATORS`, `FieldResult`, `set_params`
 * **De-Dupe UI**: `cmp_alt_ids`, `cmp_length`, `cmp_release_date`, `cmp_titles`, `fuzzy`
 <!-- /dict-usedby -->
@@ -2579,7 +2603,7 @@ Source `src/eidr_core/compare/nonlinear.py`. Public names: 3 functions (declared
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.nonlinear -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `accumulate`, `aggregate`, `corroborate`, (the module)
 * **De-Dupe UI**: `accumulate`
 <!-- /dict-usedby -->
@@ -2667,7 +2691,7 @@ Source `src/eidr_core/compare/spec.py`. Public names: 2 functions (declared by `
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.spec -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_spec`, `spec_path`, (the module)
 <!-- /dict-usedby -->
 
@@ -2728,7 +2752,7 @@ Source `src/eidr_core/compare/states.py`. Public names: 4 functions (declared by
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.states -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `band`, `field_not_counted`, `field_states`, `ui_field_key`, (the module)
 <!-- /dict-usedby -->
 
@@ -2835,7 +2859,7 @@ Source `src/eidr_core/compare/titles.py`. Public names: 7 functions, 2 constants
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.titles -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `parse_part`, `parts_conflict`, `segments`, `select_titles`, `title_similarity`
 * **De-Dupe UI**: `COMBINATION_DIFFERS_QUALITY`, `parse_part`, `PART_AMBIGUOUS_QUALITY`, `parts_conflict`, `segments`, `title_similarity`
 * **LanguageTool**: `title_similarity`
@@ -3019,7 +3043,7 @@ Source `src/eidr_core/db_schemas/__init__.py`. Public names: 4 functions, 1 cons
 
 **Used by.**
 <!-- dict-usedby:eidr_core.db_schemas -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `assert_tables`, `contract_version`, `DATABASES`, `load_manifest`, `table_columns`
 * **eidr-dq**: `assert_tables`, `contract_version`, `load_manifest`, `table_columns`
 * **eidr-imdb**: `assert_tables`, `load_manifest`
@@ -3144,7 +3168,7 @@ needs no extra.
 
 **Used by.**
 <!-- dict-usedby:eidr_core.dictionary -->
-No consumer imports it directly (scan of 2026-10-19).
+No consumer imports it directly (scan of 2026-11-12).
 <!-- /dict-usedby -->
 
 ### `changes`
@@ -3221,7 +3245,7 @@ Source `src/eidr_core/external/__init__.py`. Public names: 3 functions, 5 classe
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **eidr-dq**: `call_with_failover`, `DictFactCache`, `endpoint_chain`, `Entry`, `FactCache`, `Key`, `NullFactCache`, `RequestPacer`, `RETRY`
 * **eidr-imdb**: `call_with_failover`, `endpoint_chain`, `FATAL`, `NEXT_ENDPOINT`, `OUTAGE`, `RETRY`
 * **eidr-wikidata**: `call_with_failover`, `classify_sparql_error`, `DictFactCache`, `endpoint_chain`, `FactCache`, `NEXT_ENDPOINT`, `NullFactCache`, `OUTAGE`, `RequestPacer`, `RETRY`
@@ -3461,7 +3485,7 @@ Source `src/eidr_core/external/failover.py`. Public names: 5 functions, 8 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external.failover -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **eidr-imdb**: `DEFAULT_RATE_LIMIT_FLOOR`, `http_status`
 * **eidr-wikidata**: `is_bad_query_error`, `is_outage_error`
 * **LanguageTool**: `DEFAULT_MAX_RETRY_AFTER`, `retry_after_seconds`
@@ -3647,7 +3671,7 @@ Source `src/eidr_core/ids/__init__.py`. Public names: 8 functions, 11 constants 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ids -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `category`, `fault`, `find_content_ids`, `is_valid_eidr_id`
 * **BMRtoAltID**: `fault`
 * **De-Dupe UI**: `ALPHABET`, `check_character`, `is_valid_eidr_id`
@@ -3919,7 +3943,7 @@ Source `src/eidr_core/inheritance/__init__.py`. Public names: 6 functions, 1 cla
 
 **Used by.**
 <!-- dict-usedby:eidr_core.inheritance -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `build_full_record`, `provenance`, `RECORD_ATTRS`, `TitleConstructionError`, (the module)
 * **XML_to_JSON**: `build_full_base`, `INHERITABLE_FIELDS`, `is_absent`, `TitleConstructionError`
 <!-- /dict-usedby -->
@@ -4137,7 +4161,7 @@ Source `src/eidr_core/normalize/__init__.py`. Public names: 13 functions (declar
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `ascii_fold`, `cmp_key`, `days_between`, `nfkc`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **De-Dupe UI**: `ascii_fold`, `cmp_key`, `norm_code`, `norm_country`, `norm_lang`, `norm_name`, `norm_title`, `parse_date`, `parse_minutes`, `parse_registrant_extra`
 * **eidr-wikidata**: `norm_title`, `sanitize_field`
@@ -4409,7 +4433,7 @@ Source `src/eidr_core/normalize/aliases.py`. Public names: 2 functions, 1 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize.aliases -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `alias_name`, `alias_title`, `ORDINALS`
 <!-- /dict-usedby -->
 
@@ -4482,7 +4506,7 @@ Source `src/eidr_core/ordering/__init__.py`. Public names: 9 functions (declared
 
 **Used by.**
 <!-- dict-usedby:eidr_core.ordering -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `altid_canonical_key`, `altid_collapsed_canonical_key`, `altid_display_key`, `altid_kind`, `is_shortdoi`, `title_bucket`, `title_sort_key`
 * **XML_to_JSON**: `altid_collapsed_canonical_key`, `title_sort_key`
 <!-- /dict-usedby -->
@@ -4685,7 +4709,7 @@ Source `src/eidr_core/registry/__init__.py`. Public names: 5 functions, 1 class,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.registry -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `get_registry_client`
 * **eidr-dq**: `build_registry_credentials`, `get_registry_client`
 * **eidr-wikidata**: `build_registry_credentials`, `CODE_SUCCESS`, `DEFAULT_REGISTRY`, `get_registry_client`, `OperationStatus`, `parse_operation_status`, `parse_operation_statuses`, `token_operation_status`
@@ -4865,7 +4889,7 @@ Source `src/eidr_core/secrets_loader/__init__.py`. Public names: 3 functions, 1 
 
 **Used by.**
 <!-- dict-usedby:eidr_core.secrets_loader -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `load_local`
 * **BMRtoAltID**: `load_secrets`, `SecretsError`
 * **eidr-dq**: `load_secrets`, `SecretsError`
@@ -4979,7 +5003,7 @@ Source `src/eidr_core/vendor/__init__.py`. Public names: 3 functions, 3 classes,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.vendor -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **python-tools**: `check`, `load_manifest`, (the module)
 <!-- /dict-usedby -->
 
@@ -5142,7 +5166,7 @@ Source `src/eidr_core/verify/__init__.py`. Public names: 5 functions (declared b
 
 **Used by.**
 <!-- dict-usedby:eidr_core.verify -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **eidr-dq**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 * **eidr-wikidata**: `compare_release_date`, `compare_runtime`, `compare_year_arbitration`, `parse_iso_date`, `runtime_candidates`
 <!-- /dict-usedby -->
@@ -5278,7 +5302,7 @@ Source `src/eidr_core/bmr_map/__init__.py`. Public names: 8 functions, 3 constan
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_map -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `record_from_xml`, `row_from_record`
 * **XML_to_JSON**: `NEVER_PRODUCED`, `PRODUCED_BASES`, `record_from_row`, `row_from_record`
 <!-- /dict-usedby -->
@@ -5483,7 +5507,7 @@ Source `src/eidr_core/verdicts/__init__.py`. Public names: 8 functions, 3 classe
 
 **Used by.**
 <!-- dict-usedby:eidr_core.verdicts -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `AssertedId`, `ASSESSMENT_COLUMN`, `clears_without_a_human`, `fill_map`, `HUMAN_REVIEW_COLUMN`, `NO_ID_SENTINELS`, `NO_MATCH`, `read_asserted_id`, `Resolution`, `resolve_row`, `resolve_sheet`, `ResolveStats`, `reviewer_relation`, `STATUSES`, `summarize`, `TERMINAL_ASSESSMENTS`, `trim`
 <!-- /dict-usedby -->
 
@@ -5782,7 +5806,7 @@ Source `src/eidr_core/altid_audit/__init__.py`. Public names: 6 functions, 7 cla
 
 **Used by.**
 <!-- dict-usedby:eidr_core.altid_audit -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMRtoAltID**: `AliasResolution`, `ALT_ID_TABLES`, `AltId`, `audit_rows`, `AuditRow`, `DEFAULT_BATCH_ALT_IDS`, `Finding`, `is_audited`, `IS_SAME_AS`, `is_single_form`, `kind_key`, `MIRROR_NEEDS`, `MirrorClient`, `MirrorError`, `RowAudit`, `same_relation`
 <!-- /dict-usedby -->
 
@@ -6129,7 +6153,8 @@ Source `src/eidr_core/lookup/__init__.py`. Public names: 6 functions, 2 classes,
 
 **Used by.**
 <!-- dict-usedby:eidr_core.lookup -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
+* **BMR-Review**: `resolve_alias`
 * **eidr-imdb**: `live_status`
 <!-- /dict-usedby -->
 
@@ -6321,7 +6346,7 @@ Source `src/eidr_core/swap/__init__.py`. Public names: 3 functions, 1 constant (
 
 **Used by.**
 <!-- dict-usedby:eidr_core.swap -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **eidr-imdb**: `abstraction_ancestors`, `plan_swaps`, `SWAP_NOTE`
 <!-- /dict-usedby -->
 
@@ -6414,7 +6439,7 @@ Source `src/eidr_core/bmr_rows/__init__.py`. Public names: 8 functions, 9 consta
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_rows -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **eidr-imdb**: `IMDB_PARTY`, `original_languages`, `registrant_party`, `title_language`, (the module)
 * **eidr-wikidata**: `EIDR_CATALOG_PARTY`, `original_languages`, `registrant_party`
 <!-- /dict-usedby -->
@@ -6660,7 +6685,7 @@ Source `src/eidr_core/external/wikimedia.py`. Public names: 8 functions, 1 class
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external.wikimedia -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: `action_api_json`, `action_api_pacer`, `ACTION_API_SCOPE`, `user_agent`, (the module)
 * **eidr-dq**: `SPARQL_CHAIN`, `sparql_pacer`, `SPARQL_PREFIXES`, `sparql_request`, `sparql_select`
 * **eidr-wikidata**: `ACTION_API`, `action_api_json`, `action_api_pacer`, `ACTION_API_SCOPE`, `sparql_pacer`, (the module)
@@ -6966,7 +6991,7 @@ Source `src/eidr_core/external/wikidata.py`. Public names: 11 functions, 1 class
 
 **Used by.**
 <!-- dict-usedby:eidr_core.external.wikidata -->
-Scan of 2026-10-19; regenerated at each release from the consumer trees.
+Scan of 2026-11-12; regenerated at each release from the consumer trees.
 * **BMR-Review**: (the module)
 * **eidr-dq**: `imdb_qids`
 * **eidr-wikidata**: `RETIRED_ID_REASONS`
@@ -7331,6 +7356,196 @@ Defined in `src/eidr_core/external/wikidata.py`.
 <!-- /dict -->
 
 **Does.** Resolves IMDb IDs to Wikidata items by P345, batched over `SPARQL_CHAIN`; the lowest QID wins a tie; a failed batch is skipped. Extracted from eidr-dq's `resolve_imdb_batch`; identical to it on 403 live IDs (300 resolved). BMR-Review does the same lookup one ID at a time through the Action API search.
+
+## `eidr_core.mddf_json`
+
+<!-- dict-module:eidr_core.mddf_json -->
+Source `src/eidr_core/mddf_json/__init__.py`. Public names: 6 functions, 4 classes (declared by `__all__`). Some are defined in, and also importable from: `src/eidr_core/mddf_json/_schema.py`.
+<!-- /dict-module -->
+
+**Purpose.** The portfolio's one XML <-> JSON converter under the MovieLabs MDDF JSON Encoding Best Practice (Draft 3 with EIDR's redline), specified in `specs/mddf-json.md` 1.0.0 with a conformance corpus in `specs/mddf_json/`. Element keys are local names, attributes `_name`, values strings (trimmed of space/tab/CR/LF; empty is null), text with attributes under `"value"`, and arrays come from the schema per parent type, not from a name list or the instance.
+
+**Use it when.** Translating registry or MDDF XML to JSON for delivery (XML_to_JSON's standard output, python-sdk's codec, python-tools `-f json`), translating such JSON back, or embedding signed XML in a JSON delivery.
+
+**Do not use it when.** Producing XML_to_JSON's star JSONL: it is internal, locked by the operator (2026-11-11) and keeps its own keys. Building a record object (use the SDK models or `bmr_map`).
+
+**Used by.**
+<!-- dict-usedby:eidr_core.mddf_json -->
+No consumer imports it directly (scan of 2026-11-12).
+<!-- /dict-usedby -->
+
+### `dumps`
+
+<!-- dict:eidr_core.mddf_json.dumps -->
+```python
+def dumps(obj: Any, *, pretty: bool = True) -> str
+```
+
+Defined in `src/eidr_core/mddf_json/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `obj` | `Any` | required | The JSON value to serialize (from `xml_to_json` or `embed_xml`). |
+| `pretty` | `bool` | `True` (keyword-only) | True: two-space indent. False: compact, no spaces after separators. |
+
+**Returns** `str` -- the JSON text, UTF-8 characters kept (`ensure_ascii=False`), key order as built.
+<!-- /dict -->
+
+**Does.** `json.dumps` with the corpus's fixed settings, so two consumers produce identical bytes.
+
+### `eidr_schema`
+
+<!-- dict:eidr_core.mddf_json.eidr_schema -->
+```python
+def eidr_schema() -> SchemaSet
+```
+
+Defined in `src/eidr_core/mddf_json/__init__.py`.
+
+No parameters.
+
+**Returns** `SchemaSet` -- the cached `SchemaSet` over the bundled files listed in `schemas/eidr-2.7.0/MANIFEST.json`.
+<!-- /dict -->
+
+**Does.** Loads common, api-common, api, service, md-v28-eidr, doi, doiavs and iso3166a2. EIDR's namespace is unversioned, so this file set is the version; the registry reports 2.7.1, which is not published.
+
+### `embed_xml`
+
+<!-- dict:eidr_core.mddf_json.embed_xml -->
+```python
+def embed_xml(xml: str | bytes, name: str | None = None) -> dict[str, str]
+```
+
+Defined in `src/eidr_core/mddf_json/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `xml` | `str \| bytes` | required | The XML, as text or UTF-8 bytes. It is not parsed for anything but its root name. |
+| `name` | `str \| None` | `None` | The key to use; default the root element's local name (e.g. `CoreMetadata`). |
+
+**Returns** `dict[str, str]` -- `{name: xml_text}`.
+<!-- /dict -->
+
+**Does.** Keeps the XML byte for byte, white space included, so a signature over it still verifies. JSON escaping of quotes, backslashes and control characters is left to the serializer.
+
+### `is_signed`
+
+<!-- dict:eidr_core.mddf_json.is_signed -->
+```python
+def is_signed(xml: str | bytes) -> bool
+```
+
+Defined in `src/eidr_core/mddf_json/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `xml` | `str \| bytes` | required | The XML, as text or bytes. |
+
+**Returns** `bool` -- True when a `ds:Signature` element (XML Signature namespace) occurs.
+<!-- /dict -->
+
+**Does.** Parses the document and looks for `{http://www.w3.org/2000/09/xmldsig#}Signature` at any depth.
+
+### `json_to_xml`
+
+<!-- dict:eidr_core.mddf_json.json_to_xml -->
+```python
+def json_to_xml(obj: dict[str, Any], *, schema: SchemaSet | None = None, root: str | None = None, namespaces: dict[str, str] | None = None, xml_declaration: bool = True) -> str
+```
+
+Defined in `src/eidr_core/mddf_json/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `obj` | `dict[str, Any]` | required | Standalone JSON (one key, the root's local name) or API JSON (pass `root`). |
+| `schema` | `SchemaSet \| None` | `None` (keyword-only) | The schema for order and namespaces; default `eidr_schema()`. |
+| `root` | `str \| None` | `None` (keyword-only) | The root as `{namespace}Local`; required for API JSON, whose root key was removed. |
+| `namespaces` | `dict[str, str] \| None` | `None` (keyword-only) | Prefix -> URI declarations to write on the root when the JSON omitted them (API mode). |
+| `xml_declaration` | `bool` | `True` (keyword-only) | Prepend `<?xml version="1.0" encoding="UTF-8"?>`. |
+
+**Returns** `str` -- the XML text.
+<!-- /dict -->
+
+**Does.** Writes children in schema order, a null element as `<X/>`, a null attribute as `x=""`, `"value"` as text, `_xmlns` keys as declarations; numbers and booleans as their text. Reproduces content, not form.
+
+### `xml_to_json`
+
+<!-- dict:eidr_core.mddf_json.xml_to_json -->
+```python
+def xml_to_json(xml: str | bytes, *, schema: SchemaSet | None = None, api: bool = False, omit_namespaces: bool = False, allow_signed: bool = False, strict: bool = False) -> dict[str, Any]
+```
+
+Defined in `src/eidr_core/mddf_json/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `xml` | `str \| bytes` | required | The XML document, text or bytes. |
+| `schema` | `SchemaSet \| None` | `None` (keyword-only) | The schema deciding arrays; default `eidr_schema()`. |
+| `api` | `bool` | `False` (keyword-only) | False: standalone, the root kept as the one top-level key. True: API mode, the root removed, its declarations and attributes kept in the top-level object. |
+| `omit_namespaces` | `bool` | `False` (keyword-only) | API mode only: drop the root's declarations (allowed where the API documents the version). |
+| `allow_signed` | `bool` | `False` (keyword-only) | True translates signed XML; the caller then delivers the signed XML with the JSON. False raises `SignedXmlError`. |
+| `strict` | `bool` | `False` (keyword-only) | True raises on an element the schema does not allow where it occurs; False (default) keys it by local name, observes its cardinality and warns `MddfJsonWarning`. |
+
+**Returns** `dict[str, Any]` -- the JSON object (`dict`), ready for `dumps`.
+<!-- /dict -->
+
+**Does.** Applies the 13 XML->JSON rules of `specs/mddf-json.md`: local-name keys, `_attr`, declarations on the declaring element, wildcard elements keep their prefix, strings, trimming of space/tab/CR/LF, null for empty, `value` with attributes, xsi:nil, arrays by effective maxOccurs in the parent type (xsi:type honoured), schemaLocation/namespace version agreement. An element the schema allows once but that occurs twice raises.
+
+### `MddfJsonError` (class)
+
+<!-- dict:eidr_core.mddf_json.MddfJsonError -->
+```python
+class MddfJsonError(ValueError)
+```
+
+Defined in `src/eidr_core/mddf_json/__init__.py`.
+<!-- /dict -->
+
+**Does.** A `ValueError` subclass: the message names the element or key and the rule.
+
+### `MddfJsonWarning` (class)
+
+<!-- dict:eidr_core.mddf_json.MddfJsonWarning -->
+```python
+class MddfJsonWarning(UserWarning)
+```
+
+Defined in `src/eidr_core/mddf_json/__init__.py`.
+<!-- /dict -->
+
+**Does.** A `UserWarning` subclass, so callers can filter or escalate it.
+
+### `SchemaSet` (class)
+
+<!-- dict:eidr_core.mddf_json.SchemaSet -->
+```python
+class SchemaSet
+```
+
+Defined in `src/eidr_core/mddf_json/_schema.py`.
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `__init__` | `def __init__(files: Iterable[str \| Path], *, label: str = "")` | Load every XSD given (include/import locations are not followed); `label` names the set in messages. |
+| `element_type` | `def element_type(qname: str) -> TypeRef` | The type of a global element: a type QName, an anonymous type node, or None. |
+| `has_element` | `def has_element(qname: str) -> bool` | Whether a global element of that QName is declared. |
+| `has_type` | `def has_type(qname: str) -> bool` | Whether a named type of that QName is declared. |
+| `content` | `def content(ref: TypeRef) -> ContentModel` | The content model (children with effective maxOccurs, type and order; wildcards) of a type, cached. |
+<!-- /dict -->
+
+**Does.** Reads complexType, sequence/choice/all, group refs, element refs, xs:any, complexContent extension (base first) and restriction, simpleContent. Ignores attributes, facets and xs:redefine. Use it for a non-EIDR schema (e.g. an MDDF manifest version) passed to `xml_to_json(schema=)`.
+
+### `SignedXmlError` (class)
+
+<!-- dict:eidr_core.mddf_json.SignedXmlError -->
+```python
+class SignedXmlError(MddfJsonError)
+```
+
+Defined in `src/eidr_core/mddf_json/__init__.py`.
+<!-- /dict -->
+
+**Does.** A `MddfJsonError` subclass, so a caller can treat it apart from other failures.
 
 ## Specs and data files
 

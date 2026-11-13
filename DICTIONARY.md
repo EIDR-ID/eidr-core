@@ -4540,7 +4540,7 @@ Source `src/eidr_core/ordering/__init__.py`. Public names: 11 functions (declare
 <!-- dict-usedby:eidr_core.ordering -->
 Scan of 2026-11-13; regenerated at each release from the consumer trees.
 * **BMR-Review**: `altid_canonical_key`, `altid_collapsed_canonical_key`, `altid_display_key`, `altid_kind`, `is_shortdoi`, `title_bucket`, `title_sort_key`
-* **XML_to_JSON**: `altid_collapsed_canonical_key`, `altid_display_key`, `title_sort_key`
+* **XML_to_JSON**: `altid_star_key`, `title_sort_key`
 <!-- /dict-usedby -->
 
 **Specs.** `specs/normalized-record.md` (§2 canonical versus display order, §3.x casefold, §4.1 titles, §4.2 Alt IDs). `specs/title-display-order.md` and `specs/altid-display-order.md` (the API Shim handoffs, each with a worked example the implementation is tested against).

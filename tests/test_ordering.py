@@ -86,3 +86,43 @@ def test_the_spec_worked_example_holds_when_executed():
     titles = [(row[3], row[1] or None, row[0] == "ResourceName") for row in given]
     ordered = sorted(titles, key=lambda t: title_sort_key(*t))
     assert [t[0] for t in ordered] == expected
+
+
+# ── Alt IDs: the star export order (operator 2026-11-12; 0.72.0) ──────────
+# A wrong order here is silent: the star JSONL still parses and every value
+# is still present. The three Alt ID orders must also stay three: the star
+# key leads with IMDb, the canonical keys must not.
+
+_STAR_ENTRIES = [
+    # (Type before the collapse, collapsed Kind, value)
+    ("ISAN", "ISAN", "0000-0001"),
+    ("Proprietary", "imdb.com", "tt0000009"),   # a domain, not the IMDB Type
+    ("ShortDOI", "ShortDOI", "10.5240/AB12"),  # retained in star
+    ("IMDB", "IMDB", "tt0234215"),
+    ("IMDB", "IMDB", "tt0133093"),
+    ("Proprietary", "Amazon", "B000"),
+]
+
+
+def test_star_order_is_imdb_first_then_kind_then_value_and_keeps_shortdoi():
+    ordered = sorted(_STAR_ENTRIES, key=lambda e: ordering.altid_star_key(*e))
+    assert [e[2] for e in ordered] == [
+        "tt0133093", "tt0234215",          # IMDb first, values ascending
+        "B000", "tt0000009", "0000-0001",  # then Kind casefolded: amazon, imdb.com, isan
+        "10.5240/AB12",                    # shortdoi: kept, sorted as any Kind
+    ]
+
+
+def test_star_imdb_rank_and_display_imdb_rank_are_one_rule():
+    # The star and display keys share is_imdb, so their first elements agree
+    # on every entry; a second IMDb definition would break this.
+    for t, kind, v in _STAR_ENTRIES:
+        dom = kind if t == "Proprietary" else ""
+        assert ordering.altid_star_key(t, kind, v)[0] == ordering.altid_display_key(t, dom, v)[0]
+
+
+def test_the_canonical_keys_still_have_no_imdb_preference():
+    ordered = sorted(_STAR_ENTRIES, key=lambda e: ordering.altid_collapsed_canonical_key(*e[1:]))
+    assert ordered[0][1] == "Amazon"
+    assert ordering.is_imdb("imdb") and not ordering.is_imdb("Proprietary")
+    assert not ordering.is_imdb(" IMDB")  # not stripped: documented

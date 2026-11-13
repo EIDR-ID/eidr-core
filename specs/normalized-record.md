@@ -1,4 +1,4 @@
-# Normalized EIDR Record — field model & canonical ordering (SPEC v1.1)
+# Normalized EIDR Record — field model & canonical ordering (SPEC v1.2)
 
 **Status: ✅ RATIFIED with amendments by the operator, 2026-07-29** (register
 Phase 2.1). The amendments are folded in below: §3 field-model corrections
@@ -169,6 +169,16 @@ type).
    value. Within IMDb, and within every other kind group, order is
    `(casefold(kind), casefold(value))` as canonical.
 
+**Star export order (v1.2, operator ruling 2026-11-12):** the star schema /
+JSONL export lists IMDb first, then sorts by `(casefold(kind),
+casefold(value))` on its collapsed Kind. ShortDOI is **retained** there, as
+in every export. IMDb is decided by the Type alone, read before Type and
+Domain collapse into Kind (a Proprietary entry with Domain `imdb.com` is not
+IMDb). The reference is `eidr_core.ordering.altid_star_key`, which shares
+`is_imdb` with the display key. This is a rule for the star shape only:
+canonical surfaces (hashing, comparison) keep the canonical order above, with
+no IMDb preference, and the standard JSON and XML outputs are not sorted.
+
 **API Shim note:** the matching system does not sort Alt ID entries — it presents them in
 API-Shim order, so **the API Shim must emit the display order**. The
 standalone handoff for that (separate) project is
@@ -224,6 +234,13 @@ Both gaps are closed; this section is kept as the record of how.
 
 ## 8. Change history
 
+* **v1.2 — 2026-11-13.** §4.2: the star export lists IMDb first (operator
+  ruling 2026-11-12: "Sort Alt IDs by their Kind then value, listing IMDb
+  first ... This need only apply to star schema."). Until then IMDb-first was
+  a display rule only. Reference: `eidr_core.ordering.altid_star_key` and
+  `is_imdb` (eidr-core 0.72.0). Canonical and display orders unchanged. No
+  golden-pair expectation depends on Alt ID order (the corpus pins scores),
+  so the corpus is not regenerated; XML_to_JSON's star lock pins this order.
 * **v1.1 — 2026-10-19.** §4.1: Title Class does not place a title, except
   Internal (operator ruling 2026-10-19: "Ignore title classes, except for
   Internal and transliterated"; from the 2026-10-02 dictionary audit). The

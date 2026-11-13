@@ -14,6 +14,12 @@ BMR-Review's dataclasses, XML_to_JSON's dict entries, and any future
 consumer. All comparisons use Unicode ``str.casefold()`` on the KEY only —
 emitted values keep their original case.
 
+Three Alt ID orders, one per surface: canonical (``altid_canonical_key``,
+no IMDb preference, ShortDOI kept), display (``altid_display_key``, IMDb
+first, caller drops ShortDOI) and star export (``altid_star_key``, IMDb
+first, ShortDOI kept; operator 2026-11-12, 0.72.0). ``is_imdb`` is the
+single IMDb test behind the two IMDb-first keys.
+
 Titles are placed STRUCTURALLY: the caller says which title is the
 ResourceName (``is_resource``). A Title Class never makes a title the
 ResourceName; the only class that moves a title is Internal (operator
@@ -26,6 +32,7 @@ __all__ = [
     "ck", "is_internal_class", "title_bucket",
     "title_sort_key", "is_shortdoi", "altid_kind", "altid_canonical_key",
     "altid_display_key", "altid_collapsed_canonical_key",
+    "is_imdb", "altid_star_key",
 ]
 
 
@@ -115,12 +122,25 @@ def altid_canonical_key(id_type, domain, value) -> tuple:
     return (*altid_kind(id_type, domain), ck(value))
 
 
+def is_imdb(id_type) -> bool:
+    """The one IMDb test the IMDb-first orders share: the Type alone,
+    casefolded, equals ``imdb``. A Proprietary entry whose Domain is
+    ``imdb.com`` is NOT IMDb here, as the display worked example has always
+    shown. Not whitespace-stripped (unlike ``is_shortdoi``): stripping would
+    move a padded entry, a behaviour change no ruling asked for.
+
+    Public since 0.72.0, so the star key and the display key cannot grow two
+    definitions of IMDb (XML_to_JSON had to read it out of
+    ``altid_display_key(...)[0]``)."""
+    return ck(id_type) == "imdb"
+
+
 def altid_display_key(id_type, domain, value) -> tuple:
     """Display order: IMDb entries first, then canonical (kind, value).
     Callers implement the display rule as: drop entries where
     ``is_shortdoi(...)``, then stable-sort by this key. (The API Shim's
     contract — altid-display-order.md.)"""
-    imdb_first = 0 if ck(id_type) == "imdb" else 1
+    imdb_first = 0 if is_imdb(id_type) else 1
     return (imdb_first, *altid_kind(id_type, domain), ck(value))
 
 
@@ -130,3 +150,18 @@ def altid_collapsed_canonical_key(kind, value) -> tuple:
     casefold(value)). Ordering among same-shaped entries is identical to the
     structured composite."""
     return (ck(kind), ck(value))
+
+
+def altid_star_key(id_type, kind, value) -> tuple:
+    """Star export order (operator ruling 2026-11-12; normalized-record
+    §4.2 v1.2): IMDb first, then the collapsed Kind, then the value, all
+    casefolded. ShortDOI is RETAINED -- suppressing it stays a display rule.
+
+    ``id_type`` is the entry's Type BEFORE the star shape collapses Type and
+    Domain into one Kind, because the collapse loses it (a Proprietary
+    ``imdb.com`` entry and an ``IMDB`` entry must not both lead). The
+    ruling's "keep any Alt ID already floated to the top" changes nothing:
+    star had no preference before. This is the star SHAPE's key; canonical
+    surfaces (hashing, comparison) keep ``altid_canonical_key`` and
+    ``altid_collapsed_canonical_key``, which have no IMDb preference."""
+    return (0 if is_imdb(id_type) else 1, *altid_collapsed_canonical_key(kind, value))

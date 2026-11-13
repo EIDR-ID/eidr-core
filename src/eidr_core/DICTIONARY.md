@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.71.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.72.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,24 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.72.0 (2026-11-13)
+
+The star export lists IMDb first (operator ruling 2026-11-12, asked for by
+XML_to_JSON's handoff of that date). `normalized-record.md` moves to v1.2.
+Additive; no existing key changes its result.
+
+* **`ordering.altid_star_key(id_type, kind, value)`** (new): IMDb first,
+  then the collapsed Kind, then the value; ShortDOI kept. Replaces reading
+  the IMDb rank out of `altid_display_key(...)[0]`, which used a display key
+  on an export.
+* **`ordering.is_imdb(id_type)`** (new): the one IMDb test. The display key
+  now calls it; its results are unchanged.
+* **`normalized-record.md` §4.2 v1.2:** IMDb-first was a display-only rule;
+  it is now also the star export rule. Canonical and display orders are
+  unchanged, and the standard JSON and XML outputs are still not sorted. No
+  golden-pair expectation depends on Alt ID order, so the corpus is
+  unchanged (`regen_golden_pairs.py --check`: 46 of 46 OK).
 
 ### 0.71.0 (2026-11-13)
 
@@ -660,7 +678,7 @@ These recent changes may still be reaching consumers:
 | Turn engine qualities into De-Dupe UI field states | `compare.states.field_states`, `compare.states.band` | |
 | Parse a part number, or choose which titles to compare | `compare.titles.parse_part`, `compare.titles.select_titles`, `compare.titles.title_similarity` | |
 | Build a child's full record (inheritance, system-generated titles) | `inheritance.build_full_record`, `inheritance.build_full_base`, `inheritance.is_absent` | |
-| Sort titles or Alt IDs in canonical or display order | `ordering.title_sort_key`, `ordering.altid_canonical_key`, `ordering.altid_display_key` | |
+| Sort titles or Alt IDs in canonical, display or star order | `ordering.title_sort_key`, `ordering.altid_canonical_key`, `ordering.altid_display_key`, `ordering.altid_star_key` | `specs/normalized-record.md` §4.2 |
 | Read a BMR workbook, streamed or in memory | `bmr_io.open_sheet`, `bmr_io.read_sheet` | |
 | Write a BMR workbook from records | `bmr_io.write_sheet`, `bmr_io.RepeatPlan` | |
 | Copy chosen rows of a BMR sheet, or fill one column | `bmr_io.subset_rows`, `bmr_io.fill_column`; `bmr_io.check_sheet` first | |
@@ -977,7 +995,9 @@ edition's Changes entry.
 | [`eidr_core.ordering.altid_collapsed_canonical_key`](#altid_collapsed_canonical_key) | function | Returns the canonical sort key for an Alt ID whose Type and Domain arrive as one Kind string. |
 | [`eidr_core.ordering.altid_display_key`](#altid_display_key) | function | Returns the display sort key for one Alt ID: IMDb-typed entries first, then canonical kind and value. |
 | [`eidr_core.ordering.altid_kind`](#altid_kind) | function | Returns the Alt ID kind composite (casefolded Type, casefolded Domain) used for grouping and sorting. |
+| [`eidr_core.ordering.altid_star_key`](#altid_star_key) | function | Returns the star export order for Alt IDs (operator ruling 2026-11-12; `normalized-record.md` §4.2 v1.2): IMDb entries first, then by Kind, then by value. |
 | [`eidr_core.ordering.ck`](#ck) | function | Returns the casefolded sort key for a value, treating None as an empty string. |
+| [`eidr_core.ordering.is_imdb`](#is_imdb) | function | The one IMDb test behind both IMDb-first orders, `altid_display_key` and `altid_star_key`. |
 | [`eidr_core.ordering.is_internal_class`](#is_internal_class) | function | Tests whether a Title Class is `Internal` (casefolded, exact match). |
 | [`eidr_core.ordering.is_shortdoi`](#is_shortdoi) | function | Tests whether an Alt ID is a ShortDOI, by its Type or its Domain (stripped and casefolded since 0.47.0, exact match). |
 | [`eidr_core.ordering.title_bucket`](#title_bucket) | function | Returns the three-bucket rank of a title: ResourceName, then non-Internal alternates, then Internal alternates. |
@@ -4497,19 +4517,20 @@ Defined in `src/eidr_core/normalize/aliases.py`.
 ## `eidr_core.ordering`
 
 <!-- dict-module:eidr_core.ordering -->
-Source `src/eidr_core/ordering/__init__.py`. Public names: 9 functions (declared by `__all__`).
+Source `src/eidr_core/ordering/__init__.py`. Public names: 11 functions (declared by `__all__`).
 <!-- /dict-module -->
 
-**Purpose.** Sort-key functions for the canonical order and the display order of an EIDR record's titles and Alternate IDs. They implement the ratified normalized-record spec (§3.x casefold, §4.1 titles, §4.2 Alt IDs) and the two API Shim handoff documents. Extracted on 2026-08-02 (register R2) so that XML_to_JSON's star-mode export and BMR-Review's `render_record` stop maintaining the same rules in parallel. The functions take plain values (text, class, type, domain, value), never model objects, and only the keys are casefolded: the values you emit keep their case.
+**Purpose.** Sort-key functions for the canonical order and the display order of an EIDR record's titles and Alternate IDs, and (since 0.72.0) the star export order of its Alternate IDs. They implement the ratified normalized-record spec (§3.x casefold, §4.1 titles, §4.2 Alt IDs) and the two API Shim handoff documents. Extracted on 2026-08-02 (register R2) so that XML_to_JSON's star-mode export and BMR-Review's `render_record` stop maintaining the same rules in parallel. The functions take plain values (text, class, type, domain, value), never model objects, and only the keys are casefolded: the values you emit keep their case.
 
 **Use it when.** You sort titles or Alt IDs:
 * Titles, for display or canonical serialization: `sorted(titles, key=lambda t: title_sort_key(t.text, t.title_class, t.is_resource))`.
 * Alt IDs in canonical order (export, hashing, comparison): `altid_canonical_key`. For a source that already merges Type and Domain into one Kind column: `altid_collapsed_canonical_key`.
 * Alt IDs for a human: drop the entries where `is_shortdoi(...)` is true, then stable-sort by `altid_display_key`.
+* Alt IDs in the star schema / JSONL export: stable-sort by `altid_star_key` (IMDb first, ShortDOI kept; operator 2026-11-12).
 * Any place that needs the casefold key rule: `ck`.
 
 **Do not use it when.** The job is one of these:
-* An export or other canonical surface. Never use `altid_display_key` or ShortDOI filtering there: IMDb-first and ShortDOI suppression are display-only rules. Canonical order keeps ShortDOI and has no IMDb preference.
+* A canonical surface (hashing, comparison) or the standard JSON and XML exports. Never use `altid_display_key`, `altid_star_key` or ShortDOI filtering there. Canonical order keeps ShortDOI and has no IMDb preference; the standard outputs keep their stored order. ShortDOI suppression is display-only. IMDb-first is a display rule and, since 0.72.0, a star-export rule; nothing else.
 * Scoring or matching. Order never changes evaluation; title-class weighting belongs to `eidr_core.compare`.
 * Code lists, organisations and credits (spec §3.2-3.4): not covered here.
 * Do not reimplement the three-bucket title rule, the kind composite or the ShortDOI test inline. Call these functions.
@@ -4697,6 +4718,44 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 <!-- /dict -->
 
 **Does.** Returns the full title sort key: the three-bucket rank, then the casefolded text. Use it with a stable sort (`sorted`, `list.sort`) so that equal keys keep their input order. The same key serves display and canonical serialization of titles.
+
+### `altid_star_key`
+
+<!-- dict:eidr_core.ordering.altid_star_key -->
+```python
+def altid_star_key(id_type, kind, value) -> tuple
+```
+
+Defined in `src/eidr_core/ordering/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `id_type` | - | required | The entry's Type as it was before Type and Domain were collapsed into Kind. Decides IMDb only. |
+| `kind` | - | required | The collapsed Kind string (the star shape's Domain, else Type). |
+| `value` | - | required | The Alt ID value. |
+
+**Returns** `tuple` -- `(0 or 1, casefold(kind), casefold(value))`; 0 for IMDb.
+<!-- /dict -->
+
+**Does.** Returns the star export order for Alt IDs (operator ruling 2026-11-12; `normalized-record.md` §4.2 v1.2): IMDb entries first, then by Kind, then by value. ShortDOI is kept; do not filter it. The IMDb test is `is_imdb` on the Type, which the collapse loses, so pass the Type separately: a Proprietary entry with Domain `imdb.com` does not lead. Use it with a stable sort. Pure. New in 0.72.0.
+
+### `is_imdb`
+
+<!-- dict:eidr_core.ordering.is_imdb -->
+```python
+def is_imdb(id_type) -> bool
+```
+
+Defined in `src/eidr_core/ordering/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `id_type` | - | required | The Alt ID's Type. The Domain is not consulted. |
+
+**Returns** `bool` -- True when the casefolded Type equals `imdb`.
+<!-- /dict -->
+
+**Does.** The one IMDb test behind both IMDb-first orders, `altid_display_key` and `altid_star_key`. Not whitespace-stripped, so `" IMDB"` is not IMDb (unlike `is_shortdoi`, which strips). A Proprietary entry with Domain `imdb.com` is not IMDb. Pure. New in 0.72.0.
 
 ## `eidr_core.registry`
 

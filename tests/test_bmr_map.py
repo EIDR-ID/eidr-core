@@ -395,8 +395,7 @@ def test_record_from_xml_builds_the_standard_shape():
     base = rec["FullMetadata"]["BaseObjectData"]
     assert base["ResourceName"] == [
         {"Title": "Pilot", "TitleClass": "release", "_lang": "en"},
-        {"Title": "Le Pilote", "TitleClass": "translated", "_lang": "fr",
-         "SystemGenerated": "false"}]
+        {"Title": "Le Pilote", "TitleClass": "translated", "_lang": "fr"}]
     assert base["OriginalLanguage"] == [{"value": "en", "_mode": "Audio"}, "fr"]
     assert base["AssociatedOrg"][0] == {
         "_idType": "EIDRPartyID", "_organizationID": "10.5237/B03D-06E1",
@@ -453,3 +452,25 @@ def test_a_shortdoi_never_reaches_a_row():
     row = M.row_from_blocks(base, {}, "non_episodic")
     assert row["Alt ID 1"] == "p1" and "Alt ID 2" not in row
     assert "10/abcd" not in row.values()
+
+
+# ── absent fields stay absent (operator, 2026-11-13) ─────────────────────────
+# "Empty or removed fields should simply be gone from the output. They should
+# not carry false or null or any other flag." A "false" SystemGenerated is
+# still a valid-looking record, so only a test sees it come back.
+
+def test_a_sheet_title_carries_no_system_generated_placeholder():
+    rec = M.record_from_row(_row(**{"Alternate Title 1": "Other"}), "non_episodic")
+    titles = rec["SelfDefinedMetadata"]["BaseObjectData"]["ResourceName"]
+    assert [t["Title"] for t in titles] == ["Test Film", "Other"]
+    assert all("SystemGenerated" not in t for t in titles)
+
+
+@pytest.mark.parametrize("attr, want", [("", None), (' systemGenerated="false"', None),
+                                        (' systemGenerated="true"', "true"),
+                                        (' systemGenerated="1"', "true")])
+def test_xml_system_generated_is_kept_only_when_true(attr, want):
+    xml = _MSG.replace('<ResourceName lang="en" titleClass="release">',
+                       f'<ResourceName lang="en" titleClass="release"{attr}>')
+    main = M.record_from_xml(xml)["FullMetadata"]["BaseObjectData"]["ResourceName"][0]
+    assert main.get("SystemGenerated") == want

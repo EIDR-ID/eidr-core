@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.70.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.71.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,17 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.71.0 (2026-11-13)
+
+* **`bmr_map` no longer writes `"SystemGenerated": "false"`** (behaviour
+  change). `record_from_row` leaves the key out of every sheet title, and
+  `record_from_xml` leaves it out of every `AlternateResourceName` and keeps
+  it on a `ResourceName` only as `"true"` (from `systemGenerated="true"` or
+  `"1"`). Operator, 2026-11-13: an empty or removed field is gone from the
+  output, never a `false` or `null` placeholder. Every reader in the
+  portfolio already tests for `"true"`, so a consumer notices only the
+  missing key in its own output (XML_to_JSON's sheet-path JSON and star).
 
 ### 0.70.0 (2026-11-12)
 

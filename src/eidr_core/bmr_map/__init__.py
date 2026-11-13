@@ -767,13 +767,16 @@ def record_from_row(row: Mapping[str, Any], template: str) -> dict:
     if _text(row.get("Title")) is not None:
         titles.append({"Title": _text(row.get("Title")),
                        "TitleClass": _text(row.get("Title Class")),
-                       "_lang": _text(row.get("Title Language")),
-                       "SystemGenerated": "false"})
+                       "_lang": _text(row.get("Title Language"))})
+    # No "SystemGenerated" key: a sheet cannot mark a title system-generated,
+    # and an absent flag is left out rather than written "false" (operator,
+    # 2026-11-13: empty or removed fields are gone from the output, never a
+    # false or null placeholder). Until 0.71.0 every sheet title said "false".
     for g in _groups(row, ["Alternate Title", "Alt Title Class", "Alt Title Language"]):
         if g.get("Alternate Title") is None:
             continue
         titles.append({"Title": g["Alternate Title"], "TitleClass": g.get("Alt Title Class"),
-                       "_lang": g.get("Alt Title Language"), "SystemGenerated": "false"})
+                       "_lang": g.get("Alt Title Language")})
     orgs: list[dict[str, Any]] = [
             {"_idType": "EIDRPartyID" if g.get("Associated Org Party ID") else None,
              "_organizationID": g.get("Associated Org Party ID"),
@@ -937,14 +940,19 @@ def _info(el: ET.Element) -> dict:
 def _base_from_xml(bod: ET.Element) -> dict:
     titles: list[dict] = []
     for t in _kids(bod, "ResourceName"):
+        # SystemGenerated only when true: "false" (or an absent attribute) is
+        # the absence of the flag, and absent fields are left out (operator,
+        # 2026-11-13). XML_to_JSON's mirror path follows the same rule.
+        generated = (_attr(t, "systemGenerated") or "").strip() in ("true", "1")
         titles.append({"Title": t.text, "TitleClass": _attr(t, "titleClass"),
                        "_lang": _attr(t, "lang"),
-                       "SystemGenerated": _attr(t, "systemGenerated")})
+                       **({"SystemGenerated": "true"} if generated else {})})
     for t in _kids(bod, "AlternateResourceName"):
-        # XML_to_JSON marks every alternate SystemGenerated "false" (the
-        # conversion table's note for alternates); kept, so both agree.
+        # The registry never generates an alternate (the mirror holds 0 of
+        # 1,402,189 so marked), so there is no flag to carry. Until 0.71.0
+        # this said "false", copying XML_to_JSON's old placeholder.
         titles.append({"Title": t.text, "TitleClass": _attr(t, "titleClass"),
-                       "_lang": _attr(t, "lang"), "SystemGenerated": "false"})
+                       "_lang": _attr(t, "lang")})
     orgs = []
     for o in _kids(bod, "AssociatedOrg"):
         names = [n.text for n in _kids(o, "DisplayName") + _kids(o, "AlternateName") if n.text]

@@ -5393,7 +5393,7 @@ Source `src/eidr_core/bmr_map/__init__.py`. Public names: 8 functions, 3 constan
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_map -->
 Scan of 2026-11-13; regenerated at each release from the consumer trees.
-* **BMR-Review**: `record_from_xml`, `row_from_record`
+* **BMR-Review**: `record_from_xml`, `row_from_record`, `select_blocks`
 * **XML_to_JSON**: `NEVER_PRODUCED`, `PRODUCED_BASES`, `record_from_row`, `row_from_record`
 <!-- /dict-usedby -->
 

@@ -216,24 +216,53 @@ def _single_line_xml(xml_text: str) -> str:
 # Record -> row
 # --------------------------------------------------------------------------
 
+def _names_a_parent(md: Any) -> bool:
+    """Does this block's ExtraObjectMetadata name a Parent? Parent is the only
+    relationship the registry inherits through (Season, Episode, Edit, Clip,
+    Manifestation); the lightweight relationships (lists) never carry one."""
+    extra = (md.get("ExtraObjectMetadata") if isinstance(md, Mapping) else None) or {}
+    return any(isinstance(info, Mapping) and not is_absent(info.get("Parent"))
+               for info in extra.values())
+
+
 def select_blocks(record: Mapping[str, Any], source: str = "self",
                   ) -> tuple[dict, dict]:
     """The ``(BaseObjectData, ExtraObjectMetadata)`` pair a sheet is built from.
 
-    ``"self"`` (the documented default): ``SelfDefinedMetadata`` only, so a
-    value the record does not define itself is left EMPTY on the sheet.
-    ``"full"``: ``FullMetadata``, falling back to ``SelfDefinedMetadata`` when
-    the record has no Full block (so a Self-only record never maps to an empty
-    row). Selection is the caller's choice (condition 2); this is the rule
-    XML_to_JSON's ``--sheet-out-type`` applies, offered so a second caller
-    does not rewrite it.
+    ``SelfDefinedMetadata`` only, so a value the record does not define itself
+    is left EMPTY on the sheet. The operator ruled on 2026-11-12 that
+    inherited data never appears in BMR spreadsheet output, and on
+    2026-11-13 that this holds for ALL BMR spreadsheet generation: a sheet
+    cannot mark a value inherited, so registering it would make the value
+    the record's own and stop it following the parent.
+
+    ``source="full"`` (``FullMetadata``) was WITHDRAWN at 0.73.0 and raises
+    ``ValueError``; the keyword stays so existing ``source="self"`` callers
+    keep working.
+
+    A record with no Self block but a Full block (a ``type=Full`` resolve
+    result): the Full block is used when it names no Parent, because a record
+    with no parent inherits nothing, so its Full and Self values are the same.
+    When it names a Parent, inherited values cannot be told apart from the
+    record's own, and this raises ``ValueError`` rather than guess. A record
+    with neither block gives empty blocks, as before.
     """
     if source == "full":
-        md = record.get("FullMetadata") or record.get("SelfDefinedMetadata") or {}
-    elif source == "self":
-        md = record.get("SelfDefinedMetadata") or {}
-    else:
-        raise ValueError(f"source must be 'self' or 'full', not {source!r}")
+        raise ValueError(
+            "source='full' was withdrawn at eidr-core 0.73.0: BMR spreadsheet "
+            "output never carries inherited data (operator rulings 2026-11-12 "
+            "and 2026-11-13). Use source='self'.")
+    if source != "self":
+        raise ValueError(f"source must be 'self', not {source!r}")
+    md = record.get("SelfDefinedMetadata") or {}
+    if not md and record.get("FullMetadata"):
+        full = record["FullMetadata"]
+        if _names_a_parent(full):
+            raise ValueError(
+                "the record has no SelfDefinedMetadata and its FullMetadata names "
+                "a Parent, so inherited values cannot be told apart from its own; "
+                "supply the self-defined block (resolve with type=SelfDefined)")
+        md = full
     base = (md.get("BaseObjectData") if isinstance(md, Mapping) else None) or {}
     extra = (md.get("ExtraObjectMetadata") if isinstance(md, Mapping) else None) or {}
     return base, extra
@@ -261,9 +290,12 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
     """Map one record's selected blocks to one Template-22 row.
 
     The caller has routed the record to ``template`` and selected the blocks
-    (``select_blocks``). ``administrators`` supplies Registrant and Metadata
-    Authority; when omitted, ``base["Administrators"]`` is used, so a record
-    built from a sheet never silently loses them. A caller holding a whole
+    (``select_blocks``). Pass self-defined blocks only: inherited data never
+    belongs on a BMR sheet (operator, 2026-11-12 and 2026-11-13); this
+    function maps whatever it is given and cannot check that for you.
+    ``administrators`` supplies Registrant and Metadata Authority; when
+    omitted, ``base["Administrators"]`` is used, so a record built from a
+    sheet never silently loses them. A caller holding a whole
     record passes ``administrators_of(record, base)``, or uses
     ``row_from_record``, which does exactly that.
 
@@ -573,10 +605,11 @@ def row_from_record(record: Mapping[str, Any], template: str, *, source: str = "
                     ) -> dict[str, str | None]:
     """``row_from_blocks`` for a whole standard record, with the documented defaults.
 
-    Selects the blocks by ``source`` (``select_blocks``) and, unless
-    ``administrators`` is given, takes them from ``administrators_of``. This
-    is exactly what XML_to_JSON's ``--sheet-out`` did per record, minus the
-    two things that stay with its caller: the ``Unique Row ID`` column and
+    Selects the self-defined blocks (``select_blocks``; ``source="full"`` was
+    withdrawn at 0.73.0 and raises) and, unless ``administrators`` is given,
+    takes them from ``administrators_of``. This is exactly what XML_to_JSON's
+    ``--sheet-out`` did per record, minus the two things that stay with its
+    caller: the ``Unique Row ID`` column and
     the verbatim echo of an unconvertible row. ``system_titles`` is as for
     ``row_from_blocks``.
     """

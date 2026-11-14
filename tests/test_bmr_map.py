@@ -40,15 +40,14 @@ def test_self_leaves_mirror_filled_gaps_empty():
     assert row.get("Mode") is None and row.get("Referent Type") is None
 
 
-def test_full_fills_gaps_from_the_full_block():
-    row = M.row_from_record(_episode_record(), "episodic", source="full")
-    assert row.get("Mode") == "AudioVisual" and row.get("Referent Type") == "TV"
-
-
-def test_full_does_not_override_self_defined_values():
-    rec = _episode_record()
-    assert M.row_from_record(rec, "episodic", source="self")["Title"] == SELF_ONLY_TITLE
-    assert M.row_from_record(rec, "episodic", source="full")["Title"] == SELF_ONLY_TITLE
+def test_full_is_withdrawn_no_inherited_data_on_any_bmr_sheet():
+    # Operator, 2026-11-12 and 2026-11-13: "No inherited data applies to all
+    # BMR spreadsheet generation." source="full" wrote the Full block's
+    # inherited values (Mode, Referent Type here) onto the sheet.
+    with pytest.raises(ValueError, match="withdrawn"):
+        M.row_from_record(_episode_record(), "episodic", source="full")
+    with pytest.raises(ValueError, match="withdrawn"):
+        M.select_blocks(_episode_record(), "full")
 
 
 def test_default_source_is_self():
@@ -56,10 +55,27 @@ def test_default_source_is_self():
     assert M.row_from_record(rec, "episodic") == M.row_from_record(rec, "episodic", source="self")
 
 
-def test_full_falls_back_to_self_when_full_absent():
+def test_a_full_only_record_with_no_parent_maps_its_full_block():
+    # A type=Full resolve of a Basic: nothing to inherit, so Full == Self.
+    base = {"ID": "10.5240/CCCC-0000-0000-0000-0000-C", "StructuralType": "Abstraction",
+            "Mode": "AudioVisual", "ResourceName": [{"Title": "A Film"}]}
+    rec = {"FullMetadata": {"BaseObjectData": base}}
+    row = M.row_from_record(rec, "non_episodic")
+    assert row["Title"] == "A Film" and row["Mode"] == "AudioVisual"
+
+
+def test_a_full_only_record_with_a_parent_is_refused_not_guessed():
+    # Without the Self block its inherited values cannot be told apart.
     rec = _episode_record()
-    del rec["FullMetadata"]
-    assert M.row_from_record(rec, "episodic", source="full")["Title"] == SELF_ONLY_TITLE
+    del rec["SelfDefinedMetadata"]
+    with pytest.raises(ValueError, match="Parent"):
+        M.row_from_record(rec, "episodic")
+
+
+def test_a_self_block_is_used_even_when_full_has_more():
+    rec = _episode_record()
+    row = M.row_from_record(rec, "episodic")
+    assert row["Title"] == SELF_ONLY_TITLE and row.get("Country of Origin 1") is None
 
 
 def test_an_unknown_source_is_refused():
@@ -115,12 +131,11 @@ def test_a_numbered_header_wins_over_a_bare_one_for_group_1():
     assert season["SeasonClass"] == ["numbered", "two"]
 
 
-@pytest.mark.parametrize("source", ["self", "full"])
-def test_a_sheet_records_registrant_and_ma_reach_the_output_row(source):
+def test_a_sheet_records_registrant_and_ma_reach_the_output_row():
     row = _row(**{"Registrant": REG, "Metadata Authority Party ID 1": PID})
     rec = M.record_from_row(row, "non_episodic")
     assert "ProvenanceMetadata" not in rec  # the shape that exposed the 2026-10-02 defect
-    row = M.row_from_record(rec, "non_episodic", source=source)
+    row = M.row_from_record(rec, "non_episodic")
     assert row["Registrant"] == REG and row["Metadata Authority Party ID 1"] == PID
 
 
@@ -174,7 +189,7 @@ def test_unsupported_and_unknown_templates_are_refused():
 def test_inputs_are_not_mutated():
     rec = _episode_record()
     before = copy.deepcopy(rec)
-    M.row_from_record(rec, "episodic", source="full")
+    M.row_from_record(rec, "episodic")
     assert rec == before
 
 
@@ -414,7 +429,10 @@ def test_record_from_xml_builds_the_standard_shape():
 
 
 def test_record_from_xml_feeds_row_from_record():
-    row = M.row_from_record(M.record_from_xml(_MSG), "episodic", source="full")
+    # Every column at once: the Full block's content presented as the record's
+    # own (a sheet takes only self-defined values; _MSG's Self block is thin).
+    rec = M.record_from_xml(_MSG)
+    row = M.row_from_record({"SelfDefinedMetadata": rec["FullMetadata"]}, "episodic")
     assert row["IMDb"] == "tt0000001"
     assert (row["Alt ID 1"], row["Domain 1"]) == ("X1", "example.org")
     assert row["Parent EIDR/Row ID"] == "10.5240/BBBB-0000-0000-0000-0000-B"

@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.72.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.73.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,26 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.73.0 (2026-11-13)
+
+No BMR sheet carries inherited data. The operator, 2026-11-13: "No inherited
+data applies to all BMR spreadsheet generation" (extending the 2026-11-12
+ruling made for XML_to_JSON's `--sheet-out`). **Breaking for a caller that
+passes `source="full"`.**
+
+* **`bmr_map.select_blocks` / `row_from_record`:** `source="full"` is
+  withdrawn and raises `ValueError`. The keyword stays; `"self"` is the only
+  value.
+* **A record with no Self block** (a `type=Full` resolve result) now maps its
+  Full block when that names no Parent, and raises `ValueError` when it
+  names one. Before, `"self"` gave an empty row for it without a word.
+* **`row_from_blocks`:** unchanged, but documented as taking self-defined
+  blocks only; it cannot check what it is given.
+* BMR-Review's four sheet builders, which passed `"full"`, move to the Self
+  block in the same work cycle. On 3,000 real submissions that changes 2,189
+  rows (Episodes, Edits, Seasons, Manifestations); every submission in the
+  audit files carries both blocks.
 
 ### 0.72.0 (2026-11-13)
 
@@ -774,7 +794,7 @@ edition's Changes entry.
 | [`eidr_core.bmr_map.record_from_xml`](#record_from_xml) | function | Builds the standard record (the shape XML_to_JSON builds from the mirror, which `row_from_record` takes) from registry XML, on the standard library's ElementTree, so `bmr_map` stays vendorable. |
 | [`eidr_core.bmr_map.row_from_blocks`](#row_from_blocks) | function | Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title; Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line; `Language Mode N` only from the template's own language family (Original Language on Abstraction templates, Version Language on Edit and Manifestation, none on Clip; 0.51.0). |
 | [`eidr_core.bmr_map.row_from_record`](#row_from_record) | function | Maps a whole record with the documented defaults: exactly what XML_to_JSON's `--sheet-out` did per record, minus the `Unique Row ID` column and the echo of an unconvertible row, which stay with the caller. |
-| [`eidr_core.bmr_map.select_blocks`](#select_blocks) | function | Picks the blocks a sheet is built from. |
+| [`eidr_core.bmr_map.select_blocks`](#select_blocks) | function | Picks the blocks a sheet is built from: `SelfDefinedMetadata`, so values the record does not define itself stay empty on the sheet. |
 | [`eidr_core.bmr_map.NEVER_PRODUCED`](#never_produced-constant) | constant | the template columns this module never writes, each for a stated reason: `Unique Row ID` (the caller's), `Assigned EIDR ID` and `Registration Errors & Notes` (the registry's and the reviewer's), `Metadata Authority` (the display name; only the Party ID column is written), `Operator's Notes` (written on Manifestation only). |
 | [`eidr_core.bmr_map.PRODUCED_BASES`](#produced_bases-constant) | constant | per supported template, every header base the mapper can write (derived from a record that takes every branch and pinned by a test, together with the rule that every stock template column is here or in `NEVER_PRODUCED`). |
 | [`eidr_core.bmr_map.SUPPORTED_TEMPLATES`](#supported_templates-constant) | constant | the template keys `row_from_blocks` writes; Compilation has a sheet but is refused. |
@@ -5357,7 +5377,7 @@ Source `src/eidr_core/bmr_map/__init__.py`. Public names: 8 functions, 3 constan
 **Purpose.** The one implementation of mapping a standard record (the registry-shaped JSON XML_to_JSON emits) to a Template-22 BMR row, and a row back to the self-defined record it describes. Extracted 2026-10-13 (register B5) from XML_to_JSON's `_bmr_rows_from_standard_records` and `build_standard_record_from_bmr_row`, on the six conditions XML_to_JSON set and eidr-core accepted on 2026-09-24. Second consumer: python-tools (`FlattenTool -f bmr`, `-bmrin`). It is cell <-> field mechanism for one record and one row; routing, family expansion, row IDs, parent resolution and Full-record construction stay where they already live.
 
 **Use it when.** 
-* You turn a standard record into a BMR row: `row_from_record` (select the block, take Administrators from where the record carries them), or `row_from_blocks` if you hold the blocks. Route first with `bmr_io.template_for_creation_type`, write with `bmr_io.write_sheet`.
+* You turn a standard record into a BMR row: `row_from_record` (selects the self-defined block, takes Administrators from where the record carries them), or `row_from_blocks` if you hold the self-defined blocks. Never pass Full blocks: no BMR sheet carries inherited data (operator, 2026-11-13). Route first with `bmr_io.template_for_creation_type`, write with `bmr_io.write_sheet`.
 * You read a BMR row back into a record (for a Modify, or a `--sheet` pass): `record_from_row`, then resolve the parent with `bmr_io.resolve_parent` and build Full with `inheritance.build_full_base` if you need them.
 * You hold registry XML (a resolve result, an API Shim message): `record_from_xml` first, then `row_from_record`.
 * Your guardrail checks that every column of a template is accounted for: compare the template's header bases (`header_base`) with `PRODUCED_BASES[template] | NEVER_PRODUCED`.
@@ -5487,7 +5507,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 |---|---|---|---|
 | `record` | `Mapping[str, Any]` | required | A standard record. |
 | `template` | `str` | required | One of `SUPPORTED_TEMPLATES`. |
-| `source` | `str` | `"self"` (keyword-only) | `"self"` (SelfDefinedMetadata only) or `"full"` (FullMetadata, falling back to Self). |
+| `source` | `str` | `"self"` (keyword-only) | Only `"self"`. `"full"` was withdrawn at 0.73.0 and raises `ValueError` (no inherited data on any BMR sheet). |
 | `administrators` | `Mapping[str, Any] \| None` | `None` (keyword-only) | Overrides where Registrant and Metadata Authority come from; omitted, `administrators_of` decides. |
 | `system_titles` | `str` | `"keep"` (keyword-only) | `"drop"` leaves `Title`, `Title Class` and `Title Language` empty when the main title is system-generated, without promoting the next title; for a sheet that may be registered (a sheet cannot mark a title system-generated, so registering it would block regeneration). `"keep"` writes it. Anything else raises ValueError. |
 
@@ -5508,12 +5528,12 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
 | `record` | `Mapping[str, Any]` | required | A standard record. |
-| `source` | `str` | `"self"` | `"self"` or `"full"`; anything else raises `ValueError`. |
+| `source` | `str` | `"self"` | Only `"self"`. `"full"` (withdrawn at 0.73.0) and anything else raise `ValueError`. |
 
 **Returns** `tuple[dict, dict]` -- `(BaseObjectData, ExtraObjectMetadata)`, each `{}` when absent.
 <!-- /dict -->
 
-**Does.** Picks the blocks a sheet is built from. `self` leaves values the record does not define itself empty on the sheet; `full` uses FullMetadata and falls back to Self when there is none, so a Self-only record never maps to an empty row.
+**Does.** Picks the blocks a sheet is built from: `SelfDefinedMetadata`, so values the record does not define itself stay empty on the sheet. The operator ruled that inherited data never appears in BMR spreadsheet output, for every BMR writer (2026-11-12, 2026-11-13). A record with no Self block uses its Full block when that names no Parent (a parentless record inherits nothing), and raises `ValueError` when it names one (inherited values cannot be told apart). A record with neither block gives `({}, {})`. Until 0.73.0, `"full"` selected FullMetadata.
 
 ### `NEVER_PRODUCED` (constant)
 

@@ -330,6 +330,7 @@ class _Rec:
     length_minutes: float | None = None
     sequence_number: str | None = None
     distribution_number: str | None = None
+    time_slot: str | None = None
     titles: list = field(default_factory=list)
     countries: list = field(default_factory=list)
     original_languages: list = field(default_factory=list)
@@ -991,3 +992,41 @@ def test_dropping_leaves_the_input_untouched_and_success_unchanged():
                                  extra={"SequenceNumber": "2"})
     assert full["ResourceName"][0]["Title"] == "The Series: Season 2"
     assert prov["ResourceName"] == "system"
+
+
+# --- the Episode TimeSlot (0.74.0) ------------------------------------------
+# Measured on the mirror 2026-11-13: all 158 Episodes with a TimeSlot carry a
+# generated title "<Season> [<date> <HH:MM>]"; none matched before. A wrong
+# title here is silent: it is plausible text that simply fails to match the
+# registry's own record.
+
+def test_an_episode_time_slot_goes_inside_the_brackets():
+    assert system_generated_title(
+        "BBC London News", "Episode", release_date="2012-05-19", time_slot="16:50:00",
+    ) == ("BBC London News [2012-05-19 16:50]", "season numeric")
+
+
+@pytest.mark.parametrize("kw", [
+    {"distribution_number": "4"},                    # numbered form: no slot
+    {"time_slot": "16:50:00"},                       # no date: no title, as before
+    {"release_date": "2012-05-19", "time_slot": "evening"},   # unreadable: ignored
+])
+def test_the_time_slot_is_used_only_on_the_dated_episode_form(kw):
+    got = system_generated_title("S", "Episode", **kw)
+    assert got is None or "16:50" not in got[0]
+    if kw.get("time_slot") == "evening":
+        assert got == ("S [2012-05-19]", "season numeric")
+
+
+def test_a_season_never_takes_a_time_slot():
+    assert system_generated_title("S", "Season", release_date="2012",
+                                  time_slot="16:50:00") == ("S [2012]", "series numeric")
+
+
+def test_both_adapters_agree_on_a_time_slot_title():
+    json_full, _ = build_full_base({"ReleaseDate": "2012-05-19"}, PARENT, "Episode",
+                                   extra={"TimeSlot": "21:25:00"})
+    rec_full = build_full_record(_Rec(creation_type="Episode", release_date="2012-05-19",
+                                      time_slot="21:25:00"), _parent_rec(), "Episode")
+    assert json_full["ResourceName"][0]["Title"] == rec_full.titles[0].text \
+        == "The Series [2012-05-19 21:25]"

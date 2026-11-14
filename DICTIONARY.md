@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.73.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.74.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,22 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.74.0 (2026-11-13)
+
+A generated Episode title carries the Episode's TimeSlot, as the
+registry's does. Additive keyword; titles change only for Episodes that have
+a TimeSlot and no Distribution Number.
+
+* **`inheritance.system_generated_title(..., time_slot=None)`** (new
+  keyword): the dated Episode form becomes `<Season Title> [<date> <HH:MM>]`
+  when a slot is given. Measured on the mirror: all 158 Episodes with a
+  TimeSlot have a generated title of that form, and none matched before; all
+  158 match now.
+* **`build_full_base`** reads `extra["TimeSlot"]`; **`build_full_record`**
+  reads the `time_slot` attribute. BMR-Review's record class already has
+  that attribute, so its generated titles for those Episodes move with this
+  release. XML_to_JSON passes the slot in its own commit.
 
 ### 0.73.0 (2026-11-13)
 
@@ -4015,7 +4031,7 @@ Defined in `src/eidr_core/inheritance/__init__.py`.
 | `self_base` | `dict` | required | The child's SELF-defined `BaseObjectData` (registry JSON, canonical field names as keys). Deep-copied, never modified. `None` is treated as `{}`. |
 | `parent_base` | `dict \| None` | required | The parent's FULL `BaseObjectData`, not its self-defined one. `None` or `{}` means no parent, and Self is returned as Full. |
 | `creation_type` | `str` | required | The child's creation type, exact spelling (`'Season'`, `'Episode'`, ...). A type outside `CHILD_TYPES` returns Self as Full and ignores the parent. |
-| `extra` | `dict \| None` | `None` | Title inputs only: `SequenceNumber` (Season), `DistributionNumber` (Episode), `ReleaseDate` (fallback for both; when non-empty it outranks the child's own `ReleaseDate`). The numbers are read ONLY from here, never from `self_base`, so a missing `SequenceNumber` or `DistributionNumber` means the numbered pattern cannot fire. A missing or empty `ReleaseDate` falls back to the child's own `self_base["ReleaseDate"]`. |
+| `extra` | `dict \| None` | `None` | Title inputs only: `SequenceNumber` (Season), `DistributionNumber` (Episode), `ReleaseDate` (fallback for both; when non-empty it outranks the child's own `ReleaseDate`), `TimeSlot` (Episode, dated form; 0.74.0). The numbers are read ONLY from here, never from `self_base`, so a missing `SequenceNumber` or `DistributionNumber` means the numbered pattern cannot fire. A missing or empty `ReleaseDate` falls back to the child's own `self_base["ReleaseDate"]`. |
 
 **Returns** `tuple[dict, dict[str, str]]` -- `(full_base, provenance)`: a new dict, and a map from each field populated in the result to `'self'`, `'inherited'` or `'system'`. A system-generated ResourceName that was carried over rather than built here has no entry.
 <!-- /dict -->
@@ -4043,7 +4059,7 @@ Defined in `src/eidr_core/inheritance/__init__.py`.
 **Returns** `Any` -- A deep copy of `self_rec` with inherited values filled in and the provenance map attached as the attribute `eidr_provenance` (read it with `provenance()`).
 <!-- /dict -->
 
-**Does.** Builds a child's full record object from its self-defined one and its parent's full record, by the `build_full_base` policy. Title inputs come from the child's `sequence_number`, `distribution_number` and `release_date` attributes; a generated title is a deep copy of the parent's first title element with `text`, `title_class`, `system_generated=True`, `self_defined=False` and `is_resource=True` set where the class has them. Elements of the list attributes get `self_defined` stamped (False when inherited, otherwise `not system_generated`, and an existing explicit False is kept), so running it again over an already-built cached record does not promote inherited values to self-defined. Raises `TitleConstructionError` as `build_full_base` does, after inheritance, with `partial` and `provenance` attached.
+**Does.** Builds a child's full record object from its self-defined one and its parent's full record, by the `build_full_base` policy. Title inputs come from the child's `sequence_number`, `distribution_number`, `release_date` and (0.74.0) `time_slot` attributes, each optional; a generated title is a deep copy of the parent's first title element with `text`, `title_class`, `system_generated=True`, `self_defined=False` and `is_resource=True` set where the class has them. Elements of the list attributes get `self_defined` stamped (False when inherited, otherwise `not system_generated`, and an existing explicit False is kept), so running it again over an already-built cached record does not promote inherited values to self-defined. Raises `TitleConstructionError` as `build_full_base` does, after inheritance, with `partial` and `provenance` attached.
 
 **Notes.** When the record has no `titles` attribute at all, title handling is skipped. `titles=None` is treated as untitled (since 0.68.0; it was skipped silently), so a title is generated or inherited, or `TitleConstructionError` raised, exactly as `build_full_base` does. A field whose attribute is missing on either record is skipped silently. If the object cannot take the `eidr_provenance` attribute (slotted or frozen), the map is dropped silently and `provenance()` returns `{}`. A `ResourceName` entry in a custom `attrs` is ignored (since 0.68.0): titles are built only by the title logic, so the parent's title no longer leaks into `exc.partial` and a system-generated title is no longer reported as `'self'`.
 
@@ -4105,7 +4121,7 @@ Defined in `src/eidr_core/inheritance/__init__.py`.
 
 <!-- dict:eidr_core.inheritance.system_generated_title -->
 ```python
-def system_generated_title(parent_title: str, creation_type: str, *, sequence_number: Any = None, distribution_number: Any = None, release_date: Any = None) -> tuple[str, str] | None
+def system_generated_title(parent_title: str, creation_type: str, *, sequence_number: Any = None, distribution_number: Any = None, release_date: Any = None, time_slot: Any = None) -> tuple[str, str] | None
 ```
 
 Defined in `src/eidr_core/inheritance/__init__.py`.
@@ -4117,11 +4133,12 @@ Defined in `src/eidr_core/inheritance/__init__.py`.
 | `sequence_number` | `Any` | `None` (keyword-only) | Season number. Converted with `str()` and stripped; any non-empty value (`0` included) gives `Season <N>`. |
 | `distribution_number` | `Any` | `None` (keyword-only) | Episode distribution number, handled the same way; gives `Episode <N>`. |
 | `release_date` | `Any` | `None` (keyword-only) | Fallback when the number is empty, rendered verbatim as `[<date>]`. Pass the child's OWN date, never an inherited one. |
+| `time_slot` | `Any` | `None` (keyword-only) | Episode TimeSlot (0.74.0). On the dated Episode form only, its `HH:MM` goes inside the brackets: `[<date> <HH:MM>]` (`16:50:00` gives `16:50`). A value that does not read as `HH:MM[:SS]` is ignored. Never used on the numbered form or on a Season. |
 
 **Returns** `tuple[str, str] | None` -- `(title, title_class)`, with title_class `'series numeric'` for a Season and `'season numeric'` for an Episode (date forms included); `None` when no pattern can fire.
 <!-- /dict -->
 
-**Does.** Builds the registry's system-generated title for a Season or Episode from the parent's title plus a number or a date. The patterns are `<Series Title>: Season <N>`, `<Series Title> [<date>]`, `<Season Title>: Episode <N>` and `<Season Title> [<date>]`. `HouseSequence` is deliberately never consulted, because the registry's rules do not use it. Never raises; the builders turn a `None` into `TitleConstructionError`.
+**Does.** Builds the registry's system-generated title for a Season or Episode from the parent's title plus a number or a date. The patterns are `<Series Title>: Season <N>`, `<Series Title> [<date>]`, `<Season Title>: Episode <N>` and `<Season Title> [<date>]`, the last as `<Season Title> [<date> <HH:MM>]` when the Episode has a TimeSlot (all 158 such Episodes in the mirror, 2026-11-13). `HouseSequence` is deliberately never consulted, because the registry's rules do not use it. Never raises; the builders turn a `None` into `TitleConstructionError`.
 
 ### `TitleConstructionError` (class)
 

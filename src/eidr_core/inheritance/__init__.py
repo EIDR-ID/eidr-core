@@ -125,6 +125,7 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import re
 from typing import Any
 
 
@@ -238,6 +239,7 @@ def system_generated_title(
     sequence_number: Any = None,      # Season
     distribution_number: Any = None,  # Episode
     release_date: Any = None,         # the fallback for both
+    time_slot: Any = None,            # Episode, date form only (0.74.0)
 ) -> tuple[str, str] | None:
     """``(title, title_class)`` for a Season or Episode, or None.
 
@@ -249,6 +251,17 @@ def system_generated_title(
     Episode **with** Dist. Number    ``<Season Title>: Episode <N>``
     Episode **without**              ``<Season Title> [<Episode Release Date>]``
     ===============================  ==========================================
+
+    An Episode without a Distribution Number that has a ``TimeSlot`` gets the
+    slot's ``HH:MM`` inside the brackets: ``<Season Title> [<date> <HH:MM>]``.
+    Measured on the mirror, 2026-11-13: all 158 Episodes with a TimeSlot have
+    a generated title of exactly that form (``BBC London News [2012-05-19
+    16:50]`` from slot ``16:50:00``), and 0 of them matched this function
+    before 0.74.0, so each failed to match the registry's own record. The
+    slot is used only when it reads as ``HH:MM`` (seconds dropped), the only
+    shape the mirror holds; anything else is ignored rather than guessed.
+    Never on the numbered form or on a Season: the registry has no such
+    title (no Episode with both a number and a slot exists to show one).
 
     The date form is a FALLBACK, not an error path — the pre-2026-08-29
     XML_to_JSON implementation had only the numbered rows and returned None
@@ -281,9 +294,22 @@ def system_generated_title(
         if dist:
             return f"{title}: Episode {dist}", "season numeric"
         date = _text(release_date)
-        return (f"{title} [{date}]", "season numeric") if date else None
+        if not date:
+            return None
+        slot = _hh_mm(time_slot)
+        stamp = f"{date} {slot}" if slot else date
+        return f"{title} [{stamp}]", "season numeric"
 
     return None
+
+
+_HH_MM = re.compile(r"^(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?$")
+
+
+def _hh_mm(value: Any) -> str:
+    """``HH:MM`` from a TimeSlot (``16:50:00`` -> ``16:50``), else ""."""
+    m = _HH_MM.match(_text(value))
+    return m.group(1) if m else ""
 
 
 def _text(value: Any) -> str:
@@ -369,10 +395,10 @@ def build_full_base(
 
     ``extra`` supplies the title inputs: ``SequenceNumber`` (Season),
     ``DistributionNumber`` (Episode), ``ReleaseDate`` (the fallback for
-    both). A missing ``ReleaseDate`` falls back to the child's own
-    ``self_base['ReleaseDate']`` (never an inherited one); missing
-    ``SequenceNumber``/``DistributionNumber`` mean the numbered pattern
-    cannot fire.
+    both), ``TimeSlot`` (Episode, date form; 0.74.0). A missing
+    ``ReleaseDate`` falls back to the child's own ``self_base['ReleaseDate']``
+    (never an inherited one); missing ``SequenceNumber``/``DistributionNumber``
+    mean the numbered pattern cannot fire.
 
     Returns ``(full_base, provenance)`` where provenance maps each canonical
     field present in the result to ``'self'``, ``'inherited'`` or
@@ -417,6 +443,7 @@ def build_full_base(
             creation_type,
             sequence_number=extra.get("SequenceNumber"),
             distribution_number=extra.get("DistributionNumber"),
+            time_slot=extra.get("TimeSlot"),
             # `full` has not been through the loop yet, so this is the child's
             # OWN date -- which is the point of generating first. `extra`
             # still wins: it is the caller saying "use this date for the
@@ -771,6 +798,7 @@ def _apply_title(
             sequence_number=getattr(full, "sequence_number", None),
             distribution_number=getattr(full, "distribution_number", None),
             release_date=getattr(full, "release_date", None),
+            time_slot=getattr(full, "time_slot", None),
         )
         if not built:
             # Same rule, same failure, same exception as build_full_base -- the

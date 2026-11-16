@@ -408,8 +408,10 @@ _MSG = """<Message xmlns="http://www.eidr.org/schema"
 def test_record_from_xml_builds_the_standard_shape():
     rec = M.record_from_xml(_MSG)
     base = rec["FullMetadata"]["BaseObjectData"]
+    # Alternates under their own key, as in the XML (0.75.0).
     assert base["ResourceName"] == [
-        {"Title": "Pilot", "TitleClass": "release", "_lang": "en"},
+        {"Title": "Pilot", "TitleClass": "release", "_lang": "en"}]
+    assert base["AlternateResourceName"] == [
         {"Title": "Le Pilote", "TitleClass": "translated", "_lang": "fr"}]
     assert base["OriginalLanguage"] == [{"value": "en", "_mode": "Audio"}, "fr"]
     assert base["AssociatedOrg"][0] == {
@@ -479,7 +481,8 @@ def test_a_shortdoi_never_reaches_a_row():
 
 def test_a_sheet_title_carries_no_system_generated_placeholder():
     rec = M.record_from_row(_row(**{"Alternate Title 1": "Other"}), "non_episodic")
-    titles = rec["SelfDefinedMetadata"]["BaseObjectData"]["ResourceName"]
+    base = rec["SelfDefinedMetadata"]["BaseObjectData"]
+    titles = base["ResourceName"] + base["AlternateResourceName"]
     assert [t["Title"] for t in titles] == ["Test Film", "Other"]
     assert all("SystemGenerated" not in t for t in titles)
 
@@ -492,3 +495,154 @@ def test_xml_system_generated_is_kept_only_when_true(attr, want):
                        f'<ResourceName lang="en" titleClass="release"{attr}>')
     main = M.record_from_xml(xml)["FullMetadata"]["BaseObjectData"]["ResourceName"][0]
     assert main.get("SystemGenerated") == want
+
+
+# ── cell values (MDDF JSON step 3, 2026-11-13) ───────────────────────────────
+
+def test_a_date_cell_is_an_xs_date_not_a_python_datetime_string():
+    # openpyxl gives a date cell as a datetime; str() made "2020-01-01 00:00:00",
+    # which is not an xs:date and reached generated titles as such.
+    from datetime import date, datetime
+
+    rec = M.record_from_row(_row(**{"Release Date": datetime(2020, 1, 1)}), "non_episodic")
+    assert rec["SelfDefinedMetadata"]["BaseObjectData"]["ReleaseDate"] == "2020-01-01"
+    assert M._text(datetime(2020, 1, 1, 21, 25)) == "2020-01-01T21:25:00"
+    assert M._text(date(2020, 1, 1)) == "2020-01-01"
+
+
+# ── titles: an alternate is never the main title (operator, 2026-11-15) ──────
+# "For child records, you can have only an Alternate Title, which must remain
+# an Alternate Title ... if the main title is missing, you do not promote the
+# Alternate." Until 0.75.0 alternates shared the ResourceName list, where
+# entry 0 is the main title, so a blank Title promoted the first alternate:
+# a plausible record, wrong only in which title is which.
+
+def test_a_row_with_only_an_alternate_title_keeps_it_an_alternate():
+    row = _row(**{"Title": None, "Title Language": None, "Title Class": None,
+                  "Referent Type": "TV", "Alternate Title 1": "Le Pilote",
+                  "Alt Title Language 1": "fr", "Alt Title Class 1": "translated"})
+    base = M.record_from_row(row, "episodic")["SelfDefinedMetadata"]["BaseObjectData"]
+    assert "ResourceName" not in base
+    assert base["AlternateResourceName"] == [
+        {"Title": "Le Pilote", "TitleClass": "translated", "_lang": "fr"}]
+    back = M.row_from_blocks(base, {}, "episodic")
+    assert back.get("Title") is None
+    assert back["Alternate Title 1"] == "Le Pilote"
+
+
+def test_registry_xml_with_only_an_alternate_keeps_it_an_alternate():
+    # The shape of 10.5240/4D28-...-H's SelfDefined (2,711 such in the mirror).
+    xml = _MSG.replace(
+        '<SelfDefinedMetadata><BaseObjectData><ID>10.5240/AAAA-0000-0000-0000-0000-A</ID>\n'
+        '<StructuralType>Abstraction</StructuralType>\n'
+        '<ResourceName lang="en" titleClass="release">Pilot</ResourceName>',
+        '<SelfDefinedMetadata><BaseObjectData><ID>10.5240/AAAA-0000-0000-0000-0000-A</ID>\n'
+        '<StructuralType>Abstraction</StructuralType>\n'
+        '<AlternateResourceName lang="fr">Le Pilote</AlternateResourceName>')
+    base = M.record_from_xml(xml)["SelfDefinedMetadata"]["BaseObjectData"]
+    assert "ResourceName" not in base
+    row = M.row_from_blocks(base, {}, "episodic")
+    assert row.get("Title") is None and row["Alternate Title 1"] == "Le Pilote"
+
+
+def test_an_empty_main_entry_does_not_promote_the_next_title():
+    # The one-list shape some callers still build: entry 0 is the main title
+    # even when it has no text; entries 1..n are alternates.
+    base = {"ResourceName": [{"TitleClass": "release"}, {"Title": "Alt", "_lang": "en"}]}
+    row = M.row_from_blocks(base, {}, "non_episodic")
+    assert row.get("Title") is None and row["Alternate Title 1"] == "Alt"
+
+
+# ── no empty elements, no duplicate values (operator, 2026-11-15) ────────────
+
+def test_xml_empty_elements_and_repeated_values_are_not_read():
+    xml = _MSG.replace('<Description lang="en">A test</Description>',
+                       '<Description lang="en"></Description>'
+                       '<VersionLanguage mode="Audio">en</VersionLanguage>'
+                       '<VersionLanguage mode="Visual">en</VersionLanguage>'
+                       '<VersionLanguage mode="Audio" type="primary">en</VersionLanguage>')
+    xml = xml.replace('<SequenceInfo>', '<EpisodeClass>Segment</EpisodeClass>'
+                      '<EpisodeClass>Segment</EpisodeClass><SequenceInfo>')
+    full = M.record_from_xml(xml)["FullMetadata"]
+    base = full["BaseObjectData"]
+    assert "Description" not in base
+    # Same code, two modes: two values. Same code and mode: one (type unread).
+    assert base["VersionLanguage"] == [{"value": "en", "_mode": "Audio"},
+                                       {"value": "en", "_mode": "Visual"}]
+    assert full["ExtraObjectMetadata"]["EpisodeInfo"]["EpisodeClass"] == ["Segment"]
+
+
+def test_sheet_empty_details_and_repeated_classes_are_not_read():
+    row = _row(**{"Referent Type": "TV", "Edit Class 1": "Original", "Edit Class 2": "Original",
+                  "Edit Details Domain 1": "x.org", "Description Language": "en"})
+    rec = M.record_from_row(row, "edit")["SelfDefinedMetadata"]
+    info = rec["ExtraObjectMetadata"]["EditInfo"]
+    assert info["EditClass"] == ["Original"] and "Details" not in info
+    assert "Description" not in rec["BaseObjectData"]
+
+
+@pytest.mark.parametrize("template,column,where,key", [
+    ("episodic", "Season Class", "SeasonInfo", "SeasonClass"),
+    ("episodic", "Episode Class", "EpisodeInfo", "EpisodeClass"),
+    ("manifestation", "Manif Class", "ManifestationInfo", "ManifestationClass"),
+    ("manifestation", "Made for Region", "ManifestationInfo", "MadeForRegion"),
+    ("edit", "Made for Region", "EditInfo", "MadeForRegion"),
+])
+def test_every_class_family_drops_a_repeated_value(template, column, where, key):
+    rt = {"SeasonInfo": "Season"}.get(where, "TV")
+    row = _row(**{"Referent Type": rt, f"{column} 1": "X", f"{column} 2": "X",
+                  f"{column} 3": "Y"})
+    extra = M.record_from_row(row, template)["SelfDefinedMetadata"]["ExtraObjectMetadata"]
+    assert extra[where][key] == ["X", "Y"]
+
+
+def test_xml_original_language_is_one_entry_per_code_and_mode():
+    xml = _MSG.replace('<OriginalLanguage mode="Audio">en</OriginalLanguage>',
+                       '<OriginalLanguage mode="Audio" type="primary">en</OriginalLanguage>'
+                       '<OriginalLanguage mode="Audio">en</OriginalLanguage>')
+    base = M.record_from_xml(xml)["FullMetadata"]["BaseObjectData"]
+    assert base["OriginalLanguage"] == [{"value": "en", "_mode": "Audio"}, "fr"]
+
+
+def test_xml_details_and_titles_without_text_are_not_read():
+    xml = _MSG.replace('<SequenceInfo>', '<EditDetails domain="x.org"/>'
+                       '<EditDetails domain="y.org">  </EditDetails>'
+                       '<EditDetails domain="z.org">Kept</EditDetails><SequenceInfo>')
+    xml = xml.replace('<Description lang="en">A test</Description>',
+                      '<Description lang="en">   </Description>'
+                      '<AlternateResourceName lang="de" titleClass="FKA"/>')
+    full = M.record_from_xml(xml)["FullMetadata"]
+    assert full["ExtraObjectMetadata"]["EpisodeInfo"]["Details"] == [
+        {"Details": "Kept", "Domain": "z.org"}]
+    base = full["BaseObjectData"]
+    assert "Description" not in base
+    assert all(t.get("Title") for t in base.get("AlternateResourceName", []))
+
+
+def test_row_titles_take_entry_0_before_any_filtering_and_accept_one_alternate_dict():
+    row = M.row_from_blocks({"ResourceName": ["M", {"Title": "A"}],
+                             "AlternateResourceName": {"Title": "B", "_lang": "fr"}},
+                            {}, "non_episodic")
+    assert row["Title"] == "M"
+    assert (row["Alternate Title 1"], row["Alternate Title 2"]) == ("A", "B")
+    assert row["Alt Title Language 2"] == "fr"
+
+
+def test_a_title_without_text_writes_no_class_or_language():
+    row = M.row_from_blocks({"ResourceName": [{"TitleClass": "release", "_lang": "en"}],
+                             "AlternateResourceName": [{"TitleClass": "FKA", "_lang": "fr"},
+                                                       {"Title": "Alt"}]},
+                            {}, "non_episodic")
+    assert row.get("Title Class") is None and row.get("Title Language") is None
+    assert row["Alternate Title 1"] == "Alt" and row.get("Alt Title Class 1") is None
+
+
+def test_drop_withholds_only_a_generated_main_title():
+    base = {"ResourceName": [{"Title": "Mine"}],
+            "AlternateResourceName": [{"Title": "Alt", "SystemGenerated": "true"}]}
+    row = M.row_from_blocks(base, {}, "non_episodic", system_titles="drop")
+    assert row["Title"] == "Mine" and row["Alternate Title 1"] == "Alt"
+    base = {"ResourceName": [{"Title": "Gen", "SystemGenerated": "true"}],
+            "AlternateResourceName": [{"Title": "Alt"}]}
+    row = M.row_from_blocks(base, {}, "non_episodic", system_titles="drop")
+    assert row.get("Title") is None and row["Alternate Title 1"] == "Alt"

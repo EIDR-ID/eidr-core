@@ -272,6 +272,17 @@ def system_generated_title(
     but each step needs only the parent's FULL record — never a walk to the
     root.
 
+    The title class is ``series numeric`` for the two numbered forms and
+    ``series date`` for the two bracket forms, as the registry writes them:
+    measured over every generated title in the mirror on 2026-11-15 (Season
+    numbered 87,347, bracket 1,461; Episode numbered 809,428, bracket 1,601;
+    0 exceptions), and over 75,296 of the registry's own XML records. Until
+    0.75.0 an Episode got ``season numeric``, which is not in the schema's
+    titleClass enumeration, and a dated Season ``series numeric``.
+
+    The title's language is not decided here: the adapters copy the
+    IMMEDIATE parent's main-title language (see :func:`build_full_base`).
+
     Deliberately NOT consulted: ``HouseSequence``. XML_to_JSON fell back to
     it for the episode number, which is not in the registry's rules — an
     episode with a house sequence but no distribution number would get a
@@ -287,18 +298,18 @@ def system_generated_title(
         if seq:
             return f"{title}: Season {seq}", "series numeric"
         date = _text(release_date)
-        return (f"{title} [{date}]", "series numeric") if date else None
+        return (f"{title} [{date}]", "series date") if date else None
 
     if creation_type == "Episode":
         dist = _text(distribution_number)
         if dist:
-            return f"{title}: Episode {dist}", "season numeric"
+            return f"{title}: Episode {dist}", "series numeric"
         date = _text(release_date)
         if not date:
             return None
         slot = _hh_mm(time_slot)
         stamp = f"{date} {slot}" if slot else date
-        return f"{title} [{stamp}]", "season numeric"
+        return f"{title} [{stamp}]", "series date"
 
     return None
 
@@ -316,8 +327,49 @@ def _text(value: Any) -> str:
     return "" if value is None else str(value).strip()
 
 
+def _items(titles: Any) -> list:
+    if is_absent(titles):
+        return []
+    return list(titles) if isinstance(titles, (list, tuple)) else [titles]
+
+
+def _is_generated(item: Any) -> bool:
+    if isinstance(item, dict):
+        return str(item.get("SystemGenerated")).strip().lower() == "true"
+    return bool(getattr(item, "system_generated", False))
+
+
+def _title_text(item: Any) -> str:
+    if isinstance(item, dict):
+        return _text(item.get("Title") if item.get("Title") is not None
+                     else item.get("value"))
+    if hasattr(item, "text"):
+        return _text(item.text)
+    return _text(item)
+
+
+def _split_titles(titles: Any) -> tuple[Any, list]:
+    """``(main title, alternates)`` from a title list, in either shape.
+
+    The main title is entry 0 of a list of dicts, whatever its text: an
+    alternate is never promoted to main (operator, 2026-11-15: "if the main
+    title is missing, you do not promote the Alternate"). For record objects
+    that carry ``is_resource`` (BMR-Review's model), the main title is the
+    element marked ``is_resource`` and there may be none; for objects without
+    the attribute, entry 0 as for dicts.
+    """
+    items = _items(titles)
+    if not items:
+        return None, []
+    if not isinstance(items[0], dict) and any(hasattr(t, "is_resource") for t in items):
+        mains = [t for t in items if getattr(t, "is_resource", False)]
+        main = mains[0] if mains else None
+        return main, [t for t in items if t is not main]
+    return items[0], items[1:]
+
+
 def has_user_supplied_title(titles: Any) -> bool:
-    """Does this ResourceName value carry a title the SUBMITTER provided?
+    """Does this ResourceName value carry a MAIN title the SUBMITTER provided?
 
     Only a user-supplied title blocks inheritance or regeneration. A
     system-generated one does not: the registry produced it, not the
@@ -326,23 +378,55 @@ def has_user_supplied_title(titles: Any) -> bool:
     than destructive. Operator, 2026-08-30 -- "only Resource Name can be
     inherited (if it is not provided or system-generated)".
 
+    Only the MAIN title counts (0.75.0; see :func:`_split_titles` for which
+    one that is). An alternate title never blocks: "For child records, you
+    can have only an Alternate Title, which must remain an Alternate Title.
+    The main title will be inherited or system generated, as normal"
+    (operator, 2026-11-15). Until 0.75.0 any non-generated entry blocked, so
+    a child with a stale generated title plus one alternate (8,766 in the
+    mirror) kept the stale title, and an alt-only child kept its alternate
+    as its title.
+
     Accepts either shape: registry-JSON title dicts (``SystemGenerated`` is
     the string ``"true"``) or record objects with a ``system_generated``
-    attribute. Anything unrecognised counts as user-supplied, because the
-    safe error is to PRESERVE a title rather than overwrite one.
+    attribute. A main title with no text is no title. Anything unrecognised
+    counts as user-supplied, because the safe error is to PRESERVE a title
+    rather than overwrite one.
     """
-    if is_absent(titles):
+    main, _ = _split_titles(titles)
+    if main is None:
         return False
-    items = titles if isinstance(titles, (list, tuple)) else [titles]
-    for item in items:
-        if isinstance(item, dict):
-            flag = item.get("SystemGenerated")
-            generated = str(flag).strip().lower() == "true"
-        else:
-            generated = bool(getattr(item, "system_generated", False))
-        if not generated:
-            return True          # at least one real title -> blocks
-    return False
+    if isinstance(main, dict) or hasattr(main, "text"):
+        return bool(_title_text(main)) and not _is_generated(main)
+    return not _is_generated(main)
+
+
+def _split_base_titles(base: dict) -> None:
+    """Move ResourceName entries 1..n to ``AlternateResourceName``, in place.
+
+    The JSON adapter's output keeps the two title fields apart, as the
+    registry XML does (0.75.0): ``ResourceName`` holds the main title only,
+    ``AlternateResourceName`` the alternates. Callers that still build the
+    older one-list shape (main first, alternates after) are accepted; their
+    alternates come back under their own key, ahead of any already there.
+
+    A main entry with no title text is removed, not promoted over: it is an
+    empty element, which EIDR does not allow (operator, 2026-11-15), and an
+    entry the provenance map would otherwise leave out.
+    """
+    titles = base.get("ResourceName")
+    if titles is None:
+        return
+    items = list(titles) if isinstance(titles, (list, tuple)) else [titles]
+    main, extra = (items[0], [t for t in items[1:] if t is not None]) if items else (None, [])
+    if main is not None and _title_text(main):
+        base["ResourceName"] = [main]
+    else:
+        base.pop("ResourceName", None)
+    if extra:
+        alts = base.get("AlternateResourceName")
+        alts = list(alts) if isinstance(alts, (list, tuple)) else ([alts] if alts else [])
+        base["AlternateResourceName"] = extra + alts
 
 
 def is_absent(value: Any) -> bool:
@@ -393,6 +477,16 @@ def build_full_base(
     self-defined one) — inheritance is one hop, because the parent's full
     record already carries whatever IT inherited.
 
+    Titles (0.75.0): the result's ``ResourceName`` is the main title only and
+    ``AlternateResourceName`` holds the child's own alternates, which are
+    never inherited and never replaced by a generated or inherited main
+    title. A one-list ``ResourceName`` (main first) is still accepted; its
+    alternates come back under ``AlternateResourceName``. Only the parent's
+    MAIN title (ResourceName entry 0) is ever used, for generation or
+    inheritance; until 0.75.0 an Edit inherited the parent's whole list,
+    alternates included, which the registry never does (0 of 564,425
+    mirror records with alternates show a parent's alternate).
+
     ``extra`` supplies the title inputs: ``SequenceNumber`` (Season),
     ``DistributionNumber`` (Episode), ``ReleaseDate`` (the fallback for
     both), ``TimeSlot`` (Episode, date form; 0.74.0). A missing
@@ -407,6 +501,11 @@ def build_full_base(
     """
     extra = extra or {}
     full: dict = copy.deepcopy(self_base or {})
+    # One representation in the output: ResourceName is the main title only,
+    # AlternateResourceName the alternates (0.75.0). A one-list input has
+    # its entries 1..n moved; entry 0 is the main title, and one with no
+    # text is dropped rather than replaced by an alternate.
+    _split_base_titles(full)
     # A system-generated ResourceName is not "self" -- the submitter did not
     # supply it. Left unset here; the construction block below marks it.
     prov: dict[str, str] = {
@@ -452,11 +551,19 @@ def build_full_base(
         )
         if built:
             text, title_class = built
-            full["ResourceName"] = [{
-                "Title": text,
-                "TitleClass": title_class,
-                "SystemGenerated": "true",
-            }]
+            made = {"Title": text, "TitleClass": title_class}
+            # The IMMEDIATE parent's main-title language, written only when
+            # it has one (absent fields stay absent). The registry does this
+            # for 899,829 of 899,837 generated titles (the 8 others are stale
+            # records), including all 6,987 Episodes under a user-titled
+            # Season whose language differs from the Series' (mirror,
+            # 2026-11-15). Until 0.75.0 a generated title had no language,
+            # which the schema requires.
+            lang = _text((_main_title(parent_base) or {}).get("_lang"))
+            if lang:
+                made["_lang"] = lang
+            made["SystemGenerated"] = "true"
+            full["ResourceName"] = [made]
             prov["ResourceName"] = "system"
         else:
             # RULE 2 says this is impossible. Reaching it means the parent has
@@ -510,6 +617,12 @@ def build_full_base(
         elif not _is_empty(full.get(field)):
             continue
         pv = parent_base.get(field)
+        if field == "ResourceName":
+            # The parent's MAIN title only: a child never acquires its
+            # parent's alternates (NEVER_INHERITED), and a parent in the
+            # one-list shape carries them in this field.
+            main = _main_title(parent_base)
+            pv = [main] if main is not None and _title_text(main) else None
         if _is_empty(pv):
             continue
         full[field] = copy.deepcopy(pv)
@@ -562,18 +675,26 @@ def _without_generated(titles: Any) -> list:
     return kept
 
 
+def _main_title(base: dict | None) -> dict | None:
+    """The main-title entry (ResourceName entry 0) of a BaseObjectData dict."""
+    if not base:
+        return None
+    main, _ = _split_titles(base.get("ResourceName"))
+    return main if isinstance(main, dict) else None
+
+
 def _best_title(base: dict | None) -> str:
-    """First non-empty ResourceName title string in a BaseObjectData dict."""
+    """The parent's MAIN title text (ResourceName entry 0), or "".
+
+    Until 0.75.0 this was the first entry with text, so a parent whose main
+    title was empty lent its first alternate (operator, 2026-11-15: an
+    alternate is never promoted). The mirror has one such parent, an alias
+    with no titles at all.
+    """
     if not base:
         return ""
-    titles = base.get("ResourceName") or []
-    if not isinstance(titles, list):
-        titles = [titles]
-    for t in titles:
-        value = t.get("Title") if isinstance(t, dict) else t
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    return ""
+    main, _ = _split_titles(base.get("ResourceName"))
+    return _title_text(main) if main is not None else ""
 
 
 # ---------------------------------------------------------------------------
@@ -635,6 +756,12 @@ def build_full_record(
     attrs = attrs or RECORD_ATTRS
     full = copy.deepcopy(self_rec)
     ctype = creation_type or getattr(full, "creation_type", None) or ""
+    # A main title element with no text is an empty element, not a title
+    # (0.75.0, as build_full_base): removed, never replaced by an alternate.
+    main, _ = _split_titles(getattr(full, "titles", None))
+    if main is not None and not _title_text(main):
+        with contextlib.suppress(Exception):
+            full.titles = [t for t in full.titles if t is not main]
 
     # A record this builder has ALREADY built carries its own provenance, and
     # presence alone cannot distinguish "the submitter supplied it" from "an
@@ -785,6 +912,9 @@ def _apply_title(
     if not hasattr(full, "titles"):
         return None
     titles = full.titles or []
+    # The child's own alternates survive whatever happens to its main title
+    # (0.75.0): generation and inheritance replace the main title only.
+    _, alternates = _split_titles(titles)
 
     if ctype in TITLE_EXEMPT_TYPES:
         # A USER-SUPPLIED title is kept. A system-generated one is not the
@@ -816,7 +946,7 @@ def _apply_title(
         text, title_class = built
         made = _clone_title(parent_full, text, title_class)
         if made is not None:
-            full.titles = [made]
+            full.titles = [made] + list(alternates)
             prov["ResourceName"] = "system"
         return None
 
@@ -828,23 +958,23 @@ def _apply_title(
     # adapter but NOT through this one -- the exact cross-adapter divergence
     # this module exists to prevent, caught by a cross-shape probe.
     if ctype not in TITLE_EXEMPT_TYPES and not has_user_supplied_title(titles):
-        parent_titles = getattr(parent_full, "titles", None) or []
-        if parent_titles:
-            inherited = copy.deepcopy(parent_titles)
-            for element in inherited:
-                if hasattr(element, "self_defined"):
-                    element.self_defined = False
-            full.titles = inherited
+        # The parent's MAIN title only, as in build_full_base: until 0.75.0
+        # the whole list was copied, alternates included, and the child's own
+        # alternates were dropped.
+        parent_main, _ = _split_titles(getattr(parent_full, "titles", None))
+        if parent_main is not None and _title_text(parent_main):
+            inherited = copy.deepcopy(parent_main)
+            if hasattr(inherited, "self_defined"):
+                inherited.self_defined = False
+            full.titles = [inherited] + list(alternates)
             prov["ResourceName"] = "inherited"
     return None
 
 
 def _best_record_title(rec: Any) -> str:
-    for title in getattr(rec, "titles", None) or []:
-        text = getattr(title, "text", None)
-        if isinstance(text, str) and text.strip():
-            return text.strip()
-    return ""
+    """The parent's MAIN title text, never an alternate's (0.75.0)."""
+    main, _ = _split_titles(getattr(rec, "titles", None))
+    return _title_text(main) if main is not None else ""
 
 
 def _clone_title(parent_full: Any, text: str, title_class: str) -> Any:
@@ -855,10 +985,10 @@ def _clone_title(parent_full: Any, text: str, title_class: str) -> Any:
     nothing to build and the child stays untitled — which the title
     comparator already handles by dropping the field.
     """
-    template = None
-    for title in getattr(parent_full, "titles", None) or []:
-        template = title
-        break
+    # The parent's MAIN title is the template, so the generated title takes
+    # its language (the registry's rule; see build_full_base) and never an
+    # alternate's (0.75.0: until then the first element, whatever it was).
+    template, _ = _split_titles(getattr(parent_full, "titles", None))
     if template is None:
         return None
     made = copy.deepcopy(template)

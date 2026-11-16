@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.74.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.75.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,53 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.75.0 (2026-11-15)
+
+Behaviour fixes from the operator's notes of 2026-11-15 and the MDDF JSON
+step-3 findings. No new public name; a consumer will notice changed values
+and one changed record shape.
+
+* **Generated titles match the registry.** `inheritance.system_generated_title`
+  returns title class `series numeric` for the two numbered forms and
+  `series date` for the two bracket forms (was `season numeric` for every
+  Episode, which is not in the schema's enumeration, and `series numeric` for
+  a dated Season). Measured over every generated title in the mirror, 0
+  exceptions. Both builders now give the generated title the IMMEDIATE
+  parent's main-title language (`_lang` / `lang`), only when it has one; until
+  now `build_full_base` wrote none, which the schema requires.
+* **An alternate title stays an alternate** (operator: "if the main title is
+  missing, you do not promote the Alternate"). The registry-JSON shape keeps
+  the two title fields apart, as the XML does: `ResourceName` is the main
+  title only, `AlternateResourceName` the alternates.
+  * `bmr_map.record_from_row` and `record_from_xml` return alternates under
+    `AlternateResourceName` (was: appended to the `ResourceName` list, so a
+    blank Title, or a SelfDefined block with only an alternate, put that
+    alternate where every reader takes the main title from).
+  * `row_from_blocks` takes `Title` from ResourceName entry 0 only and never
+    promotes an alternate; it reads `AlternateResourceName` and, for the
+    older one-list shape, ResourceName entries 1..n.
+  * `build_full_base` returns the split shape (a one-list input has its
+    entries 1..n moved to `AlternateResourceName`), inherits or generates the
+    main title only, keeps the child's own alternates, and never copies a
+    parent's alternates (an Edit used to inherit the parent's whole list).
+  * `has_user_supplied_title` looks at the main title only: an alternate no
+    longer blocks inheritance or regeneration. For record objects with
+    `is_resource`, the main title is the element so marked (BMR-Review's
+    model defaults it to False, so a title built without it is an
+    alternate). Provenance moves with it: an alt-only child's ResourceName is
+    now `inherited` or `system`, not `self`.
+  * `build_full_record` replaces only the main title and keeps the child's
+    alternates; it inherits the parent's main title element only.
+* **No empty elements, no duplicate values** (operator). `record_from_xml`
+  no longer reads a Description or a Details element without text (the
+  registry holds 1,351 and 1,525), drops a repeated class value (`Segment,
+  Segment` on 9 Episodes), and keeps one language entry per (code, mode).
+  `record_from_row` writes no Description that is only a language, no
+  Details group without text, and no repeated class or region value.
+* **A spreadsheet date cell is an xs:date**: `bmr_map` reads a midnight
+  `datetime` cell as `2020-01-01` (was `2020-01-01 00:00:00`, which reached
+  generated titles); any other `datetime` as `2020-01-01T21:25:00`.
 
 ### 0.74.0 (2026-11-13)
 
@@ -808,7 +855,7 @@ edition's Changes entry.
 | [`eidr_core.bmr_map.header_base`](#header_base) | function | Strips the group number from a family column header, so template columns compare with `PRODUCED_BASES`. |
 | [`eidr_core.bmr_map.record_from_row`](#record_from_row) | function | Builds the self-defined record a row describes. |
 | [`eidr_core.bmr_map.record_from_xml`](#record_from_xml) | function | Builds the standard record (the shape XML_to_JSON builds from the mirror, which `row_from_record` takes) from registry XML, on the standard library's ElementTree, so `bmr_map` stays vendorable. |
-| [`eidr_core.bmr_map.row_from_blocks`](#row_from_blocks) | function | Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title; Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line; `Language Mode N` only from the template's own language family (Original Language on Abstraction templates, Version Language on Edit and Manifestation, none on Clip; 0.51.0). |
+| [`eidr_core.bmr_map.row_from_blocks`](#row_from_blocks) | function | Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title and an alternate is never promoted into `Title` (0.75.0; alternates from `AlternateResourceName`, or ResourceName entries 1..n in the older one-list shape); Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line; `Language Mode N` only from the template's own language family (Original Language on Abstraction templates, Version Language on Edit and Manifestation, none on Clip; 0.51.0). |
 | [`eidr_core.bmr_map.row_from_record`](#row_from_record) | function | Maps a whole record with the documented defaults: exactly what XML_to_JSON's `--sheet-out` did per record, minus the `Unique Row ID` column and the echo of an unconvertible row, which stay with the caller. |
 | [`eidr_core.bmr_map.select_blocks`](#select_blocks) | function | Picks the blocks a sheet is built from: `SelfDefinedMetadata`, so values the record does not define itself stay empty on the sheet. |
 | [`eidr_core.bmr_map.NEVER_PRODUCED`](#never_produced-constant) | constant | the template columns this module never writes, each for a stated reason: `Unique Row ID` (the caller's), `Assigned EIDR ID` and `Registration Errors & Notes` (the registry's and the reviewer's), `Metadata Authority` (the display name; only the Party ID column is written), `Operator's Notes` (written on Manifestation only). |
@@ -981,7 +1028,7 @@ edition's Changes entry.
 | [`eidr_core.ids.USER_ID_SUFFIX`](#user_id_suffix-constant) | constant | Regex source string for the username after `10.5238/`: 3 to 32 characters from `0-9 a-z A-Z _ # . |
 | [`eidr_core.inheritance.build_full_base`](#build_full_base) | function | Builds a child's full registry-JSON `BaseObjectData` from its self-defined one plus its parent's full one. |
 | [`eidr_core.inheritance.build_full_record`](#build_full_record) | function | Builds a child's full record object from its self-defined one and its parent's full record, by the `build_full_base` policy. |
-| [`eidr_core.inheritance.has_user_supplied_title`](#has_user_supplied_title) | function | Tells whether a ResourceName value carries at least one title the submitter supplied, as opposed to a system-generated one. |
+| [`eidr_core.inheritance.has_user_supplied_title`](#has_user_supplied_title) | function | Tells whether a ResourceName value's main title was supplied by the submitter. |
 | [`eidr_core.inheritance.is_absent`](#is_absent) | function | Applies the portfolio's emptiness rule, deciding whether a value is absent for inheritance purposes. |
 | [`eidr_core.inheritance.provenance`](#provenance) | function | Returns the per-field provenance map `build_full_record` attached to a record. |
 | [`eidr_core.inheritance.system_generated_title`](#system_generated_title) | function | Builds the registry's system-generated title for a Season or Episode from the parent's title plus a number or a date. |
@@ -4036,9 +4083,9 @@ Defined in `src/eidr_core/inheritance/__init__.py`.
 **Returns** `tuple[dict, dict[str, str]]` -- `(full_base, provenance)`: a new dict, and a map from each field populated in the result to `'self'`, `'inherited'` or `'system'`. A system-generated ResourceName that was carried over rather than built here has no entry.
 <!-- /dict -->
 
-**Does.** Builds a child's full registry-JSON `BaseObjectData` from its self-defined one plus its parent's full one. For a Season or Episode without a user-supplied ResourceName it first generates the title from the number or date in `extra` (or the child's own `ReleaseDate`), then copies from the parent every `INHERITABLE_FIELDS` value the child lacks (per `is_absent`). Edit, Clip and Manifestation inherit the parent's ResourceName unless they carry a user-supplied one; Season and Episode never inherit it. Raises `TitleConstructionError`, after inheritance has run and with `partial` and `provenance` attached, when a Season or Episode title cannot be built (parent untitled, or the child has no number and no date of its own).
+**Does.** Builds a child's full registry-JSON `BaseObjectData` from its self-defined one plus its parent's full one. For a Season or Episode without a user-supplied ResourceName it first generates the title from the number or date in `extra` (or the child's own `ReleaseDate`), then copies from the parent every `INHERITABLE_FIELDS` value the child lacks (per `is_absent`). Edit, Clip and Manifestation inherit the parent's ResourceName unless they carry a user-supplied one; Season and Episode never inherit it. Titles (0.75.0): the result keeps the main title in `ResourceName` and the child's own alternates in `AlternateResourceName` (a one-list input comes back split); only the parent's MAIN title (ResourceName entry 0) is used, for generation or inheritance, and a parent's alternates are never copied. Raises `TitleConstructionError`, after inheritance has run and with `partial` and `provenance` attached, when a Season or Episode title cannot be built (parent untitled, or the child has no number and no date of its own).
 
-**Notes.** A Season or Episode with no number and no date of its own does NOT borrow the parent's date for its title; it raises, because every sibling would otherwise get the same title. The generated element is `{"Title": ..., "TitleClass": "series numeric" or "season numeric", "SystemGenerated": "true"}`. `ExtraObjectMetadata` belongs to the caller and is not touched.
+**Notes.** A Season or Episode with no number and no date of its own does NOT borrow the parent's date for its title; it raises, because every sibling would otherwise get the same title. The generated element is `{"Title": ..., "TitleClass": "series numeric" or "series date", "_lang": <the immediate parent's main-title language>, "SystemGenerated": "true"}`, with `_lang` left out when that title has none (0.75.0). `ExtraObjectMetadata` belongs to the caller and is not touched.
 
 ### `build_full_record`
 
@@ -4059,7 +4106,7 @@ Defined in `src/eidr_core/inheritance/__init__.py`.
 **Returns** `Any` -- A deep copy of `self_rec` with inherited values filled in and the provenance map attached as the attribute `eidr_provenance` (read it with `provenance()`).
 <!-- /dict -->
 
-**Does.** Builds a child's full record object from its self-defined one and its parent's full record, by the `build_full_base` policy. Title inputs come from the child's `sequence_number`, `distribution_number`, `release_date` and (0.74.0) `time_slot` attributes, each optional; a generated title is a deep copy of the parent's first title element with `text`, `title_class`, `system_generated=True`, `self_defined=False` and `is_resource=True` set where the class has them. Elements of the list attributes get `self_defined` stamped (False when inherited, otherwise `not system_generated`, and an existing explicit False is kept), so running it again over an already-built cached record does not promote inherited values to self-defined. Raises `TitleConstructionError` as `build_full_base` does, after inheritance, with `partial` and `provenance` attached.
+**Does.** Builds a child's full record object from its self-defined one and its parent's full record, by the `build_full_base` policy. Title inputs come from the child's `sequence_number`, `distribution_number`, `release_date` and (0.74.0) `time_slot` attributes, each optional; a generated title is a deep copy of the parent's MAIN title element (the one marked `is_resource`, else the first; 0.75.0) with `text`, `title_class`, `system_generated=True`, `self_defined=False` and `is_resource=True` set where the class has them, so it takes that title's `lang`. Generation and inheritance replace the main title only and keep the child's own alternates; an inherited title is the parent's main title element only (0.75.0; the whole list, alternates included, until then). Elements of the list attributes get `self_defined` stamped (False when inherited, otherwise `not system_generated`, and an existing explicit False is kept), so running it again over an already-built cached record does not promote inherited values to self-defined. Raises `TitleConstructionError` as `build_full_base` does, after inheritance, with `partial` and `provenance` attached.
 
 **Notes.** When the record has no `titles` attribute at all, title handling is skipped. `titles=None` is treated as untitled (since 0.68.0; it was skipped silently), so a title is generated or inherited, or `TitleConstructionError` raised, exactly as `build_full_base` does. A field whose attribute is missing on either record is skipped silently. If the object cannot take the `eidr_provenance` attribute (slotted or frozen), the map is dropped silently and `provenance()` returns `{}`. A `ResourceName` entry in a custom `attrs` is ignored (since 0.68.0): titles are built only by the title logic, so the parent's title no longer leaks into `exc.partial` and a system-generated title is no longer reported as `'self'`.
 
@@ -4076,10 +4123,10 @@ Defined in `src/eidr_core/inheritance/__init__.py`.
 |---|---|---|---|
 | `titles` | `Any` | required | A ResourceName value: a list or tuple of title elements, or one element. A registry-JSON dict is generated when its `SystemGenerated` value reads `true` after `str()`, strip and lower-casing (`'true'`, `'TRUE'` or the bool `True`); an object when its `system_generated` attribute is truthy. An absent value (per `is_absent`) returns `False`. |
 
-**Returns** `bool` -- `True` when at least one element is not system-generated; `False` when the value is absent or every element is system-generated.
+**Returns** `bool` -- `True` when the MAIN title has text and is not system-generated; `False` when there is no main title, it has no text, or it is system-generated. The main title is entry 0 of a list of dicts, or for objects carrying `is_resource` the element so marked (entry 0 for objects without it).
 <!-- /dict -->
 
-**Does.** Tells whether a ResourceName value carries at least one title the submitter supplied, as opposed to a system-generated one. Only a user-supplied title blocks inheritance (Edit, Clip, Manifestation) or regeneration (Season, Episode). Anything unrecognised, including a bare string or a dict without `SystemGenerated`, counts as user-supplied, because preserving a title is the safe error.
+**Does.** Tells whether a ResourceName value's main title was supplied by the submitter. Since 0.75.0 an alternate never counts (operator, 2026-11-15: an alternate must remain an alternate; the main title is inherited or generated); until then any non-generated element did, so `[generated, alternate]` was `True`. Only a user-supplied title blocks inheritance (Edit, Clip, Manifestation) or regeneration (Season, Episode). Anything unrecognised, including a bare string or a dict without `SystemGenerated`, counts as user-supplied, because preserving a title is the safe error.
 
 ### `is_absent`
 
@@ -4135,7 +4182,7 @@ Defined in `src/eidr_core/inheritance/__init__.py`.
 | `release_date` | `Any` | `None` (keyword-only) | Fallback when the number is empty, rendered verbatim as `[<date>]`. Pass the child's OWN date, never an inherited one. |
 | `time_slot` | `Any` | `None` (keyword-only) | Episode TimeSlot (0.74.0). On the dated Episode form only, its `HH:MM` goes inside the brackets: `[<date> <HH:MM>]` (`16:50:00` gives `16:50`). A value that does not read as `HH:MM[:SS]` is ignored. Never used on the numbered form or on a Season. |
 
-**Returns** `tuple[str, str] | None` -- `(title, title_class)`, with title_class `'series numeric'` for a Season and `'season numeric'` for an Episode (date forms included); `None` when no pattern can fire.
+**Returns** `tuple[str, str] | None` -- `(title, title_class)`, with title_class `'series numeric'` for the numbered forms and `'series date'` for the bracket forms, Season and Episode alike (0.75.0; the registry's own classes); `None` when no pattern can fire.
 <!-- /dict -->
 
 **Does.** Builds the registry's system-generated title for a Season or Episode from the parent's title plus a number or a date. The patterns are `<Series Title>: Season <N>`, `<Series Title> [<date>]`, `<Season Title>: Episode <N>` and `<Season Title> [<date>]`, the last as `<Season Title> [<date> <HH:MM>]` when the Episode has a TimeSlot (all 158 such Episodes in the mirror, 2026-11-13). `HouseSequence` is deliberately never consulted, because the registry's rules do not use it. Never raises; the builders turn a `None` into `TitleConstructionError`.
@@ -5487,7 +5534,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 **Returns** `dict` -- `{"CreationType": ..., "SelfDefinedMetadata": {...}}` with absent values pruned (`inheritance.is_absent`).
 <!-- /dict -->
 
-**Does.** Builds the self-defined record a row describes. Every family is read on `bmr_io.family_layout` (a bare header is group 1; companion columns pair by the sheet's own group index). Metadata Authority comes from the Party ID column only. `IMDb`, `ISAN` and `V-ISAN` come back as Alt IDs with Domain `IMDB` / `ISAN`. Languages and countries are de-duplicated and sorted case-insensitively (the BMR-input canonical order); since 0.51.0 the template's own language family comes back with its `Language Mode` as `{"value": lang, "_mode": mode}` (plain string when there is no mode). Every Details group is read, where the reference read group 1 only. Parent references are left as written.
+**Does.** Builds the self-defined record a row describes. Every family is read on `bmr_io.family_layout` (a bare header is group 1; companion columns pair by the sheet's own group index). Metadata Authority comes from the Party ID column only. `IMDb`, `ISAN` and `V-ISAN` come back as Alt IDs with Domain `IMDB` / `ISAN`. Languages and countries are de-duplicated and sorted case-insensitively (the BMR-input canonical order); since 0.51.0 the template's own language family comes back with its `Language Mode` as `{"value": lang, "_mode": mode}` (plain string when there is no mode). Every Details group with text is read, where the reference read group 1 only. Parent references are left as written. Since 0.75.0 the Title cell is the only main title: Alternate Titles come back under `AlternateResourceName`, so a row with a blank Title has no `ResourceName` and its alternate is never promoted; a Description with no text, a Details group with no text and a repeated class or region value are not read; a date cell reads as an xs:date.
 
 ### `row_from_blocks`
 
@@ -5509,7 +5556,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 **Returns** `dict[str, str | None]` -- one row, `{column header: text or None}`, numbered families as `"<base> N"`; never `Unique Row ID`.
 <!-- /dict -->
 
-**Does.** Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title; Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line; `Language Mode N` only from the template's own language family (Original Language on Abstraction templates, Version Language on Edit and Manifestation, none on Clip; 0.51.0). Otherwise the reference's behaviour, row for row (checked against it on real sheets and 20,000 synthetic records, 2026-10-13).
+**Does.** Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title and an alternate is never promoted into `Title` (0.75.0; alternates from `AlternateResourceName`, or ResourceName entries 1..n in the older one-list shape); Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line; `Language Mode N` only from the template's own language family (Original Language on Abstraction templates, Version Language on Edit and Manifestation, none on Clip; 0.51.0). Otherwise the reference's behaviour, row for row (checked against it on real sheets and 20,000 synthetic records, 2026-10-13).
 
 ### `row_from_record`
 
@@ -5592,7 +5639,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 **Returns** `dict` -- `{"SelfDefinedMetadata": {...}, "FullMetadata": {...}}` with whichever blocks the XML carries, in the standard-record shape, absent values pruned.
 <!-- /dict -->
 
-**Does.** Builds the standard record (the shape XML_to_JSON builds from the mirror, which `row_from_record` takes) from registry XML, on the standard library's ElementTree, so `bmr_map` stays vendorable. Values are as the XML states them, not normalised (`PT2H0M` stays `PT2H0M`); ShortDOI Alt IDs are kept (the caller decides); there is no `CreationType`, `DisplayName` or `ProvenanceMetadata`, which the blocks do not carry. Checked before release against XML_to_JSON's mirror export of the same 363 records: 722 of 722 rows equal, apart from the export's own rendering (duration normalisation, dropped ShortDOI, a Self `Status` the SelfDefined XML does not state). Not a substitute: the SDK codec (`eidr.codecs.xml.to_codec_dict`), whose MovieLabs JSON encoding differs in about 40 paths.
+**Does.** Builds the standard record (the shape XML_to_JSON builds from the mirror, which `row_from_record` takes) from registry XML, on the standard library's ElementTree, so `bmr_map` stays vendorable. Values are as the XML states them, not normalised (`PT2H0M` stays `PT2H0M`); ShortDOI Alt IDs are kept (the caller decides); there is no `CreationType`, `DisplayName` or `ProvenanceMetadata`, which the blocks do not carry. Checked before release against XML_to_JSON's mirror export of the same 363 records: 722 of 722 rows equal, apart from the export's own rendering (duration normalisation, dropped ShortDOI, a Self `Status` the SelfDefined XML does not state). Not a substitute: the SDK codec (`eidr.codecs.xml.to_codec_dict`), whose MovieLabs JSON encoding differs in about 40 paths. Since 0.75.0: `AlternateResourceName` elements come back under their own key (a SelfDefined block with only an alternate has no `ResourceName`); an element without text (`<Description lang="en"/>`, a Details element with only a domain) is not read, since EIDR XML allows no empty element; a repeated class value is read once; languages are one entry per (code, mode), the `type` attribute unread.
 
 ## `eidr_core.verdicts`
 

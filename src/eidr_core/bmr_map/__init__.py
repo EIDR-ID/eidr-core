@@ -44,6 +44,7 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable, Mapping
+from datetime import datetime, time
 from typing import Any
 
 from eidr_core.bmr_io import family_layout
@@ -174,12 +175,21 @@ def _template_label(template: str) -> str:
 # --------------------------------------------------------------------------
 
 def _text(v: Any) -> str | None:
-    """A cell's text: None for None or blank, else stripped ``str``."""
+    """A cell's text: None for None or blank, else stripped ``str``.
+
+    A spreadsheet date cell arrives as a ``datetime`` (openpyxl has no
+    date-only type), and ``str()`` gave ``2020-01-01 00:00:00``: not an
+    xs:date, and it reached generated titles (``Show [2020-01-01 00:00:00]``)
+    and XML output as such (found 2026-11-13, MDDF JSON step 3). A midnight
+    datetime is the date; any other is the xs:dateTime spelling (``T``).
+    """
     if v is None:
         return None
     if isinstance(v, str):
         s = v.strip()
         return s if s != "" else None
+    if isinstance(v, datetime):
+        return v.date().isoformat() if v.time() == time(0) else v.isoformat()
     return str(v).strip()
 
 
@@ -309,8 +319,10 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
       caps and reports). A ShortDOI is never written (0.58.0): the registry
       issues it, so it is not part of a submission.
     * Titles: ``ResourceName`` entry 0 is ``Title`` / ``Title Class`` /
-      ``Title Language``; the rest are ``Alternate Title N`` and companions in
-      record order (no re-sort on this path). ``system_titles="drop"``
+      ``Title Language``; ``AlternateResourceName`` (and, in the older
+      one-list shape, ResourceName entries 1..n) are ``Alternate Title N`` and
+      companions in record order (no re-sort on this path). An alternate is
+      never promoted into ``Title`` (0.75.0). ``system_titles="drop"``
       (0.56.0) leaves ``Title`` / ``Title Class`` / ``Title Language`` empty
       when that main title is the registry's own (``SystemGenerated`` true),
       for a sheet that may be registered: a sheet cannot mark a title as
@@ -349,27 +361,42 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
     titles = base.get("ResourceName") or []
     if isinstance(titles, dict):
         titles = [titles]
-    main: tuple[str | None, str | None, str | None] | None = None
-    main_generated = False
-    alt_titles: list[tuple[str | None, str | None, str | None]] = []
-    for t in titles:
-        if not isinstance(t, dict):
-            continue
-        entry = (_text(t.get("Title")) or _text(t.get("value")),
-                 _text(t.get("TitleClass")) or _text(t.get("_titleClass")),
-                 _text(t.get("_lang")))
-        # Entry 0 is the main title, except that an entry with no title text
-        # is passed over (its class and language with it) until one has text;
-        # this is the reference's rule, kept because rows depend on it.
-        if main is None or main[0] is None:
-            main = entry
-            main_generated = str(t.get("SystemGenerated")).strip().lower() == "true"
-        else:
-            alt_titles.append(entry)
+    alternates = base.get("AlternateResourceName") or []
+    if isinstance(alternates, dict):
+        alternates = [alternates]
+
+    def _entry(t: Any) -> tuple[str | None, str | None, str | None] | None:
+        # A title with no text writes no cells at all: its class and language
+        # alone would be an empty element (operator, 2026-11-15), and they
+        # vanish on the next round trip anyway.
+        if isinstance(t, str):
+            return (_text(t), None, None) if _text(t) else None
+        if not isinstance(t, Mapping):
+            return None
+        text = _text(t.get("Title")) or _text(t.get("value"))
+        if text is None:
+            return None
+        return (text, _text(t.get("TitleClass")) or _text(t.get("_titleClass")),
+                _text(t.get("_lang")))
+
+    # The main title is ResourceName entry 0 and nothing else. An alternate
+    # is never promoted into Title: a record with only alternates leaves
+    # Title empty (operator, 2026-11-15: "if the main title is missing, you do
+    # not promote the Alternate"). Until 0.75.0 an entry with no text was
+    # passed over until one had text, which promoted the first alternate.
+    # Alternates are AlternateResourceName (0.75.0) plus, for a record in the
+    # one-list shape some callers still build, ResourceName entries 1..n.
+    # Entry 0 BEFORE any filtering: filtering first made entry 1 (an
+    # alternate in the one-list shape) the main title when entry 0 was not a
+    # dict.
+    main = _entry(titles[0]) if titles else None
+    main_generated = bool(titles) and isinstance(titles[0], Mapping) and \
+        str(titles[0].get("SystemGenerated")).strip().lower() == "true"
+    alt_titles = [e for e in (_entry(t) for t in list(titles[1:]) + list(alternates))
+                  if e is not None]
     if system_titles == "drop" and main_generated:
-        # Withheld AFTER choosing the main title, so the next title (an
-        # alternate) is not promoted into Title (BMR-Review measured that
-        # trap on 2 of 681 records).
+        # The registry's own title is withheld; the alternates stay where
+        # they are (BMR-Review measured the promotion trap on 2 of 681).
         main = None
     if main is not None and main[0] is not None:
         row["Title"] = main[0]
@@ -662,6 +689,16 @@ def _values(row: Mapping[str, Any], family: str) -> list[str]:
     return [v for g in _groups(row, [family]) if (v := g.get(family)) is not None]
 
 
+def _classes(row: Mapping[str, Any], family: str) -> list[str]:
+    """A class or region family with repeats removed, first occurrence kept.
+
+    EIDR allows no duplicate values (operator, 2026-11-15); the registry
+    nevertheless holds ``Segment, Segment`` on 9 Episodes, and a sheet can
+    repeat a value as easily, so the readers drop the repeat.
+    """
+    return list(dict.fromkeys(_values(row, family)))
+
+
 def creation_type_from_row(template: str, row: Mapping[str, Any]) -> str:
     """The creation type a row of ``template`` describes.
 
@@ -697,8 +734,11 @@ def _sequence_info(row: Mapping[str, Any]) -> dict | None:
 
 
 def _details_from_row(row: Mapping[str, Any], family: str) -> list[dict] | None:
+    # A domain without details text would be an empty element, which EIDR
+    # does not allow (operator, 2026-11-15), so such a group is not read.
     out = [{"Details": g.get(family), "_domain": g.get(f"{family} Domain")}
-           for g in _groups(row, [family, f"{family} Domain"])]
+           for g in _groups(row, [family, f"{family} Domain"])
+           if g.get(family) is not None]
     return out or None
 
 
@@ -717,18 +757,18 @@ def _extra_from_row(row: Mapping[str, Any], template: str, creation_type: str) -
             return {"SeriesInfo": series} if series else None
         if creation_type == "Season":
             season = _prune({"Parent": parent, "EndDate": end_date,
-                             "SeasonClass": _values(row, "Season Class"), **flags,
+                             "SeasonClass": _classes(row, "Season Class"), **flags,
                              "SequenceNumber": _text(row.get("Season No."))})
             return {"SeasonInfo": season} if season else None
         episode = _prune({"Parent": parent, "SequenceInfo": _sequence_info(row),
-                          "EpisodeClass": _values(row, "Episode Class"),
+                          "EpisodeClass": _classes(row, "Episode Class"),
                           "TimeSlot": _text(row.get("Time Slot"))})
         return {"EpisodeInfo": episode} if episode else None
     if template == "edit":
         obj = _prune({
             "Parent": parent, "EditUse": _text(row.get("Edit Use")),
-            "EditClass": _values(row, "Edit Class"),
-            "MadeForRegion": _values(row, "Made for Region"),
+            "EditClass": _classes(row, "Edit Class"),
+            "MadeForRegion": _classes(row, "Made for Region"),
             "ColorType": _text(row.get("Color Type")),
             "ThreeD": _bool_text(_text(row.get("In 3D"))),
             "Details": _details_from_row(row, "Edit Details"),
@@ -741,8 +781,8 @@ def _extra_from_row(row: Mapping[str, Any], template: str, creation_type: str) -
         return {"ClipInfo": obj} if obj else None
     if template == "manifestation":
         obj = _prune({
-            "Parent": parent, "ManifestationClass": _values(row, "Manif Class"),
-            "MadeForRegion": _values(row, "Made for Region"),
+            "Parent": parent, "ManifestationClass": _classes(row, "Manif Class"),
+            "MadeForRegion": _classes(row, "Made for Region"),
             "Details": _details_from_row(row, "Manif Details"),
         })
         return {"ManifestationInfo": obj} if obj else None
@@ -805,11 +845,18 @@ def record_from_row(row: Mapping[str, Any], template: str) -> dict:
     # and an absent flag is left out rather than written "false" (operator,
     # 2026-11-13: empty or removed fields are gone from the output, never a
     # false or null placeholder). Until 0.71.0 every sheet title said "false".
+    #
+    # Alternates go to AlternateResourceName, never into the ResourceName
+    # list (0.75.0). A child row may carry only an Alternate Title; it stays
+    # an alternate and the main title is inherited or generated (operator,
+    # 2026-11-15). In the one list, a blank Title put the first alternate at
+    # entry 0, where every reader takes the main title from.
+    alternates = []
     for g in _groups(row, ["Alternate Title", "Alt Title Class", "Alt Title Language"]):
         if g.get("Alternate Title") is None:
             continue
-        titles.append({"Title": g["Alternate Title"], "TitleClass": g.get("Alt Title Class"),
-                       "_lang": g.get("Alt Title Language")})
+        alternates.append({"Title": g["Alternate Title"], "TitleClass": g.get("Alt Title Class"),
+                           "_lang": g.get("Alt Title Language")})
     orgs: list[dict[str, Any]] = [
             {"_idType": "EIDRPartyID" if g.get("Associated Org Party ID") else None,
              "_organizationID": g.get("Associated Org Party ID"),
@@ -832,6 +879,7 @@ def record_from_row(row: Mapping[str, Any], template: str) -> dict:
         "Mode": _text(row.get("Mode")),
         "ReferentType": _text(row.get("Referent Type")),
         "ResourceName": titles,
+        "AlternateResourceName": alternates,
         "OriginalLanguage": _languages(row, "Original Language", template),
         "VersionLanguage": _languages(row, "Version Language", template),
         "AssociatedOrg": orgs,
@@ -845,8 +893,10 @@ def record_from_row(row: Mapping[str, Any], template: str) -> dict:
         "Credits": {role: [{"DisplayName": n, "SortName": None} for n in _values(row, role)]
                     for role in ("Director", "Actor")},
         "RegistrantExtra": _text(row.get("Registrant Extra")),
+        # Only with text: a Description that is only a language is an empty
+        # element, which EIDR does not allow (operator, 2026-11-15).
         "Description": ({"Description": description, "_lang": description_lang}
-                        if description or description_lang else None),
+                        if description else None),
     })
     return _prune({
         "CreationType": creation_type,
@@ -900,6 +950,24 @@ def _language(el: ET.Element) -> Any:
     return {"value": el.text, "_mode": mode} if mode else el.text
 
 
+def _languages_from_xml(bod: ET.Element, name: str) -> list[Any]:
+    """A language family, one entry per (code, mode), in document order.
+
+    The ``type`` attribute is not read: it is being deprecated and is not
+    needed (operator, 2026-11-15). Without it, two entries that differed only
+    by type are the same value, and EIDR allows no duplicate values; the
+    registry holds 2,217 Full OriginalLanguage pairs of that kind (raw_records,
+    2026-11-15). The same code with two modes (Audio and Visual) is two values
+    and is kept: 5,404 registry records have one.
+    """
+    out: list[Any] = []
+    for e in _kids(bod, name):
+        lang = _language(e)
+        if lang not in out:
+            out.append(lang)
+    return out
+
+
 # Children that the schema repeats, so a single occurrence is still a list,
 # as XML_to_JSON emits them.
 _LIST_TAGS = {"SeasonClass", "EpisodeClass", "EditClass", "MadeForRegion",
@@ -942,8 +1010,14 @@ def _info(el: ET.Element) -> dict:
     for c in el:
         name = _local(c.tag)
         if name in _DETAILS_TAGS:
-            out.setdefault("Details", []).append(
-                {"Details": c.text, "Domain": _attr(c, "domain")})
+            # An empty element (a domain and no text) is not allowed in EIDR
+            # XML (operator, 2026-11-15), though the registry holds 1,363
+            # ManifestationDetails and 162 EditDetails of that form
+            # (raw_records, 2026-11-15). It carries no details, so it is not
+            # read.
+            if (c.text or "").strip():
+                out.setdefault("Details", []).append(
+                    {"Details": c.text, "Domain": _attr(c, "domain")})
         elif name == "SequenceInfo":
             seq: dict[str, Any] = {}
             for n in c:
@@ -960,7 +1034,11 @@ def _info(el: ET.Element) -> dict:
             # writes it to Operator's Notes on one line.
             out["Digital"] = ET.tostring(c, encoding="unicode")
         elif name in _LIST_TAGS:
-            out.setdefault(name, []).append(_generic(c))
+            val = _generic(c)
+            # No duplicate values (operator, 2026-11-15); the registry holds
+            # EpisodeClass "Segment, Segment" on 9 Episodes.
+            if val not in out.setdefault(name, []):
+                out[name].append(val)
         elif name in out:
             if not isinstance(out[name], list):
                 out[name] = [out[name]]
@@ -972,7 +1050,10 @@ def _info(el: ET.Element) -> dict:
 
 def _base_from_xml(bod: ET.Element) -> dict:
     titles: list[dict] = []
+    alternates: list[dict] = []
     for t in _kids(bod, "ResourceName"):
+        if not (t.text or "").strip():
+            continue     # an empty element is no title (operator, 2026-11-15)
         # SystemGenerated only when true: "false" (or an absent attribute) is
         # the absence of the flag, and absent fields are left out (operator,
         # 2026-11-13). XML_to_JSON's mirror path follows the same rule.
@@ -981,11 +1062,18 @@ def _base_from_xml(bod: ET.Element) -> dict:
                        "_lang": _attr(t, "lang"),
                        **({"SystemGenerated": "true"} if generated else {})})
     for t in _kids(bod, "AlternateResourceName"):
+        if not (t.text or "").strip():
+            continue     # an empty element is no title (operator, 2026-11-15)
         # The registry never generates an alternate (the mirror holds 0 of
         # 1,402,189 so marked), so there is no flag to carry. Until 0.71.0
         # this said "false", copying XML_to_JSON's old placeholder.
-        titles.append({"Title": t.text, "TitleClass": _attr(t, "titleClass"),
-                       "_lang": _attr(t, "lang")})
+        #
+        # Their own key (0.75.0), as in the XML: a SelfDefined block with only
+        # an AlternateResourceName (2,711 in the mirror) would otherwise put
+        # that alternate at ResourceName entry 0, where readers take the main
+        # title from (operator, 2026-11-15: an alternate is never promoted).
+        alternates.append({"Title": t.text, "TitleClass": _attr(t, "titleClass"),
+                           "_lang": _attr(t, "lang")})
     orgs = []
     for o in _kids(bod, "AssociatedOrg"):
         names = [n.text for n in _kids(o, "DisplayName") + _kids(o, "AlternateName") if n.text]
@@ -1014,8 +1102,9 @@ def _base_from_xml(bod: ET.Element) -> dict:
         "Mode": _kid_text(bod, "Mode"),
         "ReferentType": _kid_text(bod, "ReferentType"),
         "ResourceName": titles,
-        "OriginalLanguage": [_language(e) for e in _kids(bod, "OriginalLanguage")],
-        "VersionLanguage": [_language(e) for e in _kids(bod, "VersionLanguage")],
+        "AlternateResourceName": alternates,
+        "OriginalLanguage": _languages_from_xml(bod, "OriginalLanguage"),
+        "VersionLanguage": _languages_from_xml(bod, "VersionLanguage"),
         "AssociatedOrg": orgs,
         "ReleaseDate": _kid_text(bod, "ReleaseDate"),
         "CountryOfOrigin": [e.text for e in _kids(bod, "CountryOfOrigin")],
@@ -1025,8 +1114,11 @@ def _base_from_xml(bod: ET.Element) -> dict:
         "Administrators": admins,
         "Credits": credits,
         "RegistrantExtra": _kid_text(bod, "RegistrantExtra"),
+        # Only with text: <Description lang="en"/> is an empty element, not
+        # allowed in EIDR XML (operator, 2026-11-15), though the registry
+        # holds 1,351 (raw_records, 2026-11-15).
         "Description": ({"Description": desc[0].text, "_lang": _attr(desc[0], "lang")}
-                        if desc else None),
+                        if desc and (desc[0].text or "").strip() else None),
     }
 
 

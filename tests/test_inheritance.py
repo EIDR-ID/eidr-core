@@ -82,11 +82,15 @@ def test_the_two_sets_do_not_overlap():
 
 # --- system-generated titles ------------------------------------------------
 
+# The classes are the registry's (0.75.0): series numeric for the numbered
+# forms, series date for the bracket forms, over every generated title in
+# the mirror (2026-11-15, 0 exceptions). "season numeric", which this module
+# wrote for every Episode until then, is not in the schema's enumeration.
 @pytest.mark.parametrize("ctype,kw,expected,klass", [
     ("Season", {"sequence_number": "6"}, "30 Something: Season 6", "series numeric"),
-    ("Season", {"release_date": "2006"}, "30 Something [2006]", "series numeric"),
-    ("Episode", {"distribution_number": "1"}, "30 Something: Episode 1", "season numeric"),
-    ("Episode", {"release_date": "2023-04-07"}, "30 Something [2023-04-07]", "season numeric"),
+    ("Season", {"release_date": "2006"}, "30 Something [2006]", "series date"),
+    ("Episode", {"distribution_number": "1"}, "30 Something: Episode 1", "series numeric"),
+    ("Episode", {"release_date": "2023-04-07"}, "30 Something [2023-04-07]", "series date"),
 ])
 def test_all_four_registry_patterns(ctype, kw, expected, klass):
     assert system_generated_title("30 Something", ctype, **kw) == (expected, klass)
@@ -614,7 +618,11 @@ def test_both_adapters_agree_on_the_system_generated_case():
     ([{"Title": "x"}], True),
     ([{"Title": "x", "SystemGenerated": "true"}], False),
     ([{"Title": "x", "SystemGenerated": "false"}], True),
-    ([{"Title": "g", "SystemGenerated": "true"}, {"Title": "r"}], True),
+    # Only the MAIN title (entry 0) counts; an alternate never blocks
+    # (operator, 2026-11-15; 0.75.0). Until then this pair was True.
+    ([{"Title": "g", "SystemGenerated": "true"}, {"Title": "r"}], False),
+    ([{"TitleClass": "release"}, {"Title": "r"}], False),
+    ([{"Title": "r"}, {"Title": "g", "SystemGenerated": "true"}], True),
 ])
 def test_has_user_supplied_title(titles, expected):
     assert has_user_supplied_title(titles) is expected
@@ -1003,7 +1011,7 @@ def test_dropping_leaves_the_input_untouched_and_success_unchanged():
 def test_an_episode_time_slot_goes_inside_the_brackets():
     assert system_generated_title(
         "BBC London News", "Episode", release_date="2012-05-19", time_slot="16:50:00",
-    ) == ("BBC London News [2012-05-19 16:50]", "season numeric")
+    ) == ("BBC London News [2012-05-19 16:50]", "series date")
 
 
 @pytest.mark.parametrize("kw", [
@@ -1015,12 +1023,12 @@ def test_the_time_slot_is_used_only_on_the_dated_episode_form(kw):
     got = system_generated_title("S", "Episode", **kw)
     assert got is None or "16:50" not in got[0]
     if kw.get("time_slot") == "evening":
-        assert got == ("S [2012-05-19]", "season numeric")
+        assert got == ("S [2012-05-19]", "series date")
 
 
 def test_a_season_never_takes_a_time_slot():
     assert system_generated_title("S", "Season", release_date="2012",
-                                  time_slot="16:50:00") == ("S [2012]", "series numeric")
+                                  time_slot="16:50:00") == ("S [2012]", "series date")
 
 
 def test_both_adapters_agree_on_a_time_slot_title():
@@ -1030,3 +1038,158 @@ def test_both_adapters_agree_on_a_time_slot_title():
                                       time_slot="21:25:00"), _parent_rec(), "Episode")
     assert json_full["ResourceName"][0]["Title"] == rec_full.titles[0].text \
         == "The Series [2012-05-19 21:25]"
+
+
+# --- titles: main and alternates (operator, 2026-11-15; 0.75.0) -------------
+# "For child records, you can have only an Alternate Title, which must remain
+# an Alternate Title. The main title will be inherited or system generated,
+# as normal." Each wrong answer below is a plausible title, so only a test
+# sees it: an alternate standing in as the main title, a parent's alternate
+# copied into the child, or the child's own alternate dropped.
+
+LANG_PARENT = {
+    "ResourceName": [{"Title": "Die Serie", "TitleClass": "release", "_lang": "de"},
+                     {"Title": "The Series", "TitleClass": "translated", "_lang": "en"}],
+    "Mode": "AudioVisual",
+}
+CHILD_ALT = {"Title": "Le Pilote", "TitleClass": "translated", "_lang": "fr"}
+
+
+def _lang_parent_rec():
+    return _Rec(creation_type="Series", mode="AudioVisual",
+                titles=[_Title(text="Die Serie", lang="de", title_class="release",
+                               is_resource=True),
+                        _Title(text="The Series", lang="en", title_class="translated")])
+
+
+def test_an_alt_only_edit_inherits_the_parent_main_title_and_keeps_its_alternate():
+    full, prov = build_full_base({"AlternateResourceName": [CHILD_ALT]}, LANG_PARENT, "Edit")
+    assert full["ResourceName"] == [LANG_PARENT["ResourceName"][0]]
+    assert full["AlternateResourceName"] == [CHILD_ALT]      # the parent's is not copied
+    assert prov["ResourceName"] == "inherited"
+
+
+def test_a_one_list_child_comes_back_split():
+    # The older shape: main first, alternates after, in one list.
+    own = {"Title": "Mine", "_lang": "en"}
+    full, _ = build_full_base({"ResourceName": [own, CHILD_ALT]}, LANG_PARENT, "Edit")
+    assert full["ResourceName"] == [own]
+    assert full["AlternateResourceName"] == [CHILD_ALT]
+
+
+def test_an_alternate_does_not_block_regeneration_and_survives_it():
+    stale = {"Title": "Old: Episode 1", "TitleClass": "season numeric",
+             "SystemGenerated": "true"}
+    full, prov = build_full_base({"ResourceName": [stale, CHILD_ALT]}, LANG_PARENT, "Episode",
+                                 extra={"DistributionNumber": "2"})
+    assert full["ResourceName"] == [{"Title": "Die Serie: Episode 2",
+                                     "TitleClass": "series numeric", "_lang": "de",
+                                     "SystemGenerated": "true"}]
+    assert full["AlternateResourceName"] == [CHILD_ALT]
+    assert prov["ResourceName"] == "system"
+
+
+def test_a_generated_title_takes_the_parent_main_title_language_only():
+    full, _ = build_full_base({"AlternateResourceName": [CHILD_ALT]}, LANG_PARENT, "Season",
+                              extra={"SequenceNumber": "1"})
+    assert full["ResourceName"][0]["_lang"] == "de"           # never the alternate's "en"
+    full, _ = build_full_base({}, PARENT, "Season", extra={"SequenceNumber": "1"})
+    assert "_lang" not in full["ResourceName"][0]             # absent, never invented
+
+
+def test_a_parent_with_no_main_title_lends_no_alternate():
+    parent = {"ResourceName": [{"TitleClass": "release"}, {"Title": "Alt", "_lang": "en"}]}
+    full, _ = build_full_base({}, parent, "Edit")
+    assert "ResourceName" not in full
+    with pytest.raises(TitleConstructionError):
+        build_full_base({}, parent, "Season", extra={"SequenceNumber": "1"})
+
+
+@pytest.mark.parametrize("ctype,json_extra,rec_kw", [
+    ("Edit", {}, {}),
+    ("Season", {"SequenceNumber": "3"}, {"sequence_number": "3"}),
+    ("Episode", {"DistributionNumber": "4"}, {"distribution_number": "4"}),
+    ("Episode", {"ReleaseDate": "2020-01-02"}, {"release_date": "2020-01-02"}),
+])
+def test_both_adapters_agree_on_an_alt_only_child(ctype, json_extra, rec_kw):
+    """The two shapes must give the same main title (text, class, language)
+    and keep the same alternate. A per-adapter test cannot see them diverge."""
+    json_full, json_prov = build_full_base({"AlternateResourceName": [CHILD_ALT]},
+                                           LANG_PARENT, ctype, extra=json_extra)
+    rec_full = build_full_record(
+        _Rec(creation_type=ctype, titles=[_Title(text="Le Pilote", lang="fr",
+                                                 title_class="translated")], **rec_kw),
+        _lang_parent_rec(), ctype)
+    main = json_full["ResourceName"][0]
+    rec_main = [t for t in rec_full.titles if t.is_resource]
+    assert len(rec_main) == 1
+    assert (rec_main[0].text, rec_main[0].title_class, rec_main[0].lang) == \
+        (main["Title"], main["TitleClass"], main.get("_lang"))
+    assert [t.text for t in rec_full.titles if not t.is_resource] == \
+        [t["Title"] for t in json_full["AlternateResourceName"]]
+    assert provenance(rec_full)["ResourceName"] == json_prov["ResourceName"]
+
+
+# The record adapter on its own (review of 0.75.0, 2026-11-15): the
+# cross-adapter test above uses only alt-only children under a main-first
+# parent, so these shapes are pinned separately.
+
+def test_record_regeneration_drops_the_stale_main_and_keeps_the_alternate():
+    child = _Rec(creation_type="Episode", distribution_number="2", titles=[
+        _Title(text="Old: Episode 1", system_generated=True, is_resource=True),
+        _Title(text="Le Pilote", lang="fr")])
+    full = build_full_record(child, _lang_parent_rec(), "Episode")
+    assert [(t.text, t.lang, t.is_resource) for t in full.titles] == [
+        ("Die Serie: Episode 2", "de", True), ("Le Pilote", "fr", False)]
+
+
+def test_record_main_title_is_the_marked_one_not_the_first():
+    parent = _Rec(creation_type="Series", titles=[
+        _Title(text="Alt First", lang="en"),
+        _Title(text="Main Second", lang="de", is_resource=True)])
+    full = build_full_record(_Rec(creation_type="Season", sequence_number="1"), parent, "Season")
+    assert [(t.text, t.lang) for t in full.titles] == [("Main Second: Season 1", "de")]
+    edit = build_full_record(_Rec(creation_type="Edit"), parent, "Edit")
+    assert [t.text for t in edit.titles] == ["Main Second"]     # no parent alternate
+
+
+def test_an_empty_main_title_is_dropped_in_both_adapters():
+    full, prov = build_full_base({"ResourceName": [{"Title": "", "_lang": "en"},
+                                                   {"Title": "Alt"}]}, None, "Basic")
+    assert "ResourceName" not in full and "ResourceName" not in prov
+    assert full["AlternateResourceName"] == [{"Title": "Alt"}]
+    rec = build_full_record(_Rec(creation_type="Basic", titles=[
+        _Title(text="", is_resource=True), _Title(text="Alt")]), None, "Basic")
+    assert [(t.text, t.is_resource) for t in rec.titles] == [("Alt", False)]
+
+
+@pytest.mark.parametrize("adapter", ["base", "record"])
+def test_the_generated_language_is_never_an_alternates(adapter):
+    """The parent's main title has no language and its alternate has one: the
+    generated title gets none (absent, never borrowed)."""
+    if adapter == "base":
+        parent = {"ResourceName": [{"Title": "S", "TitleClass": "release"},
+                                   {"Title": "Alt", "_lang": "en"}]}
+        full, _ = build_full_base({}, parent, "Season", extra={"SequenceNumber": "1"})
+        assert "_lang" not in full["ResourceName"][0]
+    else:
+        parent = _Rec(creation_type="Series", titles=[
+            _Title(text="S", is_resource=True), _Title(text="Alt", lang="en")])
+        full = build_full_record(_Rec(creation_type="Season", sequence_number="1"),
+                                 parent, "Season")
+        assert full.titles[0].lang is None
+
+
+def test_a_title_given_as_value_is_read_like_title():
+    assert has_user_supplied_title([{"value": "x"}])
+    full, _ = build_full_base({}, {"ResourceName": [{"value": "P", "_lang": "en"}]}, "Season",
+                              extra={"SequenceNumber": "4"})
+    assert full["ResourceName"][0]["Title"] == "P: Season 4"
+
+
+def test_one_list_alternates_come_ahead_of_keyed_ones_and_none_is_skipped():
+    full, _ = build_full_base({"ResourceName": [{"Title": "Mine"}, None, {"Title": "A1"}],
+                               "AlternateResourceName": [{"Title": "A2"}]},
+                              {"ResourceName": [{"Title": "P"}]}, "Edit")
+    assert full["ResourceName"] == [{"Title": "Mine"}]
+    assert full["AlternateResourceName"] == [{"Title": "A1"}, {"Title": "A2"}]

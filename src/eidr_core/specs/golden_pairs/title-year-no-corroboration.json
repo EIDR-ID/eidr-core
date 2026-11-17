@@ -7,7 +7,8 @@
     "titles": [
       {
         "text": "State of Fear",
-        "lang": "en"
+        "lang": "en",
+        "is_resource": true
       }
     ],
     "release_date": "2004"
@@ -18,7 +19,8 @@
     "titles": [
       {
         "text": "State of Fear",
-        "lang": "en"
+        "lang": "en",
+        "is_resource": true
       }
     ],
     "release_date": "2004"

@@ -78,6 +78,17 @@ confirms No Match, and the match stays in the registry.
   registry built from the record's structure -- the two flags the title
   comparator's inclusion and both-sides-drop rules read, so a loader that
   drops either scores a different pair than the fixture states.
+* **`is_resource: true` marks the record's ResourceName, its main title;
+  every other title is an AlternateResourceName** (eidr-core 0.76.0). "The
+  ResourceName (user-supplied, generated, or inherited) is always treated as
+  the main title. AlternateResourceName (if any) is always the alternate
+  titles" (operator, 2026-11-16). Position never makes a title the main one,
+  and a plain string, which cannot carry the mark, is an alternate. So a
+  record that has a main title marks exactly one; a record with no marked
+  title is a child that has only alternates, whose main title the shared
+  builder inherits or generates. A loader keeps the mark as given and never
+  infers it. The eight seed pairs' sixteen single-title records carried no
+  mark until 0.76.0 and gained it then; no expectation changed.
 * **Records may carry a `provenance` map where the lesson needs it**
   (2.13.0, 2026-09-23): `"provenance": {"<EIDR field>": "self" | "inherited"
   | "system"}` -- the shared builder's map, which the loader sets on the

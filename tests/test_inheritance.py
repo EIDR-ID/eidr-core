@@ -8,6 +8,7 @@ test pins a defect, it names it.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 
 import pytest
 
@@ -335,6 +336,7 @@ class _Rec:
     sequence_number: str | None = None
     distribution_number: str | None = None
     time_slot: str | None = None
+    end_date: str | None = None
     titles: list = field(default_factory=list)
     countries: list = field(default_factory=list)
     original_languages: list = field(default_factory=list)
@@ -1193,3 +1195,53 @@ def test_one_list_alternates_come_ahead_of_keyed_ones_and_none_is_skipped():
                               {"ResourceName": [{"Title": "P"}]}, "Edit")
     assert full["ResourceName"] == [{"Title": "Mine"}]
     assert full["AlternateResourceName"] == [{"Title": "A1"}, {"Title": "A2"}]
+
+
+# --- a dated Season's brackets hold the year (operator, 2026-11-16; 0.76.0) ---
+# "5Vor12 [2017]" on 10.5240/88A3-8C1A-DE86-1D38-EDF6-U, whose release date
+# is 2017-09-18. The mirror's 1,461 bracket Seasons hold a year or a year
+# range, never a full date. A full date here is plausible text that simply
+# fails to match the registry's own record, so only a test sees it.
+
+@pytest.mark.parametrize("kw,expected", [
+    ({"release_date": "2017-09-18"}, "5Vor12 [2017]"),
+    ({"release_date": "2017"}, "5Vor12 [2017]"),
+    ({"release_date": "2021-03-01", "end_date": "2022-02-27"}, "5Vor12 [2021-2022]"),
+    ({"release_date": "2021-03-01", "end_date": "2022"}, "5Vor12 [2021-2022]"),
+    ({"release_date": "2021-03-01", "end_date": "2021-11-30"}, "5Vor12 [2021]"),
+    ({"release_date": "2021", "end_date": ""}, "5Vor12 [2021]"),
+    ({"release_date": "2021", "end_date": "soon"}, "5Vor12 [2021]"),
+    # Bad data the registry has no example of: kept as given, not repaired.
+    ({"release_date": "2022-05-01", "end_date": "2021-12-31"}, "5Vor12 [2022-2021]"),
+    ({"release_date": "Spring 2021"}, "5Vor12 [Spring 2021]"),
+    ({"release_date": "Spring 2021", "end_date": "2022"}, "5Vor12 [Spring 2021]"),
+    ({"release_date": "20210301"}, "5Vor12 [20210301]"),
+    ({"end_date": "2022"}, None),
+])
+def test_a_dated_season_title_holds_the_year_or_a_year_range(kw, expected):
+    got = system_generated_title("5Vor12", "Season", **kw)
+    assert got == (None if expected is None else (expected, "series date"))
+
+
+def test_a_date_object_reads_as_its_year():
+    assert system_generated_title(
+        "5Vor12", "Season", release_date=date(2017, 9, 18), end_date=date(2019, 1, 1),
+    ) == ("5Vor12 [2017-2019]", "series date")
+
+
+def test_the_end_date_never_touches_a_numbered_season_or_an_episode():
+    assert system_generated_title("S", "Season", sequence_number="3", release_date="2021",
+                                  end_date="2022") == ("S: Season 3", "series numeric")
+    assert system_generated_title("S", "Episode", release_date="2021-03-01",
+                                  end_date="2022") == ("S [2021-03-01]", "series date")
+
+
+@pytest.mark.parametrize("end", [None, "2022-06-30"])
+def test_both_adapters_agree_on_a_dated_season_title(end):
+    extra = {"EndDate": end} if end else {}
+    json_full, _ = build_full_base({"ReleaseDate": "2021-03-01"}, PARENT, "Season",
+                                   extra=extra)
+    rec_full = build_full_record(_Rec(creation_type="Season", release_date="2021-03-01",
+                                      end_date=end), _parent_rec(), "Season")
+    want = "The Series [2021-2022]" if end else "The Series [2021]"
+    assert json_full["ResourceName"][0]["Title"] == rec_full.titles[0].text == want

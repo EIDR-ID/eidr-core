@@ -7,7 +7,8 @@
     "titles": [
       {
         "text": "The Sound of Music",
-        "lang": "en"
+        "lang": "en",
+        "is_resource": true
       }
     ],
     "release_date": "1965-04-20",
@@ -28,7 +29,8 @@
     "titles": [
       {
         "text": "The Sound of Music",
-        "lang": "en"
+        "lang": "en",
+        "is_resource": true
       }
     ],
     "release_date": "1970-01-01",

@@ -240,6 +240,7 @@ def system_generated_title(
     distribution_number: Any = None,  # Episode
     release_date: Any = None,         # the fallback for both
     time_slot: Any = None,            # Episode, date form only (0.74.0)
+    end_date: Any = None,             # Season, date form only (0.76.0)
 ) -> tuple[str, str] | None:
     """``(title, title_class)`` for a Season or Episode, or None.
 
@@ -247,10 +248,29 @@ def system_generated_title(
 
     ===============================  ==========================================
     Season **with** Sequence Number  ``<Series Title>: Season <N>``
-    Season **without**               ``<Series Title> [<Season Release Date>]``
+    Season **without**               ``<Series Title> [<Season Release Year>]``
     Episode **with** Dist. Number    ``<Season Title>: Episode <N>``
     Episode **without**              ``<Season Title> [<Episode Release Date>]``
     ===============================  ==========================================
+
+    A dated Season's brackets hold the YEAR of its release date, or
+    ``<year>-<end year>`` when the Season's ``EndDate`` falls in another
+    year: ``5Vor12 [2017]`` for release date 2017-09-18
+    (10.5240/88A3-8C1A-DE86-1D38-EDF6-U, the operator's example, 2026-11-16),
+    ``Motorsport Mundial [2021-2022]``. Measured over the mirror's 1,461
+    bracket Seasons on 2026-11-15: 0 hold a full date; 910 hold a year-only
+    release date, 427 the year of a full release date, 86 a year range from
+    the end year, and 38 whose end year equals the start year the year
+    alone. Until 0.76.0 the whole date was written, so 534 of them (427 +
+    86 + the 21 of the 38 with a full release date) failed to match the
+    registry's own record. No generated Season has an end year BEFORE its
+    release year, so the registry shows nothing for that bad-data case; it
+    gets the range as given (``[2022-2021]``) rather than a guessed repair.
+    A release date that does not start with a four-digit year is written as
+    given rather than guessed at, and then no range is built: there is no
+    release year to compare the end year with. An Episode's
+    brackets keep the full date (0 of 1,601 registry Episode bracket titles
+    hold a year only).
 
     An Episode without a Distribution Number that has a ``TimeSlot`` gets the
     slot's ``HH:MM`` inside the brackets: ``<Season Title> [<date> <HH:MM>]``.
@@ -298,7 +318,14 @@ def system_generated_title(
         if seq:
             return f"{title}: Season {seq}", "series numeric"
         date = _text(release_date)
-        return (f"{title} [{date}]", "series date") if date else None
+        if not date:
+            return None
+        start = _year(date)
+        if not start:
+            return f"{title} [{date}]", "series date"
+        end = _year(_text(end_date))
+        stamp = f"{start}-{end}" if end and end != start else start
+        return f"{title} [{stamp}]", "series date"
 
     if creation_type == "Episode":
         dist = _text(distribution_number)
@@ -315,6 +342,15 @@ def system_generated_title(
 
 
 _HH_MM = re.compile(r"^(\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?$")
+# A year at the start of an xs:date / xs:gYear / datetime text. The negative
+# lookahead stops "20170918" (no separators) from reading as the year 2017.
+_YEAR = re.compile(r"^(\d{4})(?!\d)")
+
+
+def _year(value: str) -> str:
+    """The leading four-digit year of a date text (``2017-09-18`` -> ``2017``), else ""."""
+    m = _YEAR.match(value)
+    return m.group(1) if m else ""
 
 
 def _hh_mm(value: Any) -> str:
@@ -489,7 +525,8 @@ def build_full_base(
 
     ``extra`` supplies the title inputs: ``SequenceNumber`` (Season),
     ``DistributionNumber`` (Episode), ``ReleaseDate`` (the fallback for
-    both), ``TimeSlot`` (Episode, date form; 0.74.0). A missing
+    both), ``TimeSlot`` (Episode, date form; 0.74.0), ``EndDate`` (the
+    Season's ``SeasonInfo/EndDate``, date form; 0.76.0). A missing
     ``ReleaseDate`` falls back to the child's own ``self_base['ReleaseDate']``
     (never an inherited one); missing ``SequenceNumber``/``DistributionNumber``
     mean the numbered pattern cannot fire.
@@ -543,6 +580,9 @@ def build_full_base(
             sequence_number=extra.get("SequenceNumber"),
             distribution_number=extra.get("DistributionNumber"),
             time_slot=extra.get("TimeSlot"),
+            # The Season's own SeasonInfo/EndDate (0.76.0). Never inherited:
+            # ExtraObjectMetadata is the caller's, and only the caller has it.
+            end_date=extra.get("EndDate"),
             # `full` has not been through the loop yet, so this is the child's
             # OWN date -- which is the point of generating first. `extra`
             # still wins: it is the caller saying "use this date for the
@@ -929,6 +969,8 @@ def _apply_title(
             distribution_number=getattr(full, "distribution_number", None),
             release_date=getattr(full, "release_date", None),
             time_slot=getattr(full, "time_slot", None),
+            # The record's own end date, as the JSON adapter's extra["EndDate"].
+            end_date=getattr(full, "end_date", None),
         )
         if not built:
             # Same rule, same failure, same exception as build_full_base -- the

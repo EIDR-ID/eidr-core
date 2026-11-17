@@ -7,7 +7,8 @@
     "titles": [
       {
         "text": "The Matrix",
-        "lang": "en"
+        "lang": "en",
+        "is_resource": true
       }
     ],
     "release_date": "1999-03-31",
@@ -28,7 +29,8 @@
     "titles": [
       {
         "text": "Matrix, The",
-        "lang": "en"
+        "lang": "en",
+        "is_resource": true
       }
     ],
     "release_date": "1999",

@@ -7,7 +7,8 @@
     "titles": [
       {
         "text": "Красная палатка",
-        "lang": "ru"
+        "lang": "ru",
+        "is_resource": true
       }
     ],
     "release_date": "1969",
@@ -28,7 +29,8 @@
     "titles": [
       {
         "text": "Красная палатка",
-        "lang": "ru"
+        "lang": "ru",
+        "is_resource": true
       }
     ],
     "release_date": "1969",

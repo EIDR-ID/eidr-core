@@ -7,7 +7,8 @@
     "titles": [
       {
         "text": "The Iron Serial Part 2",
-        "lang": "en"
+        "lang": "en",
+        "is_resource": true
       }
     ],
     "release_date": "1936",
@@ -28,7 +29,8 @@
     "titles": [
       {
         "text": "The Iron Serial Part 3",
-        "lang": "en"
+        "lang": "en",
+        "is_resource": true
       }
     ],
     "release_date": "1936",

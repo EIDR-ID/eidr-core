@@ -7,7 +7,8 @@
     "titles": [
       {
         "text": "Arrival of a Train at the Station",
-        "lang": "en"
+        "lang": "en",
+        "is_resource": true
       }
     ],
     "release_date": "1896",
@@ -25,7 +26,8 @@
     "titles": [
       {
         "text": "Arrival of the Mail Boat at the Station",
-        "lang": "en"
+        "lang": "en",
+        "is_resource": true
       }
     ],
     "release_date": "1896",

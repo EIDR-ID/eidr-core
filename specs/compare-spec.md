@@ -202,6 +202,36 @@ BMR-Review.
    section, in that operation order, and compute the ` est` suffix by
    comparing against the unflagged score rather than from the flag.
 
+**Shipped inert, awaiting their version (eidr-core 0.77.0).** Two title
+rules from BMR-Review's handoff of 2026-11-23, approved by the operator the
+same day. Each is read from an OPTIONAL parameter, as
+`INTERNAL_TITLE_DISCOUNT` first was: absent, the engine scores exactly as
+before. BMR-Review sets the knob in `config.py` in its own measured cycle, at
+the version reserved for it, and these become porting requirements then.
+
+* **`TITLE_BONUS_MIN_BEST` (reserved 2.22.0; approved at 0.85).** When the
+  best aligned title pair is below it, the title quality is that best pair
+  alone, with no accumulation bonus. Two 0.69 pairs had added up to 1.133,
+  and a different film ("A Christmas Gift of Love" against "An Antique
+  Christmas", same cast, year and length) scored 94.0 Accept. Applied in
+  `cmp_titles`, after the Internal-title rule; the shared
+  `nonlinear.accumulate` is unchanged. The detail gains `no bonus, weak best`.
+  A value outside (0, 1] is refused.
+* **`TITLE_DATE_TOKENS` (reserved 2.23.0; Episode/Season pairs only).** A
+  date in a title is read as a date before segments and part numbers:
+  `d/m/y`, `d.m.y`, `d-m-y` (same separator twice, two- or four-digit
+  year), `y-m-d`, and `m/d` after an English weekday (`Mon, 6/16`); day and
+  month must be plausible in either order. Dates compare literally, never
+  interpreted (`2026-08-13` equals `13/08/2026`; a two-digit year matches on
+  its last two digits; `m/d` against a full date is a mismatch, since d/m
+  and m/d cannot be told apart). Both titles dated and equal: the rest is
+  compared. Both dated and different: `COMBINATION_DIFFERS_QUALITY` (0.20).
+  One side dated: the rest is compared and `cmp_titles` meta
+  `date_ambiguous` is true (BMR-Review's scorer caps it at Review, as
+  `part_ambiguous`). The part checks read the titles with their dates
+  removed. The meta key is present only with the knob set. A non-bool value
+  is refused.
+
 ## Date profiles: the ANCHOR is per creation type, the SHAPE is measured
 
 `DATE_PROFILES` (compare-spec 2.8.0) gives each creation type a table:

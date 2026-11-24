@@ -41,6 +41,8 @@ from . import nonlinear
 from ._params import set_source as set_params  # the public registration API, re-exported
 from .titles import (
     _numbered_parts_conflict,
+    date_tokens,
+    dates_ambiguous,
     fuzzy,
     is_internal,
     parts_ambiguous,
@@ -157,6 +159,51 @@ def _internal_title_discount():
     return float(d)
 
 
+def _title_date_tokens():
+    """Is date-token reading on for Episode/Season titles? (0.77.0)
+
+    Read OPTIONALLY, as ``INTERNAL_TITLE_DISCOUNT`` is: absent (or no source
+    registered) means today's behaviour byte for byte. The mechanism ships
+    inert and BMR-Review turns it on in its own measured cycle, at the
+    compare-spec version eidr-core reserved for it (2.23.0; BMR-Review handoff
+    of 2026-11-23, operator approved the same day). A present value must be a
+    bool: a truthy string or 1 would be a guess about what the tuner meant.
+    """
+    if config.get_source() is None:
+        return False
+    v = getattr(config, "TITLE_DATE_TOKENS", None)
+    if v is None:
+        return False
+    if not isinstance(v, bool):
+        raise ValueError(f"TITLE_DATE_TOKENS must be true or false, got {v!r}")
+    return v
+
+
+def _title_bonus_min_best():
+    """The weakest best title pair that still earns the accumulation bonus,
+    or ``None`` (0.77.0).
+
+    ``nonlinear.accumulate`` adds a diminishing bonus for every further
+    aligned pair, which turned two 0.69 title pairs into a title quality of
+    1.133: a different film ("A Christmas Gift of Love" against "An Antique
+    Christmas", same cast, year and length) scored 94.0 Accept. Below this
+    cut the title quality is the best pair alone (BMR-Review handoff of
+    2026-11-23, measured on its labelled corpora; operator approved the same
+    day at 0.85, the similarity this module treats as "the same title"
+    throughout). The cut lives here, not in ``accumulate``, which serves
+    every list field. Optional like the other knobs, reserved for
+    compare-spec 2.22.0; a present value must be a number in (0, 1].
+    """
+    if config.get_source() is None:
+        return None
+    v = getattr(config, "TITLE_BONUS_MIN_BEST", None)
+    if v is None:
+        return None
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0.0 < v <= 1.0:
+        raise ValueError(f"TITLE_BONUS_MIN_BEST must be a number in (0, 1], got {v!r}")
+    return float(v)
+
+
 def cmp_titles(a, b):
     # Internal-class titles (LanguageTool, 2026-09-30: Internal = system-
     # generated, a machine translation; ~450,000 registry-wide, 11% of a 2%
@@ -214,7 +261,14 @@ def cmp_titles(a, b):
         return FieldResult("title", None, why, meta={})
     _ep = ((getattr(a, "creation_type", None) or "") in ("Episode", "Season")
            and (getattr(b, "creation_type", None) or "") in ("Episode", "Season"))
-    simf = partial(title_similarity, episodic=_ep)
+    # Date tokens are an Episode/Season rule (operator, 2026-11-23), like the
+    # compound-title and part rules this flag already gates. Read (and
+    # validated) for every pair, so a malformed knob fails on the first
+    # comparison, not on the first Episode.
+    dates_knob = (config.get_source() is not None
+                  and getattr(config, "TITLE_DATE_TOKENS", None) is not None)
+    dates_on = _title_date_tokens() and _ep
+    simf = partial(title_similarity, episodic=_ep, dates=dates_on)
     internal_used = False
     if discount is None:
         qs = _greedy_align(a_raw, b_raw, simf=simf)
@@ -268,8 +322,13 @@ def cmp_titles(a, b):
     # a conflict, so the meta said part_conflict=True and part_ambiguous
     # (computed only without a conflict) almost never fired. Only DIFFERENT
     # numbers on the same base conflict for episodes; films keep both halves.
-    pconf = (_numbered_parts_conflict(a_raw, b_raw) if _ep
-             else parts_conflict(a_raw, b_raw))
+    # With dates on, the part checks read the titles with their dates
+    # removed, as title_similarity does, so a date never stands in front of
+    # a part number ("13/08/2026 - Show Part 2" is "Show Part 2").
+    a_pt = [date_tokens(x)[1] for x in a_raw] if dates_on else a_raw
+    b_pt = [date_tokens(x)[1] for x in b_raw] if dates_on else b_raw
+    pconf = (_numbered_parts_conflict(a_pt, b_pt) if _ep
+             else parts_conflict(a_pt, b_pt))
     # When a part conflict is present, record whether the two sides share the
     # same BASE title (the numbered serial case, e.g. "<Show> Part 2" vs
     # "<Show> Part 3"). The raw best_sim is near zero once the differing part
@@ -279,8 +338,8 @@ def cmp_titles(a, b):
     base_match = 0.0
     if pconf:
         from .titles import parse_part
-        pa = [parse_part(x) for x in a_raw]
-        pb = [parse_part(x) for x in b_raw]
+        pa = [parse_part(x) for x in a_pt]
+        pb = [parse_part(x) for x in b_pt]
         for x in pa:
             if not x:
                 continue
@@ -288,12 +347,25 @@ def cmp_titles(a, b):
                 if not y:
                     continue
                 base_match = max(base_match, _title_base_ratio(x[0], y[0]))
-    pamb = _ep and (not pconf) and parts_ambiguous(a_raw, b_raw)
+    pamb = _ep and (not pconf) and parts_ambiguous(a_pt, b_pt)
+    damb = dates_on and dates_ambiguous(a_raw, b_raw)
+    quality = nonlinear.accumulate(qs)
+    cut = _title_bonus_min_best()
+    weak = cut is not None and 0.0 < best < cut and quality > best
+    if weak:
+        quality = best
     detail = (f"best={best:.2f} matches={sum(1 for q in qs if q>0)}"
-              + (" part-ambiguous" if pamb else ""))
+              + (" part-ambiguous" if pamb else "")
+              + (" date-ambiguous" if damb else "")
+              + (" no bonus, weak best" if weak else ""))
     meta = {"best_sim": best, "part_conflict": pconf,
             "part_base_match": base_match,
             "part_ambiguous": pamb}
+    # Only with the knob present, so the knob-absent meta stays identical to
+    # 0.76.x. Like part_ambiguous, a one-sided date is AMBIGUOUS (the undated
+    # title may be any day's broadcast): BMR-Review's scorer caps it at Review.
+    if dates_knob:
+        meta["date_ambiguous"] = damb
     if inc:
         # Only with the knob present, so the knob-absent meta and rationale
         # stay identical to 0.39.0. best_sim above is the DISCOUNTED value:
@@ -302,7 +374,7 @@ def cmp_titles(a, b):
         meta["internal_title_used"] = internal_used
         if internal_used:
             detail += " internal title, discounted"
-    return FieldResult("title", nonlinear.accumulate(qs), detail, meta=meta)
+    return FieldResult("title", quality, detail, meta=meta)
 
 
 def _proportional(qs, n_a, n_b):

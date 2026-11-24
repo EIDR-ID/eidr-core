@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.76.1<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.77.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,27 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.77.0 (2026-11-23)
+
+Two title rules from BMR-Review's handoff of 2026-11-23, approved by the
+operator the same day. Both ship INERT: no score moves until a registered
+parameter source carries the knob. BMR-Review adds each in its own measured
+cycle, at the compare-spec version reserved for it.
+
+* **`TITLE_BONUS_MIN_BEST` (reserved 2.22.0, approved at 0.85).** In
+  `compare.cmp_titles`, a best title pair below it gives the title quality of
+  that pair alone, with no accumulation bonus. `nonlinear.accumulate` is
+  unchanged.
+* **`TITLE_DATE_TOKENS` (reserved 2.23.0, Episode/Season pairs only).** A date
+  in a title is a date, not a compound title: equal dates compare the rest,
+  different dates are the existing 0.20 conflict, one-sided dates compare the
+  rest and set `meta["date_ambiguous"]`. New public names
+  `compare.titles.date_tokens` and `compare.titles.dates_ambiguous`; new
+  keyword `title_similarity(..., dates=False)`.
+* `specs/compare-spec.md` documents both under "Shipped inert". With neither
+  knob registered, `cmp_titles` returns exactly what 0.76.1 did (meta keys
+  included).
 
 ### 0.76.1 (2026-11-23)
 
@@ -955,6 +976,8 @@ edition's Changes entry.
 | [`eidr_core.compare.states.field_not_counted`](#field_not_counted) | function | Lists fields that have a real quality but were not counted in the score, naming the affected side. |
 | [`eidr_core.compare.states.field_states`](#field_states) | function | Builds the payload's `field_states` and `field_qualities` maps from an engine rationale, keyed by UI field-manifest keys. |
 | [`eidr_core.compare.states.ui_field_key`](#ui_field_key) | function | Maps an engine field name to its De-Dupe UI field-manifest key, such as `title` to `titles`. |
+| [`eidr_core.compare.titles.date_tokens`](#date_tokens) | function | Finds the dates in a title (0.77.0, BMR-Review's handoff of 2026-11-23): `d/m/y`, `d.m.y` and `d-m-y` with the same separator twice and a two- or four-digit year, `y-m-d`, and `m/d` after an English weekday (`Mon, 6/16`, removed with its weekday). |
+| [`eidr_core.compare.titles.dates_ambiguous`](#dates_ambiguous) | function | True when any pair of titles (not only the best pair) has a date on exactly one side and the rest agrees (`title_similarity` with the Episode rules at least 0.85): the undated title may be any day's broadcast, so, like a one-sided part number, the pair should not reach Accept on the title. |
 | [`eidr_core.compare.titles.is_internal`](#is_internal) | function | Returns True for a title with text whose class is `Internal` (case-insensitive, stripped) and that is not also system-generated. |
 | [`eidr_core.compare.titles.parse_part`](#parse_part) | function | Parses a part number out of a title and returns the normalised base title with the part as an integer. |
 | [`eidr_core.compare.titles.parts_ambiguous`](#parts_ambiguous) | function | Returns True when any title pair has a part number on exactly one side and the bases agree. |
@@ -2593,10 +2616,10 @@ Defined in `src/eidr_core/compare/__init__.py`.
 | `a` | - | required | Submitted record: any object with a `titles` list (objects with `text`, optional `system_generated`, `title_class`) and optional `creation_type`. |
 | `b` | - | required | Candidate record, same shape as `a`. |
 
-**Returns** not annotated -- `FieldResult` with field `"title"`: quality from `accumulate` over the aligned pairs (above 1.0 when several titles match), or `None` with `meta={}` when a side has no title text or both sides hold only fallback titles. Otherwise `meta` has `best_sim`, `part_conflict`, `part_base_match`, `part_ambiguous`, plus `internal_title_used` when the Internal knob is registered.
+**Returns** not annotated -- `FieldResult` with field `"title"`: quality from `accumulate` over the aligned pairs (above 1.0 when several titles match), or `None` with `meta={}` when a side has no title text or both sides hold only fallback titles. Otherwise `meta` has `best_sim`, `part_conflict`, `part_base_match`, `part_ambiguous`, plus `internal_title_used` when the Internal knob is registered and `date_ambiguous` when `TITLE_DATE_TOKENS` is registered (0.77.0).
 <!-- /dict -->
 
-**Does.** Compares two records' title lists with part and segment rules, greedy one-to-one alignment, and diminishing credit for extra matches. Real titles are preferred (`select_titles`): system-generated and, by default, Internal titles are fallback only, and the field is dropped when both sides fall back. Pair similarity is `titles.title_similarity`, with the episode rules on only when both records are Episode or Season. With `INTERNAL_TITLE_DISCOUNT` registered (a number in (0, 1]; compare-spec 2.20.0 sets 0.8), Internal titles are included, every pair touching one is multiplied by it, and an Internal pair counts only as the best aligned pair, never as an accumulation bonus; any other non-None value raises ValueError.
+**Does.** Compares two records' title lists with part and segment rules, greedy one-to-one alignment, and diminishing credit for extra matches. Real titles are preferred (`select_titles`): system-generated and, by default, Internal titles are fallback only, and the field is dropped when both sides fall back. Pair similarity is `titles.title_similarity`, with the episode rules on only when both records are Episode or Season. With `INTERNAL_TITLE_DISCOUNT` registered (a number in (0, 1]; compare-spec 2.20.0 sets 0.8), Internal titles are included, every pair touching one is multiplied by it, and an Internal pair counts only as the best aligned pair, never as an accumulation bonus; any other non-None value raises ValueError. Two more optional knobs (0.77.0; inert until registered, reserved for compare-spec 2.22.0 and 2.23.0): `TITLE_BONUS_MIN_BEST`, a number in (0, 1], makes the title quality the best pair alone when that pair is below it (detail `no bonus, weak best`); `TITLE_DATE_TOKENS`, a bool, turns on `title_similarity(dates=True)` for Episode/Season pairs, reads the part checks on the titles with their dates removed, and adds `date_ambiguous` to the meta (detail `date-ambiguous`). A malformed value raises ValueError on the first comparison.
 
 **Notes.** Needs registered parameters unless the field is dropped (`accumulate` reads `NL_MODIFIER`, `FIELD_BONUS_CAP`). For an Episode or Season pair, a part number on one side only (`Show Part 2` vs `Show`) reports `part_ambiguous: True`, `part_conflict: False` (since 0.69.0, operator ruling 2026-10-19; it reported a conflict) and scores `PART_AMBIGUOUS_QUALITY` (0.70); different part numbers still conflict, and films are unchanged (`Rocky 2` vs `Rocky` conflicts). `titles.parts_conflict` itself keeps the film meaning. The detail strings `no real title to compare` and `system-generated titles only - ignored` are pinned by De-Dupe UI's spec audit; do not reword them casually.
 
@@ -2996,7 +3019,7 @@ Defined in `src/eidr_core/compare/states.py`.
 ## `eidr_core.compare.titles`
 
 <!-- dict-module:eidr_core.compare.titles -->
-Source `src/eidr_core/compare/titles.py`. Public names: 7 functions, 2 constants (declared by `__all__`).
+Source `src/eidr_core/compare/titles.py`. Public names: 9 functions, 2 constants (declared by `__all__`).
 <!-- /dict-module -->
 
 **Purpose.** The one implementation of title matching: part-number parsing in several languages, order-independent segment titles, episode-only semantics, and the choice of which titles to compare (real versus system-generated or Internal). It was updated from BMR-Review's engine cycle on 2026-08-05, and BMR-Review's own `titles.py` is now a shim over it. `compare.cmp_titles` is built on it.
@@ -3142,7 +3165,7 @@ Defined in `src/eidr_core/compare/titles.py`.
 
 <!-- dict:eidr_core.compare.titles.title_similarity -->
 ```python
-def title_similarity(a_raw, b_raw, *, episodic=False)
+def title_similarity(a_raw, b_raw, *, episodic=False, dates=False)
 ```
 
 Defined in `src/eidr_core/compare/titles.py`.
@@ -3152,6 +3175,7 @@ Defined in `src/eidr_core/compare/titles.py`.
 | `a_raw` | - | required | First raw title string. |
 | `b_raw` | - | required | Second raw title string. |
 | `episodic` | - | `False` (keyword-only) | Turns on the episode-only rules: compound titles are combinations (a different set gives 0.20) and a part number on one side only is ambiguous (0.70). Off by default because both rules are wrong for films. |
+| `dates` | - | `False` (keyword-only) | Reads a date in a title as a date before any other rule (0.77.0; see `date_tokens`). Acts only with `episodic=True`. Equal dates: the rest is compared. Different dates: `COMBINATION_DIFFERS_QUALITY`. One side dated: the rest is compared. Off by default; `cmp_titles` passes it when `TITLE_DATE_TOKENS` is registered true. |
 
 **Returns** not annotated -- `float` in [0, 1].
 <!-- /dict -->
@@ -3175,6 +3199,45 @@ Defined in `src/eidr_core/compare/titles.py`.
 
 **Value** `PART_AMBIGUOUS_QUALITY = 0.70` -- Similarity `title_similarity(..., episodic=True)` returns when only one title carries a part number and the bases agree (>= 0.85), so the title alone cannot carry a pair to Accept. Module constant: not in compare-spec.json and not settable through `set_params`.
 <!-- /dict -->
+
+### `date_tokens`
+
+<!-- dict:eidr_core.compare.titles.date_tokens -->
+```python
+def date_tokens(raw)
+```
+
+Defined in `src/eidr_core/compare/titles.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `raw` | - | required | A raw title. `None` reads as `''`. |
+
+**Returns** not annotated -- `(dates, rest)`: a list of date keys in title order, and the title with them removed, separators trimmed from its edges and empty brackets dropped. `([], raw)` when there is no date.
+<!-- /dict -->
+
+**Does.** Finds the dates in a title (0.77.0, BMR-Review's handoff of 2026-11-23): `d/m/y`, `d.m.y` and `d-m-y` with the same separator twice and a two- or four-digit year, `y-m-d`, and `m/d` after an English weekday (`Mon, 6/16`, removed with its weekday). Day and month must be plausible in either order (both at most 31, one at most 12), and no digit, slash, dot or hyphen may touch the token, so `9/11` and `6/16` alone are not dates. A key is `('dmy', first, second, yy, yyyy)` (`yyyy` None for a two-digit year; `y-m-d` reordered, so `2026-08-13` and `13/08/2026` give the same key) or `('md', month, day)`. Nothing is interpreted: d/m and m/d are not told apart.
+
+**Notes.** Pure. A version-like number with plausible parts (`Show 1.2.10`) is taken for a date; harmless when both titles carry it; on one side only it reads as a one-sided date.
+
+### `dates_ambiguous`
+
+<!-- dict:eidr_core.compare.titles.dates_ambiguous -->
+```python
+def dates_ambiguous(a_titles, b_titles)
+```
+
+Defined in `src/eidr_core/compare/titles.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `a_titles` | - | required | Raw title strings of one record. |
+| `b_titles` | - | required | Raw title strings of the other. |
+
+**Returns** not annotated -- `bool`.
+<!-- /dict -->
+
+**Does.** True when any pair of titles (not only the best pair) has a date on exactly one side and the rest agrees (`title_similarity` with the Episode rules at least 0.85): the undated title may be any day's broadcast, so, like a one-sided part number, the pair should not reach Accept on the title. `cmp_titles` reports it as `meta["date_ambiguous"]` when `TITLE_DATE_TOKENS` is on (0.77.0). Pure.
 
 ## `eidr_core.db_schemas`
 

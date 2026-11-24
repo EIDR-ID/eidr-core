@@ -101,7 +101,18 @@ _CLAIM = re.compile(
     r"(-?[0-9]+(?:\.[0-9]+)?)"       # the number it claims
 )
 # Named in the prose but deliberately not a tuning value.
-_NOT_A_VALUE = {"EIDR_COMPARE_SPEC"}
+_NOT_A_VALUE = {
+    "EIDR_COMPARE_SPEC",
+    # A module constant of compare.titles, not a tuning value (fixed by
+    # operator ruling 2026-09-01).
+    "COMBINATION_DIFFERS_QUALITY",
+    # Optional knobs shipped inert in 0.77.0 ("Shipped inert, awaiting their
+    # version"): the prose documents them before BMR-Review defines them in
+    # its measured cycle (reserved 2.22.0 and 2.23.0). Once they are in the
+    # JSON, the numeric-claim test below checks them like any other value.
+    "TITLE_BONUS_MIN_BEST",
+    "TITLE_DATE_TOKENS",
+}
 
 
 def _spec_values():

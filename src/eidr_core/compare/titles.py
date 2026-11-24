@@ -43,6 +43,8 @@ __all__ = [
     "fuzzy",
     "COMBINATION_DIFFERS_QUALITY",
     "PART_AMBIGUOUS_QUALITY",
+    "date_tokens",
+    "dates_ambiguous",
     "is_internal",
     "parse_part",
     "parts_ambiguous",
@@ -143,6 +145,117 @@ COMBINATION_DIFFERS_QUALITY = 0.20   # a different set of segments is a differen
 PART_AMBIGUOUS_QUALITY = 0.70        # numbered vs un-numbered: cannot reach Accept on title
 
 
+# --- date tokens in Episode titles (0.77.0) ---------------------------------
+# A daily programme puts the broadcast date in its title: "13/08/2026 - Quem
+# Ama Nao Esquece". segments() splits on "/", so that title became three
+# segments ("13", "08", "2026 quem ama nao esquece") and scored the
+# combination-differs 0.20 against the registry's undated title, with the
+# parent, date, number and length all matching (BMR-Review handoff of
+# 2026-11-23: 44 audited rows, 3 closed as a no-match nobody saw). Not
+# splitting digit/digit is not the fix: "07/09/2026 - X" against
+# "08/09/2026 - X" would then score 0.97, two days of one programme read as
+# one. So the date is recognised as a date and compared as one (operator
+# approved 2026-11-23, Episode/Season pairs only). Enabled by
+# title_similarity(dates=True); cmp_titles passes it when the registered
+# parameters carry TITLE_DATE_TOKENS true.
+_WEEKDAY = (r"(?:monday|mon|tuesday|tues|tue|wednesday|wed|thursday|thurs|thur"
+            r"|thu|friday|fri|saturday|sat|sunday|sun)\.?")
+# The two separators in a date must be the same character ("13/08/2026",
+# "13.08.2026", "13-08-2026"), and nothing digit-like may touch the token, so
+# "1.2.10" inside a longer number run or "9/11" (no year) never qualifies.
+_YMD = re.compile(r"(?<![\d/.\-])(\d{4})([/.\-])(\d{1,2})\2(\d{1,2})(?![\d/.\-])")
+_DMY = re.compile(r"(?<![\d/.\-])(\d{1,2})([/.\-])(\d{1,2})\2(\d{4}|\d{2})(?![\d/.\-])")
+# Month/day after a weekday: "Mon, 6/16". Without the weekday, "6/16" is as
+# likely a fraction or a segment pair as a date, so it is not taken.
+_WD_MD = re.compile(r"\b" + _WEEKDAY + r",?\s+(\d{1,2})/(\d{1,2})(?![\d/])", re.I)
+# A date written in brackets, "Show, Part 2 (13/08/2026)", leaves "()" behind.
+_EMPTY_BRACKETS = re.compile(r"[(\[]\s*[)\]]")
+_EDGE = re.compile(r"^[\s\-\u2013\u2014:|,./]+|[\s\-\u2013\u2014:|,./]+$")
+
+
+def _plausible(a, b):
+    # Day and month in either order (d/m or m/d): both at most 31, one at
+    # most 12. A pair that cannot be a date is left in the title untouched.
+    return 1 <= a <= 31 and 1 <= b <= 31 and min(a, b) <= 12
+
+
+def date_tokens(raw):
+    """``(dates, rest)``: the date tokens in a title, in order, and the title
+    with them removed.
+
+    Recognised: ``d/m/y``, ``d.m.y``, ``d-m-y`` (two- or four-digit year),
+    ``y-m-d`` (any of the three separators), and ``m/d`` after a weekday
+    (``Mon, 6/16``, the weekday removed with it). Each date is a tuple compared
+    literally, never interpreted: ``('dmy', first, second, yy, yyyy)``, the
+    year's last two digits and the four-digit year or None (``y-m-d``
+    reordered to that shape, so ``2026-08-13`` equals ``13/08/2026``), or
+    ``('md', month, day)``. ``rest`` has the separators left at its edges
+    trimmed. A title with no date returns ``([], raw)``.
+    """
+    s = "" if raw is None else str(raw)
+    found = []                    # (start, end, key)
+
+    def _free(a, b):
+        return all(b <= x or a >= y for x, y, _ in found)
+
+    for m in _YMD.finditer(s):
+        y, mo, d = int(m.group(1)), int(m.group(3)), int(m.group(4))
+        if 1 <= mo <= 12 and 1 <= d <= 31 and _free(m.start(), m.end()):
+            found.append((m.start(), m.end(), ("dmy", d, mo, y % 100, y)))
+    for m in _DMY.finditer(s):
+        a, b, y = int(m.group(1)), int(m.group(3)), m.group(4)
+        if _plausible(a, b) and _free(m.start(), m.end()):
+            found.append((m.start(), m.end(),
+                          ("dmy", a, b, int(y) % 100, int(y) if len(y) == 4 else None)))
+    for m in _WD_MD.finditer(s):
+        mo, d = int(m.group(1)), int(m.group(2))
+        if _plausible(mo, d) and _free(m.start(), m.end()):
+            found.append((m.start(), m.end(), ("md", mo, d)))
+    if not found:
+        return [], s
+    found.sort()
+    rest, last = [], 0
+    for a, b, _ in found:
+        rest.append(s[last:a])
+        last = b
+    rest.append(s[last:])
+    joined = _EMPTY_BRACKETS.sub(" ", " ".join(p.strip() for p in rest if p.strip()))
+    return [k for _, _, k in found], _EDGE.sub("", " ".join(joined.split()))
+
+
+def _same_date(x, y):
+    """Literal equality of two date keys. A two-digit year equals a
+    four-digit one with the same last two digits (the century is not
+    guessed); a month/day equals only another month/day, since d/m against
+    m/d cannot be told apart."""
+    if x[0] != y[0]:
+        return False
+    if x[0] == "md":
+        return x == y
+    if x[1:4] != y[1:4]:
+        return False
+    return x[4] is None or y[4] is None or x[4] == y[4]
+
+
+def _same_dates(da, db):
+    return len(da) == len(db) and all(_same_date(x, y) for x, y in zip(da, db, strict=True))
+
+
+def dates_ambiguous(a_titles, b_titles):
+    """True when ANY pair of raw titles has a date on exactly ONE side and the
+    rest agrees (similarity >= 0.85, Episode rules) -- the undated title may
+    be any one day's broadcast, so, like a one-sided part number, the pair may
+    not reach Accept on the title. Read only with dates enabled (0.77.0)."""
+    for a in a_titles:
+        da, ra = date_tokens(a)
+        for b in b_titles:
+            db, rb = date_tokens(b)
+            if bool(da) != bool(db) and title_similarity(
+                    ra if da else a, rb if db else b, episodic=True) >= 0.85:
+                return True
+    return False
+
+
 def segments(raw):
     """Split a slash- or semicolon-delimited segment title into an ordered
     list of normalised segments (duplicates kept, empties dropped), or None
@@ -177,8 +290,15 @@ def fuzzy(a, b):
 _fuzzy = fuzzy
 
 
-def title_similarity(a_raw, b_raw, *, episodic=False):
+def title_similarity(a_raw, b_raw, *, episodic=False, dates=False):
     """Pairwise title similarity in [0,1] honouring part/segment rules.
+
+    `dates=True` (0.77.0; Episode/Season pairs only, so it acts only with
+    `episodic=True`) reads a date in a title as a date (see `date_tokens`)
+    before any other rule: both titles dated and the dates equal -> the rest
+    is compared; both dated and the dates differ -> COMBINATION_DIFFERS_QUALITY,
+    the conflict "13/08/2026" against "18/08/2026" already scored; one side
+    dated -> the rest is compared, and `dates_ambiguous` reports the pair.
 
     `episodic=True` switches on two EPISODE-ONLY semantics (operator,
     2026-09-01) that are wrong for films and are therefore off by default:
@@ -193,6 +313,16 @@ def title_similarity(a_raw, b_raw, *, episodic=False):
     applying the episode rules to films dropped 324 confirmed-match title
     pairs by >= 0.2 across three labelled corpora, 247 of them with no
     delimiter at all."""
+    if dates and episodic:
+        da, ra = date_tokens(a_raw)
+        db, rb = date_tokens(b_raw)
+        if da or db:
+            if da and db and not _same_dates(da, db):
+                return COMBINATION_DIFFERS_QUALITY
+            ra, rb = (ra if da else a_raw), (rb if db else b_raw)
+            if da and db and not norm_title(ra) and not norm_title(rb):
+                return 1.0                     # the titles are the same date alone
+            return title_similarity(ra, rb, episodic=True)
     pa, pb = parse_part(a_raw), parse_part(b_raw)
     if pa and pb:
         base = _fuzzy(pa[0], pb[0])

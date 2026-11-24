@@ -17,8 +17,9 @@ emitted values keep their original case.
 Three Alt ID orders, one per surface: canonical (``altid_canonical_key``,
 no IMDb preference, ShortDOI kept), display (``altid_display_key``, IMDb
 first, caller drops ShortDOI) and star export (``altid_star_key``, IMDb
-first, ShortDOI kept; operator 2026-11-12, 0.72.0). ``is_imdb`` is the
-single IMDb test behind the two IMDb-first keys.
+first; operator 2026-11-12, 0.72.0; the caller drops ShortDOI, operator
+2026-11-17). ``is_imdb`` is the single IMDb test behind the two IMDb-first
+keys, ``is_shortdoi`` the single ShortDOI test behind both drops.
 
 Titles are placed STRUCTURALLY: the caller says which title is the
 ResourceName (``is_resource``). A Title Class never makes a title the
@@ -97,8 +98,11 @@ def title_sort_key(text, title_class=None, is_resource: bool = False) -> tuple:
 # ── alt IDs (§4.2 / altid-display-order.md) ────────────────────────────────
 
 def is_shortdoi(id_type, domain) -> bool:
-    """ShortDOI test (display suppression + evaluation exclusion; the
-    canonical/export form RETAINS ShortDOI — do not use this in exporters).
+    """ShortDOI test, for the three places ShortDOI is left out: display,
+    evaluation, and the star export (operator ruling 2026-11-17: "Exclude
+    ShortDOI IDs from the star schema export"; normalized-record §4.2 v1.3).
+    Everywhere else ShortDOI is a valid Alt ID and stays: the canonical form,
+    the standard JSON and XML outputs. Do not use it to filter those.
 
     Whitespace around either half is ignored (0.47.0, BMR-Review's proposal):
     a padded ``"ShortDOI "`` was never a real third-party identifier, and the
@@ -155,7 +159,14 @@ def altid_collapsed_canonical_key(kind, value) -> tuple:
 def altid_star_key(id_type, kind, value) -> tuple:
     """Star export order (operator ruling 2026-11-12; normalized-record
     §4.2 v1.2): IMDb first, then the collapsed Kind, then the value, all
-    casefolded. ShortDOI is RETAINED -- suppressing it stays a display rule.
+    casefolded.
+
+    The star export leaves ShortDOI out (operator ruling 2026-11-17; §4.2
+    v1.3), and the CALLER drops it with ``is_shortdoi`` on the Type and
+    Domain before the collapse, as the display rule does with
+    ``altid_display_key``. The key itself filters nothing: a sort key that
+    drops entries would surprise its callers, and the collapse has already
+    lost the Type and Domain the test needs.
 
     ``id_type`` is the entry's Type BEFORE the star shape collapses Type and
     Domain into one Kind, because the collapse loses it (a Proprietary

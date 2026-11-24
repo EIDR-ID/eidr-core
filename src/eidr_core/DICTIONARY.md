@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.76.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.76.1<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,22 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.76.1 (2026-11-23)
+
+Documentation and spec only; no code behaviour changed. From XML_to_JSON's
+handoff of 2026-11-17.
+
+* **`normalized-record.md` §4.2 v1.3: the star export leaves out ShortDOI**
+  (operator ruling 2026-11-17: "Exclude ShortDOI IDs from the star schema
+  export"). It was kept there, as in every export. Star only: the canonical
+  form and the standard JSON and XML outputs keep ShortDOI, and BMR sheets
+  never carry it. XML_to_JSON already does this (`a450b51`).
+* **`ordering.is_shortdoi`** names the star export as a permitted use; its
+  docstring had said never to use it in an exporter.
+* **`ordering.altid_star_key`** still filters nothing. Its text now says the
+  caller drops ShortDOI with `is_shortdoi` before sorting, as the display
+  rule already did.
 
 ### 0.76.0 (2026-11-16)
 
@@ -4636,7 +4652,7 @@ Source `src/eidr_core/ordering/__init__.py`. Public names: 11 functions (declare
 * Titles, for display or canonical serialization: `sorted(titles, key=lambda t: title_sort_key(t.text, t.title_class, t.is_resource))`.
 * Alt IDs in canonical order (export, hashing, comparison): `altid_canonical_key`. For a source that already merges Type and Domain into one Kind column: `altid_collapsed_canonical_key`.
 * Alt IDs for a human: drop the entries where `is_shortdoi(...)` is true, then stable-sort by `altid_display_key`.
-* Alt IDs in the star schema / JSONL export: stable-sort by `altid_star_key` (IMDb first, ShortDOI kept; operator 2026-11-12).
+* Alt IDs in the star schema / JSONL export: drop ShortDOI with `is_shortdoi` (operator 2026-11-17), then stable-sort by `altid_star_key` (IMDb first; operator 2026-11-12).
 * Any place that needs the casefold key rule: `ck`.
 
 **Do not use it when.** The job is one of these:
@@ -4788,7 +4804,7 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 **Returns** `bool` -- True when the Type or the Domain, stripped and casefolded, is exactly `shortdoi`.
 <!-- /dict -->
 
-**Does.** Tests whether an Alt ID is a ShortDOI, by its Type or its Domain (stripped and casefolded since 0.47.0, exact match). Use it to hide ShortDOI from display and to leave it out of evaluation. Never use it to filter an export: canonical and export forms keep ShortDOI.
+**Does.** Tests whether an Alt ID is a ShortDOI, by its Type or its Domain (stripped and casefolded since 0.47.0, exact match). Use it in the three places ShortDOI is left out: display, evaluation, and the star export (operator ruling 2026-11-17; `normalized-record.md` §4.2 v1.3). Do not use it to filter anything else: the canonical form and the standard JSON and XML outputs keep ShortDOI.
 
 ### `title_bucket`
 
@@ -4847,7 +4863,7 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 **Returns** `tuple` -- `(0 or 1, casefold(kind), casefold(value))`; 0 for IMDb.
 <!-- /dict -->
 
-**Does.** Returns the star export order for Alt IDs (operator ruling 2026-11-12; `normalized-record.md` §4.2 v1.2): IMDb entries first, then by Kind, then by value. ShortDOI is kept; do not filter it. The IMDb test is `is_imdb` on the Type, which the collapse loses, so pass the Type separately: a Proprietary entry with Domain `imdb.com` does not lead. Use it with a stable sort. Pure. New in 0.72.0.
+**Does.** Returns the star export order for Alt IDs (operator ruling 2026-11-12; `normalized-record.md` §4.2 v1.2): IMDb entries first, then by Kind, then by value. It filters nothing. The star export leaves ShortDOI out (operator ruling 2026-11-17; §4.2 v1.3), so drop those entries first with `is_shortdoi` on the Type and Domain, before they collapse into Kind, then sort the rest by this key. The IMDb test is `is_imdb` on the Type, which the collapse loses, so pass the Type separately: a Proprietary entry with Domain `imdb.com` does not lead. Use it with a stable sort. Pure. New in 0.72.0.
 
 ### `is_imdb`
 
@@ -7740,7 +7756,7 @@ no version yet.
 
 | Spec | What it fixes | Status | Machine-readable data | Implemented or checked by |
 |---|---|---|---|---|
-| `specs/normalized-record.md` | The field model of an EIDR record and its canonical ordering (titles, Alt IDs, credits) | SPEC v1, ratified 2026-07-29 | none | `eidr_core.ordering`; consumers XML_to_JSON, BMR-Review, eidr-wikidata, De-Dupe UI |
+| `specs/normalized-record.md` | The field model of an EIDR record and its canonical ordering (titles, Alt IDs, credits) | SPEC v1.3 (2026-11-17; v1 ratified 2026-07-29) | none | `eidr_core.ordering`; consumers XML_to_JSON, BMR-Review, eidr-wikidata, De-Dupe UI |
 | `specs/unified-scoring.md` | The design of the one match-candidate scoring engine: layers, banded states, per-creation-type weights | approved 2026-07-27 | its runtime config is the compare-spec | BMR-Review's engine (reference), De-Dupe UI (JavaScript) |
 | `specs/compare-spec.md` | The engine's tuning surface: weights, values, states, rationale, and the porting requirements | the version is the JSON's `$spec.version`: 2.20.0 on 2026-10-13 | `src/eidr_core/specs/compare-spec.json`, loaded by `eidr_core.compare.spec.load_spec` (override with `EIDR_COMPARE_SPEC`) | Authored in BMR-Review `eidr_dedup_score/config.py` and regenerated, never hand-edited; conforming: BMR-Review, De-Dupe UI |
 | `specs/golden-pairs.md` | The conformance corpus formats (`pair`, `case`, `recovery_pool`), invariants, and the optional `ancestry` block | landed; 44 fixtures at compare-spec 2.20.0 (three carry `ancestry`) | `src/eidr_core/specs/golden_pairs/*.json`; `golden_pairs_pending/` holds fixtures that wait on an engine version | Evaluator: BMR-Review `eidr_dedup_score/golden.py`; conforming: BMR-Review, De-Dupe UI |

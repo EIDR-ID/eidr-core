@@ -1,4 +1,4 @@
-# Normalized EIDR Record — field model & canonical ordering (SPEC v1.2)
+# Normalized EIDR Record — field model & canonical ordering (SPEC v1.3)
 
 **Status: ✅ RATIFIED with amendments by the operator, 2026-07-29** (register
 Phase 2.1). The amendments are folded in below: §3 field-model corrections
@@ -169,10 +169,16 @@ type).
    value. Within IMDb, and within every other kind group, order is
    `(casefold(kind), casefold(value))` as canonical.
 
-**Star export order (v1.2, operator ruling 2026-11-12):** the star schema /
-JSONL export lists IMDb first, then sorts by `(casefold(kind),
-casefold(value))` on its collapsed Kind. ShortDOI is **retained** there, as
-in every export. IMDb is decided by the Type alone, read before Type and
+**Star export (v1.2, operator ruling 2026-11-12; v1.3, 2026-11-17):** the
+star schema / JSONL export **leaves out ShortDOI** ("Exclude ShortDOI IDs
+from the star schema export", operator 2026-11-17), decided by
+`eidr_core.ordering.is_shortdoi` on the Type and Domain before they collapse
+into Kind; a block whose only Alt ID is a ShortDOI has no Alt IDs. It then
+lists IMDb first and sorts by `(casefold(kind), casefold(value))` on its
+collapsed Kind. This is the star shape only: the canonical form and the
+standard JSON and XML outputs keep ShortDOI (operator, 2026-10-17), and BMR
+sheets never carry it (operator, 2026-11-12). IMDb is decided by the Type
+alone, read before Type and
 Domain collapse into Kind (a Proprietary entry with Domain `imdb.com` is not
 IMDb). The reference is `eidr_core.ordering.altid_star_key`, which shares
 `is_imdb` with the display key. This is a rule for the star shape only:
@@ -234,6 +240,14 @@ Both gaps are closed; this section is kept as the record of how.
 
 ## 8. Change history
 
+* **v1.3 — 2026-11-17.** §4.2: the star export leaves out ShortDOI
+  (operator ruling 2026-11-17: "Exclude ShortDOI IDs from the star schema
+  export"). Until then it was kept there, as in every export. Star only: the
+  canonical form and the standard JSON and XML outputs keep it. Reference:
+  `eidr_core.ordering.is_shortdoi` (the caller filters; `altid_star_key`
+  still sorts and filters nothing). Implemented by XML_to_JSON (`a450b51`,
+  its star lock 34 ShortDOI entries fewer). No golden-pair expectation
+  depends on Alt IDs being present in star output, so none changed.
 * **v1.2 — 2026-11-13.** §4.2: the star export lists IMDb first (operator
   ruling 2026-11-12: "Sort Alt IDs by their Kind then value, listing IMDb
   first ... This need only apply to star schema."). Until then IMDb-first was

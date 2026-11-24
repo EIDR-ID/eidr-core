@@ -1245,3 +1245,78 @@ def test_both_adapters_agree_on_a_dated_season_title(end):
                                       end_date=end), _parent_rec(), "Season")
     want = "The Series [2021-2022]" if end else "The Series [2021]"
     assert json_full["ResourceName"][0]["Title"] == rec_full.titles[0].text == want
+
+
+# --- an Episode under a user-titled Season (operator, 2026-11-24; 0.78.0) ----
+# The registry titles it from the Series too: "America Reports: 2024: Episode
+# 110" under the Season titled "2024"; "Parallels [2015-03-01]" under the
+# Season "One Night Movie Version". Mirror, 2026-11-24: 37,202 such Episodes
+# match the builder; the 1,653 others are registry titles left stale by a
+# Series retitle. Without the Series a plausible "2024: Episode 110" comes out,
+# which only a test sees.
+
+USER_SEASON = {"ResourceName": [{"Title": "2024", "_lang": "en"}]}
+GEN_SEASON = {"ResourceName": [{"Title": "America Reports: Season 3", "_lang": "en",
+                                "SystemGenerated": "true"}]}
+
+
+@pytest.mark.parametrize("kw,expected", [
+    ({"distribution_number": "110"}, ("America Reports: 2024: Episode 110", "series numeric")),
+    ({"release_date": "2015-03-01"}, ("America Reports [2015-03-01]", "series date")),
+    ({"release_date": "2012-05-19", "time_slot": "16:50:00"},
+     ("America Reports [2012-05-19 16:50]", "series date")),
+])
+def test_the_generator_prefixes_the_series_when_told(kw, expected):
+    assert system_generated_title("2024", "Episode", series_title="America Reports",
+                                  **kw) == expected
+
+
+def test_the_series_title_never_touches_a_season():
+    assert system_generated_title("America Reports", "Season", sequence_number="3",
+                                  series_title="X") == ("America Reports: Season 3",
+                                                        "series numeric")
+
+
+@pytest.mark.parametrize("parent,series,want", [
+    (USER_SEASON, "America Reports", "America Reports: 2024: Episode 110"),
+    (USER_SEASON, None, "2024: Episode 110"),            # caller passed no Series
+    (USER_SEASON, "  ", "2024: Episode 110"),
+    (GEN_SEASON, "America Reports", "America Reports: Season 3: Episode 110"),
+])
+def test_build_full_base_uses_the_series_only_under_a_user_titled_season(parent, series, want):
+    full, prov = build_full_base({}, parent, "Episode", extra={"DistributionNumber": "110"},
+                                 series_title=series)
+    assert full["ResourceName"] == [{"Title": want, "TitleClass": "series numeric",
+                                     "_lang": "en", "SystemGenerated": "true"}]
+    assert prov["ResourceName"] == "system"
+
+
+def test_the_language_stays_the_seasons_when_the_text_comes_from_the_series():
+    # Measured: all 6,987 such Episodes whose Season and Series languages
+    # differ take the SEASON's (the parent's) language.
+    parent = {"ResourceName": [{"Title": "Saison 1", "_lang": "fr"}]}
+    full, _ = build_full_base({"ReleaseDate": "2015-03-01"}, parent, "Episode",
+                              series_title="Parallels")
+    assert full["ResourceName"][0]["Title"] == "Parallels [2015-03-01]"
+    assert full["ResourceName"][0]["_lang"] == "fr"
+
+
+@pytest.mark.parametrize("season_generated", [False, True])
+@pytest.mark.parametrize("extra,kw", [
+    ({"DistributionNumber": "110"}, {"distribution_number": "110"}),
+    ({}, {"release_date": "2015-03-01"}),
+])
+def test_both_adapters_agree_under_a_user_or_generated_season(season_generated, extra, kw):
+    title = {"Title": "2024", "_lang": "en"}
+    if season_generated:
+        title["SystemGenerated"] = "true"
+    self_base = {"ReleaseDate": kw["release_date"]} if "release_date" in kw else {}
+    json_full, _ = build_full_base(self_base, {"ResourceName": [title]}, "Episode",
+                                   extra=extra, series_title="America Reports")
+    parent = _Rec(creation_type="Season",
+                  titles=[_Title(text="2024", lang="en", is_resource=True,
+                                 system_generated=season_generated)])
+    rec_full = build_full_record(_Rec(creation_type="Episode", **kw), parent, "Episode",
+                                 series_title="America Reports")
+    assert json_full["ResourceName"][0]["Title"] == rec_full.titles[0].text
+    assert ("America Reports" in rec_full.titles[0].text) is not season_generated

@@ -241,6 +241,7 @@ def system_generated_title(
     release_date: Any = None,         # the fallback for both
     time_slot: Any = None,            # Episode, date form only (0.74.0)
     end_date: Any = None,             # Season, date form only (0.76.0)
+    series_title: Any = None,         # Episode under a user-titled Season (0.78.0)
 ) -> tuple[str, str] | None:
     """``(title, title_class)`` for a Season or Episode, or None.
 
@@ -282,6 +283,21 @@ def system_generated_title(
     shape the mirror holds; anything else is ignored rather than guessed.
     Never on the numbered form or on a Season: the registry has no such
     title (no Episode with both a number and a slot exists to show one).
+
+    An Episode whose Season title the SUBMITTER supplied is titled from the
+    Series as well: ``<Series Title>: <Season Title>: Episode <N>``, or
+    ``<Series Title> [<Episode Release Date>]`` (the Season's title left out),
+    when ``series_title`` is given (operator ruling 2026-11-24, "Yes" to
+    following the registry). Measured on the mirror, 2026-11-15: 37,046
+    numbered Episodes under a user-titled Season take the first form and 0
+    take ``<Season>: Episode <N>`` (live: 10.5240/4778-F5B5-8ACC-3F5B-53A0-U
+    "America Reports: 2024: Episode 110" under the Season titled "2024"); all
+    60 dated ones take the second ("Parallels [2015-03-01]" under the Season
+    "One Night Movie Version"). It applies even when the Season title already
+    starts with the Series title ("Free Ride: Free Ride 2008: Episode 6"). A
+    generated Season title already holds the Series title, which is why only
+    a user-supplied one needs it. The CALLER decides: the builders pass
+    ``series_title`` only when the parent's main title is user-supplied.
 
     The date form is a FALLBACK, not an error path — the pre-2026-08-29
     XML_to_JSON implementation had only the numbered rows and returned None
@@ -328,15 +344,17 @@ def system_generated_title(
         return f"{title} [{stamp}]", "series date"
 
     if creation_type == "Episode":
+        series = _text(series_title)
         dist = _text(distribution_number)
         if dist:
-            return f"{title}: Episode {dist}", "series numeric"
+            prefix = f"{series}: {title}" if series else title
+            return f"{prefix}: Episode {dist}", "series numeric"
         date = _text(release_date)
         if not date:
             return None
         slot = _hh_mm(time_slot)
         stamp = f"{date} {slot}" if slot else date
-        return f"{title} [{stamp}]", "series date"
+        return f"{series or title} [{stamp}]", "series date"
 
     return None
 
@@ -501,11 +519,27 @@ _is_empty = is_absent
 # Shape 1 — registry JSON (BaseObjectData dicts). XML_to_JSON's native form.
 # ---------------------------------------------------------------------------
 
+def _series_prefix(parent_titles: Any, series_title: Any) -> str | None:
+    """The Series title the generator should prefix, or None.
+
+    Only when the parent's MAIN title is user-supplied: a generated Season
+    title already holds the Series title, and a stale generated one is
+    regenerated rather than kept. Both adapters call this, so they cannot
+    disagree on when the Series title applies. (The generator uses it for an
+    Episode only; a Season ignores it.)
+    """
+    if not _text(series_title):
+        return None
+    return _text(series_title) if has_user_supplied_title(parent_titles) else None
+
+
 def build_full_base(
     self_base: dict,
     parent_base: dict | None,
     creation_type: str,
     extra: dict | None = None,
+    *,
+    series_title: str | None = None,
 ) -> tuple[dict, dict[str, str]]:
     """Build a child's FULL ``BaseObjectData`` from its self-defined one.
 
@@ -530,6 +564,14 @@ def build_full_base(
     ``ReleaseDate`` falls back to the child's own ``self_base['ReleaseDate']``
     (never an inherited one); missing ``SequenceNumber``/``DistributionNumber``
     mean the numbered pattern cannot fire.
+
+    ``series_title`` (0.78.0) is the Series' main title, for an Episode whose
+    parent is a Season. Pass it whenever the parent is a Season; it is used
+    only when that Season's main title is user-supplied, where the registry
+    titles the Episode ``<Series>: <Season>: Episode <N>`` or ``<Series>
+    [<date>]`` (see :func:`system_generated_title`). Without it such an
+    Episode gets ``<Season>: Episode <N>``, the pre-0.78.0 title, which does
+    not match the registry's.
 
     Returns ``(full_base, provenance)`` where provenance maps each canonical
     field present in the result to ``'self'``, ``'inherited'`` or
@@ -583,6 +625,7 @@ def build_full_base(
             # The Season's own SeasonInfo/EndDate (0.76.0). Never inherited:
             # ExtraObjectMetadata is the caller's, and only the caller has it.
             end_date=extra.get("EndDate"),
+            series_title=_series_prefix(parent_base.get("ResourceName"), series_title),
             # `full` has not been through the loop yet, so this is the child's
             # OWN date -- which is the point of generating first. `extra`
             # still wins: it is the caller saying "use this date for the
@@ -771,6 +814,7 @@ def build_full_record(
     creation_type: str | None = None,
     *,
     attrs: dict[str, str] | None = None,
+    series_title: str | None = None,
 ) -> Any:
     """Build a child's FULL record object from its self-defined one.
 
@@ -792,6 +836,9 @@ def build_full_record(
     the model's ``titles`` attribute, never copied or reported by presence.
     A model whose ``titles`` is ``None`` is treated as untitled; only a model
     with no ``titles`` attribute at all skips title handling.
+
+    ``series_title`` (0.78.0): as for :func:`build_full_base`, the Series'
+    main title when the parent is a Season.
     """
     attrs = attrs or RECORD_ATTRS
     full = copy.deepcopy(self_rec)
@@ -867,7 +914,7 @@ def build_full_record(
     # build_full_base. Doing it here means `full.release_date` is still the
     # child's OWN date, and the title written below is data that the loop
     # then treats as blocking, exactly as a submitted title would be.
-    title_error = _apply_title(full, parent_full, ctype, prov)
+    title_error = _apply_title(full, parent_full, ctype, prov, series_title)
 
     for field, attr in attrs.items():
         if field not in INHERITABLE_FIELDS or field in NEVER_INHERITED:
@@ -935,6 +982,7 @@ def build_full_record(
 
 def _apply_title(
     full: Any, parent_full: Any, ctype: str, prov: dict,
+    series_title: str | None = None,
 ) -> TitleConstructionError | None:
     """Season/Episode get a constructed title; other child types inherit one.
 
@@ -971,6 +1019,7 @@ def _apply_title(
             time_slot=getattr(full, "time_slot", None),
             # The record's own end date, as the JSON adapter's extra["EndDate"].
             end_date=getattr(full, "end_date", None),
+            series_title=_series_prefix(getattr(parent_full, "titles", None), series_title),
         )
         if not built:
             # Same rule, same failure, same exception as build_full_base -- the

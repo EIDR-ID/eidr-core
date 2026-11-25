@@ -1,0 +1,86 @@
+{
+  "id": "title-weak-best-pair-earns-no-bonus",
+  "added": "2026-11-24",
+  "why": "No accumulation bonus on a weak best title pair (BMR-Review proposal E5, 2026-11-19; operator 2026-11-23: 'Yes, cut at 0.85'; mechanism eidr-core 0.77.0, knob TITLE_BONUS_MIN_BEST, compare-spec 2.22.0). Two titles on each side, each pair a near-miss of about 0.71-0.76 ('Summer of Fire' / 'Winter of Fire', 'Kings of Steel' / 'Queens of Steel'). Without the cut, nonlinear.accumulate adds the second weak pair as a bonus and the title field reaches 1.29, which with year, country and director carries the pair to Accept at 100. With the cut the title quality is the best pair alone, below 0.85, and the pair is a Review. Mutation-tested: with TITLE_BONUS_MIN_BEST removed the fixture fails both invariants. Invariants are value-independent: the title stays below the cut and the pair never auto-accepts. SCOPE: Basic, two real titles per side, no Alt ID; it does not pin the cut's value.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Summer of Fire",
+        "lang": "en",
+        "is_resource": true
+      },
+      {
+        "text": "Kings of Steel",
+        "lang": "en"
+      }
+    ],
+    "release_date": "2001",
+    "countries": [
+      "US"
+    ],
+    "directors": [
+      "Ann Lee"
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/4A7C-21E0-9B3F-58D6-E1A2-K",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Winter of Fire",
+        "lang": "en",
+        "is_resource": true
+      },
+      {
+        "text": "Queens of Steel",
+        "lang": "en"
+      }
+    ],
+    "release_date": "2001",
+    "countries": [
+      "US"
+    ],
+    "directors": [
+      "Ann Lee"
+    ]
+  },
+  "invariants": {
+    "verdict_not_in": [
+      "Accept"
+    ],
+    "field_quality_max": {
+      "title": 0.85
+    }
+  },
+  "expected": {
+    "spec_version": "2.22.0",
+    "confidence": 76.7,
+    "verdict": "Review",
+    "field_qualities": {
+      "title": 0.759,
+      "release_date": 1.0,
+      "director": 1.0,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": null,
+      "original_language": null,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "similar",
+      "release_date": "identical",
+      "director": "identical",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "neutral",
+      "original_language": "neutral",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

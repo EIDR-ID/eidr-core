@@ -209,7 +209,7 @@ same day. Each is read from an OPTIONAL parameter, as
 before. BMR-Review sets the knob in `config.py` in its own measured cycle, at
 the version reserved for it, and these become porting requirements then.
 
-* **`TITLE_BONUS_MIN_BEST` (reserved 2.22.0; approved at 0.85).** When the
+* **`TITLE_BONUS_MIN_BEST` = 0.85 (LANDED at compare-spec 2.22.0, 2026-11-24; now a porting requirement).** When the
   best aligned title pair is below it, the title quality is that best pair
   alone, with no accumulation bonus. Two 0.69 pairs had added up to 1.133,
   and a different film ("A Christmas Gift of Love" against "An Antique

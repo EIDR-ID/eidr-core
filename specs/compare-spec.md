@@ -202,7 +202,7 @@ BMR-Review.
    section, in that operation order, and compute the ` est` suffix by
    comparing against the unflagged score rather than from the flag.
 
-**Shipped inert, awaiting their version (eidr-core 0.77.0).** Two title
+**Shipped inert in eidr-core 0.77.0; both LANDED 2026-11-24 (2.22.0, 2.23.0).** Two title
 rules from BMR-Review's handoff of 2026-11-23, approved by the operator the
 same day. Each is read from an OPTIONAL parameter, as
 `INTERNAL_TITLE_DISCOUNT` first was: absent, the engine scores exactly as
@@ -217,7 +217,7 @@ the version reserved for it, and these become porting requirements then.
   `cmp_titles`, after the Internal-title rule; the shared
   `nonlinear.accumulate` is unchanged. The detail gains `no bonus, weak best`.
   A value outside (0, 1] is refused.
-* **`TITLE_DATE_TOKENS` (reserved 2.23.0; Episode/Season pairs only).** A
+* **`TITLE_DATE_TOKENS` = true (LANDED at compare-spec 2.23.0, 2026-11-24; Episode/Season pairs only; now a porting requirement, including BMR-Review's Review cap on a `date_ambiguous` pair).** A
   date in a title is read as a date before segments and part numbers:
   `d/m/y`, `d.m.y`, `d-m-y` (same separator twice, two- or four-digit
   year), `y-m-d`, and `m/d` after an English weekday (`Mon, 6/16`); day and

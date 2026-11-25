@@ -86,6 +86,11 @@ def _spec_without_knob():
     # config, a test) must keep the pre-0.40.0 behaviour byte for byte.
     spec = load_spec()
     spec.pop("INTERNAL_TITLE_DISCOUNT", None)
+    # The two title knobs that landed at 2.22.0 / 2.23.0 are stripped too: the
+    # pins below are the pre-0.40.0 title comparison byte for byte, and with
+    # TITLE_DATE_TOKENS set every cmp_titles meta carries `date_ambiguous`.
+    spec.pop("TITLE_BONUS_MIN_BEST", None)
+    spec.pop("TITLE_DATE_TOKENS", None)
     return spec
 
 

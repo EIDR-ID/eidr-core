@@ -1,0 +1,82 @@
+{
+  "id": "episode-title-dates-differ-is-a-different-programme",
+  "added": "2026-11-24",
+  "why": "A date in a title is a date (BMR-Review proposal E3; operator 2026-11-23: 'Yes, Episode/Season only'; mechanism eidr-core 0.77.0, knob TITLE_DATE_TOKENS, compare-spec 2.23.0). Two daily episodes under one parent, a day apart, whose titles differ only in the date: '07/09/2026 - Capitulo X' and '08/09/2026 - Capitulo X'. Without the knob the title splits on its slashes and the Roman 'X' folds to 10, so both titles parse as the same base and score 1.0, and the pair auto-matches at 96.7 -- two different days' programmes. With the knob the dates are compared literally: different dates are a different programme (COMBINATION_DIFFERS_QUALITY). Mutation-tested: with TITLE_DATE_TOKENS removed the fixture fails both invariants. SCOPE: Episode, both titles dated d/m/y; it does not pin the 0.20 value.",
+  "submitted": {
+    "creation_type": "Episode",
+    "titles": [
+      {
+        "text": "07/09/2026 - Capitulo X",
+        "lang": "pt",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2026-09-07",
+    "parent_id": "10.5240/1FB4-801D-C016-5F48-86E6-9",
+    "family_id": "10.5240/1FB4-801D-C016-5F48-86E6-9",
+    "countries": [
+      "BR"
+    ],
+    "length_minutes": 45
+  },
+  "candidate": {
+    "eidr_id": "10.5240/4A7C-21E0-9B3F-58D6-E1A2-K",
+    "creation_type": "Episode",
+    "titles": [
+      {
+        "text": "08/09/2026 - Capitulo X",
+        "lang": "pt",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2026-09-08",
+    "parent_id": "10.5240/1FB4-801D-C016-5F48-86E6-9",
+    "family_id": "10.5240/1FB4-801D-C016-5F48-86E6-9",
+    "countries": [
+      "BR"
+    ],
+    "length_minutes": 45
+  },
+  "invariants": {
+    "verdict_not_in": [
+      "Accept"
+    ],
+    "field_quality_max": {
+      "title": 0.5
+    }
+  },
+  "expected": {
+    "spec_version": "2.23.0",
+    "confidence": 25.0,
+    "verdict": "Reject",
+    "field_qualities": {
+      "title": 0.2,
+      "release_date": 0.95,
+      "distribution_number": null,
+      "length": 1.0,
+      "house_sequence": null,
+      "time_slot": null,
+      "director": null,
+      "actor": null,
+      "assoc_org": null,
+      "original_language": null,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "neutral",
+      "release_date": "similar",
+      "episode_distribution_number": "neutral",
+      "duration": "identical",
+      "episode_house_sequence": "neutral",
+      "episode_time_slot": "neutral",
+      "director": "neutral",
+      "actor": "neutral",
+      "associated_org": "neutral",
+      "original_language": "neutral",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

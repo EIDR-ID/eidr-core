@@ -30,7 +30,7 @@ jobs:
           cache: pip
 
       - name: Install package + dev + all extras
-        run: pip install -e ".[dev,compare,bmr,aws]"
+        run: pip install -e ".[dev,compare,bmr,aws,scripts]"
         # registry extra omitted: it pulls `eidr[client]` from PyPI, which
         # is unrelated to this repo's own correctness and would make CI
         # fail on the SDK's release cadence rather than eidr-core's.

@@ -37,7 +37,9 @@ __all__ = [
     "parse_date",
     "parse_minutes",
     "parse_registrant_extra",
+    "romanization_key",
     "sanitize_field",
+    "title_numbers",
 ]
 
 # Leading articles to strip (extend per-language as needed).
@@ -65,6 +67,50 @@ _WORDS = {
     "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
     "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
 }
+
+# A trailing article after a comma, the library-catalogue inversion
+# ('Matrix, The'), for norm_title(trailing_articles=True). Extracted from
+# LanguageTool dedupe._TRAILING_ARTICLE (proposal 1a, 2026-11-24), list
+# unchanged. It is deliberately WIDER than _ARTICLES (Dutch, Portuguese,
+# 'den'/'de'): un-inverting only puts the word back where the title proper
+# has it, and _ARTICLES/_is_leading_article still decide whether it is then
+# stripped, so 'Huis, Het' becomes 'het huis' (kept, as 'Het Huis' is) and
+# 'Matrix, I' becomes '1 matrix' (no Italian plural follows the 'i').
+# Matched after casefold and curly-quote folding, so lower case and a plain
+# apostrophe are all it has to cover.
+_TRAILING_ARTICLE = re.compile(
+    r"^(?P<body>.+?),\s*(?P<art>the|a|an|le|la|les|l'|el|los|las|lo|il|gli|i|der|die|das|"
+    r"den|de|het|een|ein|eine|o|os|as|um|uma)\s*$")
+
+# A Roman numeral as title_numbers reads it: well formed (subtractive pairs
+# only where Roman usage allows them, at most three repeats), any case.
+# LanguageTool's numbers() summed ANY run of the letters ivxlcdm, so the
+# English words 'civil' (153), 'mild' (1449), 'did' (999) and 'ill' (99)
+# came back as numbers, and a one-letter typo such as 'Mild'/'Wild' read
+# as a number change. Requiring the well-formed shape drops those; words
+# that ARE well-formed numerals ('mix', 'di', 'li', 'cd') cannot be told
+# apart from numbers without knowing the language, and still count.
+_ROMAN_NUMERAL = re.compile(
+    r"m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})", re.I)
+# Two letters or more: a single l/c/d/m in a key is an initial ('Dial M for
+# Murder'), and a single i, v or x is already a digit in a norm_title key.
+_ROMAN_TOKEN = re.compile(r"\b[ivxlcdm]{2,}\b", re.I)
+_ROMAN_LETTERS = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100, "d": 500, "m": 1000}
+_DIGITS = re.compile(r"\d+")
+
+# Romanization-scheme folds for romanization_key, applied in this order
+# (order matters: 'shii' loses its long vowel before 'shi' becomes 'si').
+# Extracted from LanguageTool dedupe._ROMANIZATION_FOLDS unchanged: long
+# vowels, Hepburn vs Kunrei-shiki spellings, the object particle 'wo'
+# written 'o', syllabic n before a labial written m, and apostrophe and
+# hyphen separators.
+_ROMANIZATION_FOLDS = (
+    ("ou", "o"), ("oo", "o"), ("uu", "u"), ("aa", "a"), ("ii", "i"), ("ee", "e"),
+    ("shi", "si"), ("chi", "ti"), ("tsu", "tu"), ("fu", "hu"), ("ji", "zi"),
+    ("sha", "sya"), ("shu", "syu"), ("sho", "syo"), ("cha", "tya"), ("chu", "tyu"),
+    ("cho", "tyo"), ("ja", "zya"), ("ju", "zyu"), ("jo", "zyo"),
+    (" wo ", " o "), ("mb", "nb"), ("mp", "np"), ("'", ""), ("-", " "),
+)
 
 
 # Overloads, not a bare ``-> str | None`` (dictionary audit 2026-10-02;
@@ -221,7 +267,8 @@ def _is_leading_article(raw: list[str], s: str) -> bool:
     return (len(nxt) > 1 and nxt.isalpha() and nxt.endswith("i")) or nxt in _IT_I_FOLLOWERS
 
 
-def norm_title(s: str, strip_articles: bool = True) -> str:
+def norm_title(s: str, strip_articles: bool = True, *,
+               trailing_articles: bool = False) -> str:
     """Normalise a title for comparison: NFKC, ASCII fold, casefold, ``&``/``+``
     read as "and", Roman and spelled numerals folded to digits, word aliases
     applied, and (``strip_articles``) one leading article dropped.
@@ -232,16 +279,93 @@ def norm_title(s: str, strip_articles: bool = True) -> str:
     article only when an Italian plural follows it, so English 'I Love
     Lucy' stays '1 love lucy' (operator ruling 2026-10-19; 0.69.0; the rule
     is in _is_leading_article). A one-word title is never stripped, nor a
-    first letter that is an initial beside an ampersand ('A&E')."""
+    first letter that is an initial beside an ampersand ('A&E').
+
+    ``trailing_articles=True`` first moves an article written after a final
+    comma back to the front ('Matrix, The' -> 'The Matrix'), so the
+    catalogue-inverted form folds like the title proper. The leading-article
+    test then runs on the result as usual, so 'Promessi sposi, I' -> 'promessi
+    sposi' but 'Robot, I' -> '1 robot' (the same as 'I, Robot'). The default
+    ``False`` leaves the comma form alone: every key computed before this
+    keyword existed, and every golden pair, stays byte-identical (proposal
+    1a from LanguageTool, accepted 2026-11-26)."""
     if not s:
         return ""
     s = ascii_fold(nfkc(s)).casefold()
     s = re.sub(r"[\u2018\u2019\u201c\u201d]", "'", s)
+    if trailing_articles:
+        # Before tokenising: _is_leading_article reads the un-inverted
+        # STRING too (its "I, Robot" punctuation test), not only the tokens.
+        m = _TRAILING_ARTICLE.match(s.strip())
+        if m:
+            s = f"{m['art']} {m['body']}"
     toks, first_initial, raw = _tokens_around_ampersands(s, alias_title)
     if (strip_articles and len(toks) > 1 and not first_initial
             and _is_leading_article(raw, s)):
         toks = toks[1:]
     return " ".join(toks).strip()
+
+
+def _roman_value(tok: str) -> int | None:
+    """Value of a well-formed Roman numeral, or None for any other word."""
+    if not _ROMAN_NUMERAL.fullmatch(tok):
+        return None
+    vals = [_ROMAN_LETTERS[c] for c in tok.casefold()]
+    # Subtractive reading: a letter worth less than the next one counts
+    # negative (the shape check above already rejected 'iix', 'vx', ...).
+    return sum(-v if i + 1 < len(vals) and v < vals[i + 1] else v
+               for i, v in enumerate(vals))
+
+
+def title_numbers(text: str) -> list[int]:
+    """The numbers a title carries, sorted: every run of digits, and every
+    well-formed Roman numeral of two letters or more, in any case and of
+    any size ('xxi' -> 21, 'mcmxc' -> 1990).
+
+    Meant for a ``norm_title`` key, where single-letter numerals and the
+    number words one to twelve are already digits, so 'Rocky V', 'Rocky 5'
+    and 'Rocky Five' all give ``[5]``. On raw text it reads only digits and
+    numerals of two letters or more.
+
+    Why it is separate from norm_title (proposal 1b from LanguageTool,
+    accepted 2026-11-26): norm_title folds only i to xii, and widening that
+    fold would change every caller's keys and the golden pairs. A caller
+    that must treat a numeral change as a different title ('Rocky XIII' vs
+    'Rocky XIV', 'Treehouse of Horror XXI' vs 'XXII') compares these lists
+    instead, which fuzzy similarity alone scores as a one-letter typo.
+    Words that happen to be well-formed numerals ('mix', 'di', 'li') still
+    count; ones that are not ('civil', 'mild') do not."""
+    if not text:
+        return []
+    found = [int(n) for n in _DIGITS.findall(text)]
+    found += [v for v in (_roman_value(t) for t in _ROMAN_TOKEN.findall(text)) if v]
+    return sorted(found)
+
+
+def romanization_key(folded: str) -> str:
+    """Fold romanization-scheme differences out of an already-folded key
+    (normally a ``norm_title`` key): long vowels written double or with a
+    macron-less 'u' (``ou``/``oo``/``uu``/``aa``/``ii``/``ee`` -> one
+    vowel), Hepburn vs Kunrei-shiki spellings (``shi``/``si``,
+    ``chi``/``ti``, ``tsu``/``tu``, ``fu``/``hu``, ``ji``/``zi``,
+    ``sha``/``sya`` ...), the particle ``wo`` -> ``o``, ``mb``/``mp`` ->
+    ``nb``/``np``, apostrophes dropped and hyphens read as spaces. So
+    'Tōkyō', 'Tokyo' and 'Toukyou' share one key.
+
+    ONLY for comparing two transliterations of the same original (both
+    sides romanized). Applied to ordinary text it merges real distinctions:
+    'you' -> 'yo', 'door' -> 'dor', 'chill' -> 'till'. That is why it is a
+    separate step and not part of norm_title (proposal 1c from
+    LanguageTool, accepted 2026-11-26). Apply it to BOTH sides.
+
+    Expects lower-case input; it does no case or Unicode folding itself."""
+    if not folded:
+        return ""
+    # Padded so ' wo ' also matches the particle at either end of the key.
+    key = f" {folded} "
+    for a, b in _ROMANIZATION_FOLDS:
+        key = key.replace(a, b)
+    return re.sub(r"\s+", " ", key).strip()
 
 
 def norm_name(s: str) -> str:

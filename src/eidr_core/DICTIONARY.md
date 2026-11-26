@@ -71,6 +71,7 @@ with the extras you need, and pin `@main`:
 | `compare` | rapidfuzz | `eidr_core.compare` (imported at module load) |
 | `bmr` | openpyxl | `eidr_core.bmr_io` functions that open or write a workbook |
 | `aws` | boto3 | the AWS path of `eidr_core.secrets_loader` |
+| `scripts` | regex | every function of `eidr_core.scripts` (imported on first use) |
 | `registry` | `eidr[client]`, the EIDR Python SDK from PyPI | `eidr_core.registry.get_registry_client` |
 
 `eidr_core.__version__` is the installed version. Under an editable install,
@@ -847,6 +848,8 @@ These recent changes may still be reaching consumers:
 | Cache facts fetched from an external source | `external.FactCache` and its implementations | |
 | Check a registered runtime or release date against an external fact | `verify.compare_runtime`, `verify.compare_release_date`, `verify.compare_year_arbitration` | |
 | Normalize a title or a name for comparison | `normalize.norm_title`, `normalize.norm_name`, `normalize.cmp_key` | |
+| Tell a number change in a title from a typo, or compare two romanizations | `normalize.title_numbers`, `normalize.romanization_key` | `romanization_key` is for transliterations only |
+| Find which script a title or name is written in | `scripts.profile`, `scripts.char_script`, `scripts.is_non_latin` | needs the `scripts` extra; which LANGUAGE a script implies is not here |
 | Parse a date or a duration from registry text | `normalize.parse_date`, `normalize.parse_minutes`, `normalize.days_between` | |
 | Read the `RD:Pro;` / `AL:Pro;` estimate flags | `normalize.parse_registrant_extra` | |
 | Make text safe for TSV, CSV or PostgreSQL COPY | `normalize.sanitize_field` | |
@@ -1167,7 +1170,9 @@ edition's Changes entry.
 | [`eidr_core.normalize.parse_date`](#parse_date) | function | Parses a date into a year and an optional `(year, month, day)` tuple. |
 | [`eidr_core.normalize.parse_minutes`](#parse_minutes) | function | Parses a duration into minutes; the whole string must match one form, else `None` (never a partial parse). |
 | [`eidr_core.normalize.parse_registrant_extra`](#parse_registrant_extra) | function | Reads the length and release-date estimate flags from a Registrant Extra value. |
+| [`eidr_core.normalize.romanization_key`](#romanization_key) | function | Folds romanization-scheme differences out of a key, so two transliterations of one original compare equal. |
 | [`eidr_core.normalize.sanitize_field`](#sanitize_field) | function | Makes a text value safe to carry through a TSV file or PostgreSQL COPY stream without changing what it says. |
+| [`eidr_core.normalize.title_numbers`](#title_numbers) | function | Reads the numbers a title carries, Roman numerals past twelve included. |
 | [`eidr_core.normalize.aliases.alias_name`](#alias_name) | function | Returns the canonical form of a personal or organisation name token. |
 | [`eidr_core.normalize.aliases.alias_title`](#alias_title) | function | Returns the canonical form of a title or company token. |
 | [`eidr_core.normalize.aliases.ORDINALS`](#ordinals-constant) | constant | Spelled ordinals `first` to `twelfth` (lower-case keys) mapped to the digit strings `'1'` to `'12'`. |
@@ -1191,6 +1196,11 @@ edition's Changes entry.
 | [`eidr_core.registry.CODE_PENDING`](#code_pending-constant) | constant | The registry's in-block "still processing" code (observed 2026-10-01 on sandbox1 as Code 2 / Type pending). |
 | [`eidr_core.registry.CODE_SUCCESS`](#code_success-constant) | constant | The registry's only success code. |
 | [`eidr_core.registry.DEFAULT_REGISTRY`](#default_registry-constant) | constant | Default `registry` for `get_registry_client`: Sandbox 2, which mirrors the production schema and is safe to write to. |
+| [`eidr_core.scripts.char_script`](#char_script) | function | Returns the Unicode script of one letter (`str.isalpha()`); digits, punctuation, symbols, spaces and combining marks are `None`. |
+| [`eidr_core.scripts.is_non_latin`](#is_non_latin) | function | Tests whether most of a string's letters are in a script other than Latin, through `profile` (so NFKC first: full-width `ＡＫＩＲＡ` is Latin). |
+| [`eidr_core.scripts.profile`](#profile) | function | Profiles the scripts of a string after NFKC normalisation, counting each letter by `char_script` and merging Hiragana and Katakana as `'Kana'`. |
+| [`eidr_core.scripts.ScriptProfile`](#scriptprofile-class) | class | Holds what `profile` found in one string. |
+| [`eidr_core.scripts.UNSPACED`](#unspaced-constant) | constant | Scripts written without spaces between words, so a length in words means nothing: `profile` counts their letters as tokens (and Kana's too). |
 | [`eidr_core.secrets_loader.load_aws`](#load_aws) | function | Fetches one secret from AWS Secrets Manager and parses it as JSON. |
 | [`eidr_core.secrets_loader.load_local`](#load_local) | function | Reads a local secrets JSON file, tolerating trailing commas before `}` or `]`. |
 | [`eidr_core.secrets_loader.load_secrets`](#load_secrets) | function | Loads a program's secrets in the portfolio order: explicit path, local-mode flag, then AWS with local fallback. |
@@ -4396,13 +4406,15 @@ Defined in `src/eidr_core/inheritance/__init__.py`.
 ## `eidr_core.normalize`
 
 <!-- dict-module:eidr_core.normalize -->
-Source `src/eidr_core/normalize/__init__.py`. Public names: 13 functions (declared by `__all__`).
+Source `src/eidr_core/normalize/__init__.py`. Public names: 15 functions (declared by `__all__`).
 <!-- /dict-module -->
 
 **Purpose.** Level-1 normalisation primitives for de-dup comparison: Unicode and diacritic folding, a punctuation-blind comparison key, title and name normalisers with numeral folding and word aliasing, country and language code normalisers, date and duration parsers, and the Registrant Extra flag parser. The module moved from BMR-Review on 2026-07-28 (`specs/unified-scoring.md` migration step 1), and BMR-Review keeps a re-export shim. The comparison normalisers are lossy on purpose (case, articles and punctuation go) so that harmless cross-source variation is neutralised before fuzzy comparison. `sanitize_field` is a different job, transport safety, extracted from EIDR MCP. The module also re-exports `canon_country`, which is `eidr_core.codes.normalize_country_code` (upper-case canonical, `SU` -> `SUHH`, keeps `XX`).
 
 **Use it when.**
-* You compare titles or names across sources: `norm_title`, `norm_name`, or `cmp_key` for a punctuation-blind equality key.
+* You compare titles or names across sources: `norm_title`, `norm_name`, or `cmp_key` for a punctuation-blind equality key. `norm_title(trailing_articles=True)` also folds the catalogue form `Matrix, The`.
+* A change in the numbers a title carries must count as a different title, not a typo (`Rocky XIII` vs `Rocky XIV`): compare `title_numbers` of the two keys.
+* You compare two transliterations of one original title (`Tōkyō` / `Toukyou`): `romanization_key` on both `norm_title` keys.
 * You compare country or language codes: `norm_country`, `norm_lang`.
 * You parse sheet or registry dates and durations for comparison: `parse_date`, `days_between`, `parse_minutes`.
 * You read the `AL:Pro` and `RD:Pro` estimate flags: `parse_registrant_extra`.
@@ -4413,7 +4425,8 @@ Source `src/eidr_core/normalize/__init__.py`. Public names: 13 functions (declar
 * You need canonical or display ordering: use `eidr_core.ordering`.
 * You need a country code to store: use `canon_country` / `eidr_core.codes.normalize_country_code`. `norm_country` returns lower-case and blanks `XX`.
 * You need field scores: use `eidr_core.compare`, which calls these normalisers itself.
-* Do not reimplement title or name folding, numeral folding or the alias table locally: call `norm_title` or `norm_name`. If you need more (a trailing article such as `Matrix, The`, numerals past twelve), propose widening them here.
+* Do not reimplement title or name folding, numeral folding or the alias table locally: call `norm_title` or `norm_name`. A trailing article (`Matrix, The`) is `norm_title(trailing_articles=True)`, numerals past twelve are `title_numbers`, and romanization-scheme differences are `romanization_key` (all from LanguageTool's proposal, 2026-11-26). If you need more, propose widening them here.
+* You compare text that is not a transliteration: never apply `romanization_key` to it (`you` -> `yo`, `door` -> `dor`).
 
 **Used by.**
 <!-- dict-usedby:eidr_core.normalize -->
@@ -4578,7 +4591,7 @@ Defined in `src/eidr_core/normalize/__init__.py`.
 
 <!-- dict:eidr_core.normalize.norm_title -->
 ```python
-def norm_title(s: str, strip_articles: bool = True) -> str
+def norm_title(s: str, strip_articles: bool = True, *, trailing_articles: bool = False) -> str
 ```
 
 Defined in `src/eidr_core/normalize/__init__.py`.
@@ -4587,13 +4600,14 @@ Defined in `src/eidr_core/normalize/__init__.py`.
 |---|---|---|---|
 | `s` | `str` | required | A title. A falsy value (`0` included) returns `''`; another non-`str` value is stringified. |
 | `strip_articles` | `bool` | `True` | `True` drops one leading article (from a fixed English, French, Spanish, German and Italian list), but only when the title has more than one token, so a title that is only an article (`'The'`) is kept, and never when the first token is an initial beside an ampersand. `False` keeps it. |
+| `trailing_articles` | `bool` | `False` (keyword-only) | `True` first moves an article written after a final comma back to the front (`Matrix, The` -> `The Matrix`), from the list the, a, an, le, la, les, l', el, los, las, lo, il, gli, i, der, die, das, den, de, het, een, ein, eine, o, os, as, um, uma; `strip_articles` then decides as usual. `False` leaves the comma form as it is (`'matrix the'`), so existing keys and golden pairs do not move. |
 
 **Returns** `str` -- Lower-case, ASCII-folded tokens joined by single spaces (`'The Matrix'` -> `'matrix'`).
 <!-- /dict -->
 
 **Does.** Normalises a title for comparison, folding Unicode, case, punctuation, numerals and common word variants. The steps are NFKC, ASCII fold, casefold, curly quotes to `'`, `&` and `+` to `and`, other punctuation to spaces, then per token Roman numerals i to xii and number words one to twelve to digits and `alias_title` (ordinals and the CT list), so `Part II`, `Part 2` and `Part Two` agree. A letter beside an ampersand stays verbatim and is never taken for an article (`A&E Networks` -> `a and e networks`).
 
-**Notes.** The leading article is tested on the first word as written, before numeral and alias folding (since 0.69.0, operator ruling 2026-10-19; Italian `i` and `lo` were folded to `1` and `low` first). `lo` is always an article (`Lo Hobbit` -> `hobbit`). `i` is one only when an Italian plural, an Italian cardinal or `più` follows (`I Promessi Sposi` -> `promessi sposi`), so English `I Love Lucy`, `I, Robot` and `I Spy` normalise as before (`1 love lucy`). Known misses: about 1 in 40 Italian `I ...` titles (loanwords such as `I babysitter`); `Lo and Behold` loses `lo`. Apostrophes split words (`Don't` -> `don t`, `L'Amour` -> `amour`). A trailing article (`Matrix, The`) is not moved back to the front.
+**Notes.** The leading article is tested on the first word as written, before numeral and alias folding (since 0.69.0, operator ruling 2026-10-19; Italian `i` and `lo` were folded to `1` and `low` first). `lo` is always an article (`Lo Hobbit` -> `hobbit`). `i` is one only when an Italian plural, an Italian cardinal or `più` follows (`I Promessi Sposi` -> `promessi sposi`), so English `I Love Lucy`, `I, Robot` and `I Spy` normalise as before (`1 love lucy`). Known misses: about 1 in 40 Italian `I ...` titles (loanwords such as `I babysitter`); `Lo and Behold` loses `lo`. Apostrophes split words (`Don't` -> `don t`, `L'Amour` -> `amour`). By default a trailing article (`Matrix, The`) is not moved back to the front; `trailing_articles=True` moves it, and then the leading-article rule above applies to the result, so `Promessi sposi, I` -> `promessi sposi` but `Robot, I` -> `1 robot` (the key of `I, Robot`) and `Huis, Het` -> `het huis` (`het` is moved but is not in the strip list, as for `Het Huis`). Only a whole final word after the last comma is moved, but any title that really ends that way is un-inverted too (`Me, Myself, I` -> `1 me myself`).
 
 ### `parse_date`
 
@@ -4668,6 +4682,46 @@ Defined in `src/eidr_core/normalize/__init__.py`.
 **Does.** Makes a text value safe to carry through a TSV file or PostgreSQL COPY stream without changing what it says. It removes NUL bytes (PostgreSQL rejects them), replaces tab, CR, LF and every other C0 control character with a space, and then strips surrounding whitespace. Apply it last, on the way out, and never compare on its output.
 
 **Notes.** It escapes nothing: backslashes, quotes and commas pass through, so CSV quoting and COPY's own backslash escaping stay the writer's job. It does not collapse runs of spaces. Stripping runs last since 0.68.0, so a control character at either end no longer leaves a space behind (`'a\t'` gives `'a'`; it gave `'a '`). DEL (0x7F) and C1 controls (0x80 to 0x9F) pass through unchanged. EIDR MCP keeps two local copies by decision (register R6, extract-only), pinned to this one by its agreement test and changed with it in 0.68.0; new code calls this one.
+
+### `romanization_key`
+
+<!-- dict:eidr_core.normalize.romanization_key -->
+```python
+def romanization_key(folded: str) -> str
+```
+
+Defined in `src/eidr_core/normalize/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `folded` | `str` | required | An already-folded, lower-case key, normally `norm_title`'s. It does no case or Unicode folding itself. A falsy value returns `''`. |
+
+**Returns** `str` -- The key with romanization-scheme differences folded out and whitespace collapsed (`'toukyou monogatari'` -> `'tokyo monogatari'`).
+<!-- /dict -->
+
+**Does.** Folds romanization-scheme differences out of a key, so two transliterations of one original compare equal. It folds long vowels (`ou`, `oo`, `uu`, `aa`, `ii`, `ee` to one vowel), Hepburn vs Kunrei-shiki (`shi`/`si`, `chi`/`ti`, `tsu`/`tu`, `fu`/`hu`, `ji`/`zi`, `sha`/`sya` and the other y-glide pairs), the particle `wo` -> `o`, `mb`/`mp` -> `nb`/`np`, apostrophes dropped and hyphens read as spaces. So `Tōkyō`, `Tokyo` and `Toukyou`, and `Shichinin` and `Sitinin`, share a key. Apply it to both sides.
+
+**Notes.** Only for comparing transliterations: on ordinary text it merges real distinctions (`you` -> `yo`, `door` -> `dor`, `chill` -> `till`), which is why it is not part of `norm_title`. The folds are Japanese-centred; they do not reconcile pinyin with Wade-Giles or other schemes.
+
+### `title_numbers`
+
+<!-- dict:eidr_core.normalize.title_numbers -->
+```python
+def title_numbers(text: str) -> list[int]
+```
+
+Defined in `src/eidr_core/normalize/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `text` | `str` | required | A `norm_title` key (recommended: single-letter numerals and the number words one to twelve are digits there) or any text. A falsy value returns `[]`. |
+
+**Returns** `list[int]` -- Every number found, sorted ascending, duplicates kept (`'2 fast 2 furious'` -> `[2, 2]`); `[]` when there is none.
+<!-- /dict -->
+
+**Does.** Reads the numbers a title carries, Roman numerals past twelve included. It finds every run of digits, and every well-formed Roman numeral of two letters or more, in any case and of any size (`'treehouse of horror xxi'` -> `[21]`, `'mcmxc'` -> `[1990]`). Compare two titles' lists to treat a numeral change as a different title, which a fuzzy ratio scores as a one-letter typo. It is separate from `norm_title`, whose i-to-xii fold is unchanged (as is `compare.titles.parse_part`'s).
+
+**Notes.** A single letter is never read (`Dial M for Murder` -> `[]`), so on raw text `Rocky V` gives `[]`; pass the key (`rocky 5`). A word that is not a well-formed numeral is not a number (`civil`, `mild`, `did`); LanguageTool's original summed any run of the letters i, v, x, l, c, d, m and read those as 153, 1449 and 999. A word that IS well formed still counts (`mix` -> 1009, Italian `di` -> 501, `li` -> 51); no language is consulted.
 
 ## `eidr_core.normalize.aliases`
 
@@ -7843,6 +7897,123 @@ Defined in `src/eidr_core/mddf_json/__init__.py`.
 <!-- /dict -->
 
 **Does.** A `MddfJsonError` subclass, so a caller can treat it apart from other failures.
+
+## `eidr_core.scripts`
+
+<!-- dict-module:eidr_core.scripts -->
+Source `src/eidr_core/scripts.py`. Public names: 3 functions, 1 class, 1 constant (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** Unicode script profiling for titles and names: the script of one letter (`char_script`), a whole string's script profile (`profile` -> `ScriptProfile`: counts, dominant script, share, letter and token counts, Kana over Han), and `is_non_latin`. Python's `unicodedata` has no Script property, so the module reads it through the third-party `regex` package: install the `scripts` extra. `regex` is imported on first use, so the module and `UNSPACED` import without it, and every function raises `ImportError` naming the extra when it is missing. Extracted from LanguageTool's `scripts.py` on 2026-11-26 (register OVERLAPS row 20). Only the mechanics moved: which language a script implies (`SINGLE_LANGUAGE_SCRIPTS`, `single_language()`, the Hebrew/Yiddish refinement) is language policy measured on EIDR data and stays in LanguageTool.
+
+**Use it when.**
+* You must know whether a title or name is written in Latin script or not, or in which script: `profile`, `is_non_latin`.
+* You classify single letters, for example to find a token that mixes scripts: `char_script`.
+* You need a length that means the same across scripts: `ScriptProfile.tokens` counts characters for unspaced scripts (`UNSPACED`) and words otherwise.
+* You keep your own Unicode range table for scripts: call `char_script` instead; it follows the Unicode release `regex` ships and covers the halfwidth, extension and compatibility blocks a hand table misses.
+
+**Do not use it when.**
+* You need the language: a script is evidence, not a language. Han alone may be Chinese, Japanese or Korean, and Cyrillic and Arabic serve many languages. The mapping from script to language is the caller's policy (LanguageTool keeps its own).
+* You cannot install `regex`: every function needs it.
+* You compare or normalise titles: use `eidr_core.normalize`.
+
+**Used by.**
+<!-- dict-usedby:eidr_core.scripts -->
+No consumer imports it directly (scan of 2026-11-26).
+<!-- /dict-usedby -->
+
+### `char_script`
+
+<!-- dict:eidr_core.scripts.char_script -->
+```python
+def char_script(ch: str) -> str | None
+```
+
+Defined in `src/eidr_core/scripts.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `ch` | `str` | required | One character. Results are cached per character. |
+
+**Returns** `str | None` -- One of 31 script names (`'Latin'`, `'Cyrillic'`, `'Greek'`, `'Han'`, `'Hiragana'`, `'Katakana'`, `'Hangul'`, `'Arabic'`, `'Hebrew'`, `'Thai'`, the main Indic scripts, `'Georgian'`, `'Armenian'`, `'Ethiopic'`, `'Khmer'`, `'Lao'`, `'Myanmar'`, `'Tibetan'`, `'Mongolian'`, `'Thaana'`, `'Syriac'`, `'Bopomofo'`); `'Other'` for a letter of any other script; `None` for anything that is not a letter of a script.
+<!-- /dict -->
+
+**Does.** Returns the Unicode script of one letter (`str.isalpha()`); digits, punctuation, symbols, spaces and combining marks are `None`. A letter whose Script property is Common or Inherited is looked up by its Script_Extensions, so the prolonged sound mark `ー` (U+30FC) is `'Hiragana'` and `ʼ` (U+02BC) `'Latin'`; one with no listed extension (the okina `ʻ`, `ℂ`) is `None`. Raises `ImportError` without the `scripts` extra.
+
+**Notes.** The Script_Extensions step is eidr-core's, added at extraction: LanguageTool's original returned `'Other'` for every Common-script letter, so `コーヒー` profiled with `'Other'` dominant and a share of 0.5. Hiragana and Katakana are separate here; `profile` merges them. Compatibility forms are not folded (`profile` applies NFKC first; normalise yourself if you classify raw letters).
+
+### `is_non_latin`
+
+<!-- dict:eidr_core.scripts.is_non_latin -->
+```python
+def is_non_latin(text: str, min_share: float = 0.5) -> bool
+```
+
+Defined in `src/eidr_core/scripts.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `text` | `str` | required | The text to test. `None` or `''` returns `False`. |
+| `min_share` | `float` | `0.5` | The Latin share below which the text counts as non-Latin. |
+
+**Returns** `bool` -- `True` when fewer than `min_share` of the letters are Latin; `False` when there are no letters at all (`'2046'`).
+<!-- /dict -->
+
+**Does.** Tests whether most of a string's letters are in a script other than Latin, through `profile` (so NFKC first: full-width `ＡＫＩＲＡ` is Latin). Raises `ImportError` without the `scripts` extra.
+
+### `profile`
+
+<!-- dict:eidr_core.scripts.profile -->
+```python
+def profile(text: str) -> ScriptProfile
+```
+
+Defined in `src/eidr_core/scripts.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `text` | `str` | required | The text to profile. `None` or `''` gives an empty profile. |
+
+**Returns** `ScriptProfile` -- The letter counts per script and the derived fields; with no letters, `counts` is `{}`, `dominant` `None`, `share` 0.0 and `letters` 0.
+<!-- /dict -->
+
+**Does.** Profiles the scripts of a string after NFKC normalisation, counting each letter by `char_script` and merging Hiragana and Katakana as `'Kana'`. With kana present, `share` is the kana-plus-Han fraction, because Japanese writes both (`七人の侍` has share 1.0 and `script_key` `'Kana'`). `tokens` counts letters when the dominant script is unspaced (`UNSPACED` or Kana) and words otherwise. Raises `ImportError` without the `scripts` extra.
+
+### `ScriptProfile` (class)
+
+<!-- dict:eidr_core.scripts.ScriptProfile -->
+```python
+@dataclass(frozen=True)
+class ScriptProfile
+```
+
+Defined in `src/eidr_core/scripts.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `counts` | `dict[str, int]` | required | Letters per script name, Hiragana and Katakana merged as `'Kana'`; characters that are not letters of a script are not counted. |
+| `dominant` | `str \| None` | required | The script with the most letters, or `None` when there are none. A tie goes to the script met first in the text. |
+| `share` | `float` | required | The dominant script's fraction of all letters; with kana present, the kana-plus-Han fraction. 0.0 with no letters. |
+| `letters` | `int` | required | The number of letters counted (the sum of `counts`). |
+| `tokens` | `int` | required | The number of words (runs between whitespace, punctuation and symbols that contain a letter), or the number of letters when the dominant script is unspaced. |
+| `has_kana` | `bool` | required | `True` when any Hiragana or Katakana is present. |
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `is_latin` | `def is_latin() -> bool` (property) | `True` when the dominant script is Latin. |
+| `is_mixed` | `def is_mixed() -> bool` (property) | `True` when letters of more than one script (Kana counted as one) are present. |
+| `script_key` | `def script_key() -> str \| None` (property) | `'Kana'` whenever kana is present, else `dominant`: any kana means Japanese text, while Han alone may be Chinese, Japanese or Korean. |
+<!-- /dict -->
+
+**Does.** Holds what `profile` found in one string. Frozen; build it with `profile`, not by hand. Which language a profile implies is not part of it (LanguageTool's `single_language()` stayed in LanguageTool).
+
+### `UNSPACED` (constant)
+
+<!-- dict:eidr_core.scripts.UNSPACED -->
+Defined in `src/eidr_core/scripts.py`.
+
+**Value** `UNSPACED = frozenset({"Han", "Hiragana", "Katakana", "Thai", "Lao", "Khmer", "Myanmar", "Tibetan"})` -- Scripts written without spaces between words, so a length in words means nothing: `profile` counts their letters as tokens (and Kana's too). Needs no extra.
+<!-- /dict -->
 
 ## Specs and data files
 

@@ -136,6 +136,10 @@ aws = ["boto3>=1.34"]
 # eidr_core.bmr_io imports openpyxl lazily — only read_sheet needs it; the
 # zip-surgery / layout / plan helpers work without it.
 bmr = ["openpyxl>=3.1"]
+# eidr_core.scripts imports regex lazily (Unicode Script properties, which
+# the stdlib's unicodedata lacks); only profiling text needs it. Floor from
+# LanguageTool, the module's source project (2026-11-26).
+scripts = ["regex>=2024.1"]
 # eidr_core.registry is the portfolio's SDK factory — it imports `eidr` lazily
 # inside get_registry_client(), so only consumers that actually talk to the
 # registry API need this extra.
@@ -219,6 +223,16 @@ module = ["numpy", "numpy.*"]
 follow_imports = "skip"
 # numpy ships .pyi stubs, and follow_imports alone does not apply to stubs.
 follow_imports_for_stubs = true
+
+# regex (the [scripts] extra) ships no py.typed, and mypy knows a types-regex
+# stub package exists, so without this it reports "Library stubs not
+# installed" whether or not regex is present. The global flag above already
+# silences that; this override says so for the module by name, so dropping
+# the global flag later cannot redden the gate here. eidr_core.scripts types
+# the module as Any and relies on none of its annotations.
+[[tool.mypy.overrides]]
+module = ["regex", "regex.*"]
+ignore_missing_imports = true
 
 [tool.setuptools.packages.find]
 where = ["src"]

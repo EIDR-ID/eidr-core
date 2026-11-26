@@ -865,6 +865,7 @@ These recent changes may still be reaching consumers:
 | Write or read an AltIDTool line | `altidtool_io.format_line`, `altidtool_io.write_lines`, `altidtool_io.parse_line`, `altidtool_io.parse_edit_line` | `specs/altidtool-format.md` |
 | Know which Alt ID Kinds are exempt from rule 6 | `altidtool_io.multi_form_domains` | never keep your own copy of the list |
 | Check that a database has the tables and columns you read | `db_schemas.assert_tables` | |
+| Keep confirmed and rejected source-ID / EIDR-ID pairs as history, and ask what held when | `confirmed_pairs.record`, `confirmed_pairs.in_force`, `confirmed_pairs.is_confirmed`, `confirmed_pairs.is_rejected` | append-only: end a verdict with `end_pairs`, never edit a row |
 | Carry eidr-core code into a package that cannot depend on it | `python -m eidr_core.vendor` (`sync`, `check`) | `specs/vendoring.md` |
 
 Names are relative to `eidr_core`. The **Used by.** line in each module
@@ -1023,6 +1024,23 @@ edition's Changes entry.
 | [`eidr_core.compare.titles.title_similarity`](#title_similarity) | function | Returns the similarity of two raw titles in [0, 1], applying part-number and segment rules before plain fuzzy matching. |
 | [`eidr_core.compare.titles.COMBINATION_DIFFERS_QUALITY`](#combination_differs_quality-constant) | constant | Similarity `title_similarity(..., episodic=True)` returns when two compound titles are different segment combinations, or when an undelimited title does not hold every segment of a delimited one. |
 | [`eidr_core.compare.titles.PART_AMBIGUOUS_QUALITY`](#part_ambiguous_quality-constant) | constant | Similarity `title_similarity(..., episodic=True)` returns when only one title carries a part number and the bases agree (>= 0.85), so the title alone cannot carry a pair to Accept. |
+| [`eidr_core.confirmed_pairs.ddl`](#ddl) | function | Returns the one reference schema, portable across PostgreSQL, DuckDB and SQLite: TEXT and INTEGER columns, CHECK constraints on the vocabularies, times as fixed-width ISO-8601 UTC text, indexes on (source, source_id) and eidr_id, and a unique index on `ends_event` so the database refuses a second ending of one verdict. |
+| [`eidr_core.confirmed_pairs.end_pairs`](#end_pairs) | function | Appends an ending row for every verdict in force on each key, without a replacement verdict: for a pair contradicted, merged, aliased or withdrawn. |
+| [`eidr_core.confirmed_pairs.ensure_table`](#ensure_table) | function | Runs `ddl(table)` statement by statement (SQLite executes one at a time). |
+| [`eidr_core.confirmed_pairs.ever_rejected`](#ever_rejected) | function | Answers "was it ever rejected" from the full history, including rejections a later confirmation superseded. |
+| [`eidr_core.confirmed_pairs.follow_aliases`](#follow_aliases) | function | Resolves the stored EIDR IDs through `lookup.resolve_aliases` in one call and pairs each record with where its ID points now. |
+| [`eidr_core.confirmed_pairs.history`](#history) | function | Reads the whole history: verdict rows joined to their ending rows (`ended_at`, `end_reason`, `end_run`). |
+| [`eidr_core.confirmed_pairs.in_force`](#in_force) | function | The as-of query. |
+| [`eidr_core.confirmed_pairs.is_confirmed`](#is_confirmed) | function | Answers "is this pair confirmed now" (or as of `at`). |
+| [`eidr_core.confirmed_pairs.is_rejected`](#is_rejected) | function | The re-match gate for a reviewer's "not this record": True while the rejection holds; a later confirmation supersedes it and the answer becomes False. |
+| [`eidr_core.confirmed_pairs.pairs_from_verdicts`](#pairs_from_verdicts) | function | Turns C4 verdicts into pair records. |
+| [`eidr_core.confirmed_pairs.record`](#record) | function | Appends verdicts, in one transaction. |
+| [`eidr_core.confirmed_pairs.PairRecord`](#pairrecord-class) | class | The one record type both consumers write and read. |
+| [`eidr_core.confirmed_pairs.WriteResult`](#writeresult-class) | class | What one `record` or `end_pairs` call changed; also what `on_write` receives. |
+| [`eidr_core.confirmed_pairs.DECIDERS`](#deciders-constant) | constant | who decided a verdict or an ending; `import` is for rows seeded from a list that kept no per-pair authority. |
+| [`eidr_core.confirmed_pairs.DEFAULT_TABLE`](#default_table-constant) | constant | the table name every helper uses unless given `table=`. |
+| [`eidr_core.confirmed_pairs.END_REASONS`](#end_reasons-constant) | constant | why a verdict stopped holding. |
+| [`eidr_core.confirmed_pairs.VERDICTS`](#verdicts-constant) | constant | the two verdicts a pair can carry. |
 | [`eidr_core.db_schemas.assert_tables`](#assert_tables) | function | Checks that every table and column a consumer declares exists in the packaged schema contract. |
 | [`eidr_core.db_schemas.contract_version`](#contract_version) | function | Returns the version string of a database's packaged schema contract. |
 | [`eidr_core.db_schemas.load_manifest`](#load_manifest) | function | Loads and returns a database's packaged schema manifest as a dict. |
@@ -7900,6 +7918,377 @@ Defined in `src/eidr_core/mddf_json/__init__.py`.
 <!-- /dict -->
 
 **Does.** A `MddfJsonError` subclass, so a caller can treat it apart from other failures.
+
+## `eidr_core.confirmed_pairs`
+
+<!-- dict-module:eidr_core.confirmed_pairs -->
+Source `src/eidr_core/confirmed_pairs/__init__.py`. Public names: 11 functions, 2 classes, 4 constants (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** The confirmed-pair history (reconciliation component C6, built on the operator's instruction of 2026-11-24): every adjudicated source-ID / EIDR-ID pair, confirmed or rejected, kept as append-only history so that "what did we believe about tt0111161 on 2026-12-01?" has an answer. One record type (`PairRecord`), one reference schema (`ddl`) and one set of read and write helpers on a DB-API connection, so eidr-imdb (PostgreSQL) and eidr-wikidata (DuckDB) keep the same rows under the same rules in their own databases and neither writes SQL for it. A changed verdict ends the old one with a new row and never edits it; aliases are followed on read through `lookup.resolve_aliases`; an optional `on_write` hook lets a consumer back up after each write. Built from eidr-wikidata's `confirmed_pairs` table.
+
+**Use it when.** 
+* You read BMR-Review verdicts back and need to keep them: `pairs_from_verdicts`, then `record`.
+* You must not propose a pair a reviewer already decided: `is_rejected`, or `in_force` for a whole source.
+* You need to know a pair is confirmed before writing its Alt ID or using the source's full cast: `is_confirmed`.
+* You need the past: `in_force(at=...)` or `history`.
+* A record in the list has since been merged: `follow_aliases`, which leaves the history as it was.
+
+**Do not use it when.** 
+* You want to know which records carry a source ID in the registry: that is the mirror, through `lookup.claimants`.
+* You need the contribution ledger (values proposed and applied to records): not here yet; eidr-wikidata's `contributed_values` stays its own.
+* Never edit or delete rows of the table by hand: end a verdict with `end_pairs` or supersede it with `record`.
+
+**Used by.**
+<!-- dict-usedby:eidr_core.confirmed_pairs -->
+No consumer imports it directly (scan of 2026-11-24).
+<!-- /dict-usedby -->
+
+### `ddl`
+
+<!-- dict:eidr_core.confirmed_pairs.ddl -->
+```python
+def ddl(table: str = DEFAULT_TABLE) -> str
+```
+
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `table` | `str` | `DEFAULT_TABLE` | The table name, plain or schema-qualified; anything else raises ValueError. |
+
+**Returns** `str` -- the CREATE TABLE and three CREATE INDEX statements, separated by `;\n`, all `IF NOT EXISTS`.
+<!-- /dict -->
+
+**Does.** Returns the one reference schema, portable across PostgreSQL, DuckDB and SQLite: TEXT and INTEGER columns, CHECK constraints on the vocabularies, times as fixed-width ISO-8601 UTC text, indexes on (source, source_id) and eidr_id, and a unique index on `ends_event` so the database refuses a second ending of one verdict.
+
+### `end_pairs`
+
+<!-- dict:eidr_core.confirmed_pairs.end_pairs -->
+```python
+def end_pairs(conn, keys: Iterable[tuple[str, str, str]], *, reason: str, decided_by: str, run: str = "", note: str = "", at: datetime | date | str | None = None, table: str = DEFAULT_TABLE, commit: bool = True, paramstyle: str | None = None, on_write: Callable[[WriteResult], object] | None = None) -> WriteResult
+```
+
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `conn` | - | required | A DB-API connection to the database holding the history (psycopg, psycopg2, DuckDB, SQLite). |
+| `keys` | `Iterable[tuple[str, str, str]]` | required | (source, source_id, eidr_id) triples whose verdicts in force are to end. |
+| `reason` | `str` | required (keyword-only) | One of `END_REASONS`; anything else raises ValueError. |
+| `decided_by` | `str` | required (keyword-only) | One of `DECIDERS`: who ended it. |
+| `run` | `str` | `""` (keyword-only) | The consumer's run ID, stored on the ending rows. |
+| `note` | `str` | `""` (keyword-only) | Free text stored on the ending rows. |
+| `at` | `datetime \| date \| str \| None` | `None` (keyword-only) | The time the write takes effect (datetime, date or ISO-8601 text; naive means UTC); None means now. |
+| `table` | `str` | `DEFAULT_TABLE` (keyword-only) | The table name, plain or schema-qualified; anything else raises ValueError. |
+| `commit` | `bool` | `True` (keyword-only) | True commits (and on failure rolls back) the connection's transaction; False leaves the transaction to you. |
+| `paramstyle` | `str \| None` | `None` (keyword-only) | `'qmark'`, `'format'` or `'pyformat'`; None reads it from the connection's driver module and raises ValueError when it cannot. |
+| `on_write` | `Callable[[WriteResult], object] \| None` | `None` (keyword-only) | Called with the `WriteResult` after the commit, only when something changed: the hook for a consumer's backup. |
+
+**Returns** `WriteResult` -- `WriteResult` with the ended verdicts in `ended` (their `ended_at`, `end_reason`, `end_run` filled); `written` and `unchanged` are empty.
+<!-- /dict -->
+
+**Does.** Appends an ending row for every verdict in force on each key, without a replacement verdict: for a pair contradicted, merged, aliased or withdrawn. A key with nothing in force is skipped, so ending twice writes nothing. An ending earlier than the verdict it ends raises ValueError.
+
+### `ensure_table`
+
+<!-- dict:eidr_core.confirmed_pairs.ensure_table -->
+```python
+def ensure_table(conn, *, table: str = DEFAULT_TABLE, commit: bool = True) -> None
+```
+
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `conn` | - | required | A DB-API connection to the database holding the history (psycopg, psycopg2, DuckDB, SQLite). |
+| `table` | `str` | `DEFAULT_TABLE` (keyword-only) | The table name, plain or schema-qualified; anything else raises ValueError. |
+| `commit` | `bool` | `True` (keyword-only) | True commits after the DDL. |
+
+**Returns** `None` -- nothing.
+<!-- /dict -->
+
+**Does.** Runs `ddl(table)` statement by statement (SQLite executes one at a time). Idempotent. A consumer with its own migrations may put `ddl()` there instead.
+
+### `ever_rejected`
+
+<!-- dict:eidr_core.confirmed_pairs.ever_rejected -->
+```python
+def ever_rejected(conn, source: str, source_id: str, eidr_id: str | None = None, *, table: str = DEFAULT_TABLE, paramstyle: str | None = None) -> bool
+```
+
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `conn` | - | required | A DB-API connection to the database holding the history (psycopg, psycopg2, DuckDB, SQLite). |
+| `source` | `str` | required | The source, `imdb`, `wikidata`, ... (case-folded). |
+| `source_id` | `str` | required | The source's ID (`tt0111161`, `Q172241`). |
+| `eidr_id` | `str \| None` | `None` | The EIDR ID; None asks about every pairing of the source ID. |
+| `table` | `str` | `DEFAULT_TABLE` (keyword-only) | The table name, plain or schema-qualified; anything else raises ValueError. |
+| `paramstyle` | `str \| None` | `None` (keyword-only) | `'qmark'`, `'format'` or `'pyformat'`; None reads it from the connection's driver module and raises ValueError when it cannot. |
+
+**Returns** `bool` -- True when any rejection was ever recorded, ended or not.
+<!-- /dict -->
+
+**Does.** Answers "was it ever rejected" from the full history, including rejections a later confirmation superseded.
+
+### `follow_aliases`
+
+<!-- dict:eidr_core.confirmed_pairs.follow_aliases -->
+```python
+def follow_aliases(records: Iterable[PairRecord], *, mirror_conn, max_depth: int = 10) -> list[tuple[PairRecord, AliasResult]]
+```
+
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `records` | `Iterable[PairRecord]` | required | Pair records, usually from `in_force` or `history`. |
+| `mirror_conn` | - | required (keyword-only) | A DB-API connection to the MIRROR (eidr_mirror_db), not to the history's database. |
+| `max_depth` | `int` | `10` (keyword-only) | Passed to `lookup.resolve_aliases`: the hop cap. |
+
+**Returns** `list[tuple[PairRecord, AliasResult]]` -- each record beside its `lookup.AliasResult`, in input order.
+<!-- /dict -->
+
+**Does.** Resolves the stored EIDR IDs through `lookup.resolve_aliases` in one call and pairs each record with where its ID points now. Writes nothing and changes no record: the history keeps the ID that was adjudicated. Only `AliasResult.usable` names a record to act on.
+
+### `history`
+
+<!-- dict:eidr_core.confirmed_pairs.history -->
+```python
+def history(conn, *, source: str, source_id: str | None = None, eidr_id: str | None = None, table: str = DEFAULT_TABLE, paramstyle: str | None = None) -> list[PairRecord]
+```
+
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `conn` | - | required | A DB-API connection to the database holding the history (psycopg, psycopg2, DuckDB, SQLite). |
+| `source` | `str` | required (keyword-only) | The source, `imdb`, `wikidata`, ... (case-folded). |
+| `source_id` | `str \| None` | `None` (keyword-only) | The source's ID; None for the whole source. |
+| `eidr_id` | `str \| None` | `None` (keyword-only) | The EIDR ID; None for any. |
+| `table` | `str` | `DEFAULT_TABLE` (keyword-only) | The table name, plain or schema-qualified; anything else raises ValueError. |
+| `paramstyle` | `str \| None` | `None` (keyword-only) | `'qmark'`, `'format'` or `'pyformat'`; None reads it from the connection's driver module and raises ValueError when it cannot. |
+
+**Returns** `list[PairRecord]` -- every verdict ever recorded that matches, oldest first, each with its ending when it has one.
+<!-- /dict -->
+
+**Does.** Reads the whole history: verdict rows joined to their ending rows (`ended_at`, `end_reason`, `end_run`). Ending rows are not returned on their own.
+
+### `in_force`
+
+<!-- dict:eidr_core.confirmed_pairs.in_force -->
+```python
+def in_force(conn, *, source: str, source_id: str | None = None, eidr_id: str | None = None, verdict: str | None = None, at: datetime | date | str | None = None, table: str = DEFAULT_TABLE, paramstyle: str | None = None) -> list[PairRecord]
+```
+
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `conn` | - | required | A DB-API connection to the database holding the history (psycopg, psycopg2, DuckDB, SQLite). |
+| `source` | `str` | required (keyword-only) | The source, `imdb`, `wikidata`, ... (case-folded). |
+| `source_id` | `str \| None` | `None` (keyword-only) | The source's ID; None for the whole source (one query, for building a batch's sets). |
+| `eidr_id` | `str \| None` | `None` (keyword-only) | The EIDR ID; None for any. |
+| `verdict` | `str \| None` | `None` (keyword-only) | `confirmed`, `rejected`, or None for both. |
+| `at` | `datetime \| date \| str \| None` | `None` (keyword-only) | None for now; else the instant to answer as of (a bare date means the end of that UTC day). |
+| `table` | `str` | `DEFAULT_TABLE` (keyword-only) | The table name, plain or schema-qualified; anything else raises ValueError. |
+| `paramstyle` | `str \| None` | `None` (keyword-only) | `'qmark'`, `'format'` or `'pyformat'`; None reads it from the connection's driver module and raises ValueError when it cannot. |
+
+**Returns** `list[PairRecord]` -- the verdicts in force, oldest first, shown with no ending (in that view they had none).
+<!-- /dict -->
+
+**Does.** The as-of query. Now: every verdict with no ending. With `at`: every verdict that took effect by then and was not ended by then, so `in_force(conn, source="imdb", source_id="tt0111161", at="2026-12-01")` is what was believed about that title that day.
+
+### `is_confirmed`
+
+<!-- dict:eidr_core.confirmed_pairs.is_confirmed -->
+```python
+def is_confirmed(conn, source: str, source_id: str, eidr_id: str, *, identity_only: bool = True, at: datetime | date | str | None = None, table: str = DEFAULT_TABLE, paramstyle: str | None = None) -> bool
+```
+
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `conn` | - | required | A DB-API connection to the database holding the history (psycopg, psycopg2, DuckDB, SQLite). |
+| `source` | `str` | required | The source, `imdb`, `wikidata`, ... (case-folded). |
+| `source_id` | `str` | required | The source's ID (`tt0111161`, `Q172241`). |
+| `eidr_id` | `str` | required | The EIDR ID. |
+| `identity_only` | `bool` | `True` (keyword-only) | True (default) counts only an IsSameAs confirmation; False counts a confirmation under any relation. |
+| `at` | `datetime \| date \| str \| None` | `None` (keyword-only) | None for now; else the instant to answer as of (a bare date means the end of that UTC day). |
+| `table` | `str` | `DEFAULT_TABLE` (keyword-only) | The table name, plain or schema-qualified; anything else raises ValueError. |
+| `paramstyle` | `str \| None` | `None` (keyword-only) | `'qmark'`, `'format'` or `'pyformat'`; None reads it from the connection's driver module and raises ValueError when it cannot. |
+
+**Returns** `bool` -- True when a matching confirmation is in force.
+<!-- /dict -->
+
+**Does.** Answers "is this pair confirmed now" (or as of `at`). The default asks for an identity confirmation, the one that licenses writing the source ID as an identity Alt ID or using the source's full cast; a confirmed `Deprecated` pair is adjudicated but not a sameness claim.
+
+### `is_rejected`
+
+<!-- dict:eidr_core.confirmed_pairs.is_rejected -->
+```python
+def is_rejected(conn, source: str, source_id: str, eidr_id: str, *, at: datetime | date | str | None = None, table: str = DEFAULT_TABLE, paramstyle: str | None = None) -> bool
+```
+
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `conn` | - | required | A DB-API connection to the database holding the history (psycopg, psycopg2, DuckDB, SQLite). |
+| `source` | `str` | required | The source, `imdb`, `wikidata`, ... (case-folded). |
+| `source_id` | `str` | required | The source's ID (`tt0111161`, `Q172241`). |
+| `eidr_id` | `str` | required | The EIDR ID. |
+| `at` | `datetime \| date \| str \| None` | `None` (keyword-only) | None for now; else the instant to answer as of (a bare date means the end of that UTC day). |
+| `table` | `str` | `DEFAULT_TABLE` (keyword-only) | The table name, plain or schema-qualified; anything else raises ValueError. |
+| `paramstyle` | `str \| None` | `None` (keyword-only) | `'qmark'`, `'format'` or `'pyformat'`; None reads it from the connection's driver module and raises ValueError when it cannot. |
+
+**Returns** `bool` -- True when a rejection of the pair is in force.
+<!-- /dict -->
+
+**Does.** The re-match gate for a reviewer's "not this record": True while the rejection holds; a later confirmation supersedes it and the answer becomes False.
+
+### `pairs_from_verdicts`
+
+<!-- dict:eidr_core.confirmed_pairs.pairs_from_verdicts -->
+```python
+def pairs_from_verdicts(rows: Mapping[int, Mapping[str, object]], verdicts: Iterable[Resolution], *, source: str, source_id_column: str, sheet: str = "", candidate_columns: Sequence[str] = (SOURCE_ASSERTED_COLUMN, REGISTRY_IDS_COLUMN)) -> list[PairRecord]
+```
+
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `rows` | `Mapping[int, Mapping[str, object]]` | required | Sheet row number -> the row (column header -> value), so each verdict is joined to its own row by `sheet_row`. |
+| `verdicts` | `Iterable[Resolution]` | required | `verdicts.Resolution` objects from `resolve_sheet` / `resolve_row`. |
+| `source` | `str` | required (keyword-only) | The source, `imdb`, `wikidata`, ... (case-folded). |
+| `source_id_column` | `str` | required (keyword-only) | The column holding the source ID (for example `IMDb ID`). |
+| `sheet` | `str` | `""` (keyword-only) | The sheet's name, stored as provenance. |
+| `candidate_columns` | `Sequence[str]` | `(SOURCE_ASSERTED_COLUMN, REGISTRY_IDS_COLUMN)` (keyword-only) | `-separated); default the R1 columns `Source-Asserted EIDR ID` and `Registry EIDR ID(s)`. |
+
+**Returns** `list[PairRecord]` -- pair records ready for `record`; nothing for a status that decided nothing.
+<!-- /dict -->
+
+**Does.** Turns C4 verdicts into pair records. CONFIRMED: a `confirmed` pair for the resolved ID under the reviewer's relation, plus a `rejected` pair for every other candidate. NO_MATCH: a `rejected` pair for every candidate. Every other status: nothing. `decided_by` is `human` when the row has a Human Review code, else `rule`; `basis` is the code or the assessment. A verdict whose row is missing raises KeyError; an invalid candidate ID raises ValueError naming the row.
+
+### `record`
+
+<!-- dict:eidr_core.confirmed_pairs.record -->
+```python
+def record(conn, pairs: Iterable[PairRecord], *, run: str = "", at: datetime | date | str | None = None, table: str = DEFAULT_TABLE, commit: bool = True, paramstyle: str | None = None, on_write: Callable[[WriteResult], object] | None = None) -> WriteResult
+```
+
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `conn` | - | required | A DB-API connection to the database holding the history (psycopg, psycopg2, DuckDB, SQLite). |
+| `pairs` | `Iterable[PairRecord]` | required | New verdicts as `PairRecord`s with the stored fields left empty. |
+| `run` | `str` | `""` (keyword-only) | The consumer's run ID, used where an input's `run` is empty. |
+| `at` | `datetime \| date \| str \| None` | `None` (keyword-only) | When the verdicts take effect where an input's `effective_at` is empty; None means now. |
+| `table` | `str` | `DEFAULT_TABLE` (keyword-only) | The table name, plain or schema-qualified; anything else raises ValueError. |
+| `commit` | `bool` | `True` (keyword-only) | True commits (and on failure rolls back) the connection's transaction; False leaves the transaction to you. |
+| `paramstyle` | `str \| None` | `None` (keyword-only) | `'qmark'`, `'format'` or `'pyformat'`; None reads it from the connection's driver module and raises ValueError when it cannot. |
+| `on_write` | `Callable[[WriteResult], object] \| None` | `None` (keyword-only) | Called with the `WriteResult` after the commit, only when something changed: the hook for a consumer's backup. |
+
+**Returns** `WriteResult` -- `WriteResult`: the verdicts written, the verdicts they ended, and the inputs that matched what was already in force.
+<!-- /dict -->
+
+**Does.** Appends verdicts, in one transaction. Per (source, source_id, eidr_id), in input order: an input that repeats the verdict in force (verdict, relation and provenance) writes nothing; any other ends what is in force (`superseded`) and is appended. A verdict on another EIDR ID for the same source ID ends nothing. Inputs are validated before anything is written; a verdict older than the one it would supersede raises ValueError.
+
+### `PairRecord` (class)
+
+<!-- dict:eidr_core.confirmed_pairs.PairRecord -->
+```python
+class PairRecord(NamedTuple)
+```
+
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `source` | `str` | required | The source, `imdb`, `wikidata`, ... (case-folded). |
+| `source_id` | `str` | required | The source's ID (`tt0111161`, `Q172241`). |
+| `eidr_id` | `str` | required | The EIDR ID as adjudicated, stored upper case and validated; never rewritten after an alias. |
+| `verdict` | `str` | required | `confirmed` or `rejected`. |
+| `decided_by` | `str` | required | `human`, `rule` or `import` (seeded from a list that kept no per-pair authority). |
+| `relation` | `str` | `""` | `""` for IsSameAs (`IsSameAs` and None are stored as `""`), else the reviewer's clarifying relation. |
+| `basis` | `str` | `""` | What decided it: the BMR-Review assessment for a rule, the reviewer's code for a human. |
+| `sheet` | `str` | `""` | The sheet the verdict was read from. |
+| `sheet_row` | `int \| None` | `None` | Its row in that sheet. |
+| `c4_status` | `str` | `""` | The `verdicts.Resolution.status` it came from. |
+| `note` | `str` | `""` | Free text. |
+| `effective_at` | `str` | `""` | When it took effect (ISO-8601 UTC); empty on write means the call's `at`. |
+| `run` | `str` | `""` | The consumer's run ID. |
+| `event_id` | `str` | `""` | Stored: the row's ID, minted by the writer; sorts in write order. |
+| `recorded_at` | `str` | `""` | Stored: wall-clock time of the write. |
+| `ended_at` | `str \| None` | `None` | On read: when it stopped holding; None while it holds. |
+| `end_reason` | `str \| None` | `None` | On read: one of `END_REASONS`, or None. |
+| `end_run` | `str \| None` | `None` | On read: the run that ended it, or None. |
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `is_identity` | `def is_identity() -> bool` (property) | True for an IsSameAs pair (`altidtool_io.is_identity_relation`). |
+| `live` | `def live() -> bool` (property) | True when no ending is known in the view that returned it. |
+<!-- /dict -->
+
+**Does.** The one record type both consumers write and read. Fill the first five fields (and any provenance) to write; reads return it with the stored and ending fields filled.
+
+### `WriteResult` (class)
+
+<!-- dict:eidr_core.confirmed_pairs.WriteResult -->
+```python
+class WriteResult(NamedTuple)
+```
+
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `written` | `tuple[PairRecord, ...]` | required | The new verdicts as stored (with `event_id`). |
+| `ended` | `tuple[PairRecord, ...]` | required | The verdicts this write ended, with their ending filled in. |
+| `unchanged` | `tuple[PairRecord, ...]` | required | The verdicts already in force that an input repeated. |
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `changed` | `def changed() -> bool` (property) | True when anything was written. |
+<!-- /dict -->
+
+**Does.** What one `record` or `end_pairs` call changed; also what `on_write` receives.
+
+### `DECIDERS` (constant)
+
+<!-- dict:eidr_core.confirmed_pairs.DECIDERS -->
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+**Value** `DECIDERS = ("human", "rule", "import")` -- who decided a verdict or an ending; `import` is for rows seeded from a list that kept no per-pair authority.
+<!-- /dict -->
+
+### `DEFAULT_TABLE` (constant)
+
+<!-- dict:eidr_core.confirmed_pairs.DEFAULT_TABLE -->
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+**Value** `DEFAULT_TABLE = "pair_verdicts"` -- the table name every helper uses unless given `table=`.
+<!-- /dict -->
+
+### `END_REASONS` (constant)
+
+<!-- dict:eidr_core.confirmed_pairs.END_REASONS -->
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+**Value** `END_REASONS = ("superseded", "contradicted", "merged", "aliased", "withdrawn")` -- why a verdict stopped holding. `record` writes `superseded`; the rest come from `end_pairs`.
+<!-- /dict -->
+
+### `VERDICTS` (constant)
+
+<!-- dict:eidr_core.confirmed_pairs.VERDICTS -->
+Defined in `src/eidr_core/confirmed_pairs/__init__.py`.
+
+**Value** `VERDICTS = ("confirmed", "rejected")` -- the two verdicts a pair can carry.
+<!-- /dict -->
 
 ## Specs and data files
 

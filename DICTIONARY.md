@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.80.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.81.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -80,6 +80,28 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.81.0 (2026-11-26)
+
+* **New `compare.states.field_item_states(rationale, submitted, candidate,
+  cand_view, state_bands, creation_type=None)`** (S-41; placement ruled into
+  eidr-core so both engines and both pages share one implementation): one
+  comparison state per list item, index-aligned with the candidate's record
+  view. Extracted from BMR-Review's `item_states.py`, same signature, output
+  identical on all 332 record pairs of the corpus under four knob settings.
+  Title item states read each pair through the title comparator's own
+  similarity, so every title rule reaches them. Emit it as
+  `scoring.field_item_states` only when non-empty.
+* **`compare.titles.title_similarity` and `dates_ambiguous` gain
+  `release_dates=None`** (compatible default).
+* **New optional knob `TITLE_DATE_VS_RELEASE_DATE`, shipped inert** (operator
+  approved 2026-11-26; reserved for compare-spec **2.26.0**, BMR-Review's
+  measured cycle). With `TITLE_DATE_TOKENS` on, in an Episode/Season pair with
+  a date in ONE title only, a title date that cannot be the other record's own
+  full release date (either d/m order) scores 0.20 and is not date-ambiguous.
+  Only release dates the record asserts count (not year-only, estimated, the
+  1970-01-01 default, or inherited). Present, `cmp_titles` meta carries
+  `date_differs_from_release_date`. Absent, every result is byte-identical.
 
 ### 0.80.0 (2026-11-26)
 

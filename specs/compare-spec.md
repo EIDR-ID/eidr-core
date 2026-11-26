@@ -280,7 +280,7 @@ corpus is unchanged with it absent, and also with it set, since no fixture
 yet carries the shape). BMR-Review sets it in its own measured cycle, at the
 version eidr-core reserves for it, and it becomes a porting requirement then.
 
-* **`TITLE_DATE_VS_RELEASE_DATE` = true (operator approved 2026-11-26; BMR-Review handoff of 2026-11-24, section 1 follow-up; Episode/Season pairs only, and only with `TITLE_DATE_TOKENS` true).**
+* **`TITLE_DATE_VS_RELEASE_DATE` = true (operator approved 2026-11-26; BMR-Review handoff of 2026-11-24, section 1 follow-up; Episode/Season pairs only, and only with `TITLE_DATE_TOKENS` true; version 2.26.0 reserved).**
   When exactly ONE title of a pair is dated, the undated record's own
   release date stands in for the date its title lacks: if none of the title's
   dates can be that day, the pair is two different days and scores

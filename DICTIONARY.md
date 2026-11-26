@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.78.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.79.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -79,6 +79,18 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.79.0 (2026-11-26)
+
+* **`imdb_snapshot_db` contract 2026.11.24** (eidr-imdb's database, packaged
+  under `specs/db_schemas/`): adds table `live_resolution` (`imdb_id` PK,
+  `resolved_at`, `outcome`, `target_id`, `http_status`, `detail`), the results
+  of resolving vanished IMDb IDs at imdb.com. `schema.sql` now also shows the
+  primary keys the `public_*` tables already had. Additive: a consumer that
+  declares no need for the new table sees no change.
+* `normalize.sanitize_field`: docstring only. MCP retired `shortdoi_audit.py`
+  on 2026-11-24, so one MCP copy remains and MCP's test is now
+  `test_the_sanitize_field_copies_agree`.
 
 ### 0.78.0 (2026-11-24)
 

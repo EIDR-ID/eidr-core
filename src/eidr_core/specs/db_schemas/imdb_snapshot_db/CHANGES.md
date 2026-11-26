@@ -1,5 +1,9 @@
 # imdb_snapshot_db schema changes
 
+## 2026.11.24 — 2026-11-25T02:19:25+00:00
+(from 2026.09.13)
+* ADDED table live_resolution
+
 ## 2026.09.13 — 2026-09-13T18:52:18+00:00
 (from 2026.09.11)
 * ADDED table public_aka

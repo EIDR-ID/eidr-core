@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict CHh2Vu07rvgIMR3pVYMPAUjuhYqlwWd9dIzMjMBiZapbW6qcpSeH8p2Mh3Lwang
+\restrict 3gjGZhiU6hGAW10gcCHd9nB1TX4hP10LHc4FRexfqLeokFXKuxB1yOPQlzfzxOP
 
 
 SET statement_timeout = 0;
@@ -168,6 +168,20 @@ CREATE TABLE public.live_probe (
     title text,
     year integer,
     rank integer,
+    detail text
+);
+
+
+--
+-- Name: live_resolution; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.live_resolution (
+    imdb_id text NOT NULL,
+    resolved_at timestamp with time zone DEFAULT now() NOT NULL,
+    outcome text NOT NULL,
+    target_id text,
+    http_status integer,
     detail text
 );
 
@@ -570,6 +584,14 @@ ALTER TABLE ONLY public.live_probe
 
 
 --
+-- Name: live_resolution live_resolution_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.live_resolution
+    ADD CONSTRAINT live_resolution_pkey PRIMARY KEY (imdb_id);
+
+
+--
 -- Name: entity_hash pk_entity_hash; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -591,6 +613,70 @@ ALTER TABLE ONLY public.episode_info
 
 ALTER TABLE ONLY public.name
     ADD CONSTRAINT pk_name PRIMARY KEY (snapshot_id, name_id);
+
+
+--
+-- Name: public_crew pk_public_crew; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.public_crew
+    ADD CONSTRAINT pk_public_crew PRIMARY KEY (public_snapshot_id, tconst, role, seq);
+
+
+--
+-- Name: public_episode pk_public_episode; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.public_episode
+    ADD CONSTRAINT pk_public_episode PRIMARY KEY (public_snapshot_id, tconst);
+
+
+--
+-- Name: public_genre pk_public_genre; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.public_genre
+    ADD CONSTRAINT pk_public_genre PRIMARY KEY (public_snapshot_id, tconst, seq);
+
+
+--
+-- Name: public_known_for pk_public_known_for; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.public_known_for
+    ADD CONSTRAINT pk_public_known_for PRIMARY KEY (public_snapshot_id, nconst, seq);
+
+
+--
+-- Name: public_name pk_public_name; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.public_name
+    ADD CONSTRAINT pk_public_name PRIMARY KEY (public_snapshot_id, nconst);
+
+
+--
+-- Name: public_profession pk_public_profession; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.public_profession
+    ADD CONSTRAINT pk_public_profession PRIMARY KEY (public_snapshot_id, nconst, seq);
+
+
+--
+-- Name: public_rating pk_public_rating; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.public_rating
+    ADD CONSTRAINT pk_public_rating PRIMARY KEY (public_snapshot_id, tconst);
+
+
+--
+-- Name: public_title pk_public_title; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.public_title
+    ADD CONSTRAINT pk_public_title PRIMARY KEY (public_snapshot_id, tconst);
 
 
 --
@@ -805,6 +891,41 @@ CREATE INDEX ix_name_remapped_to ON public.name USING btree (remapped_to) WHERE 
 
 
 --
+-- Name: ix_public_aka_tconst; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_public_aka_tconst ON public.public_aka USING btree (public_snapshot_id, tconst);
+
+
+--
+-- Name: ix_public_episode_parent; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_public_episode_parent ON public.public_episode USING btree (public_snapshot_id, parent_tconst);
+
+
+--
+-- Name: ix_public_principal_tconst; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_public_principal_tconst ON public.public_principal USING btree (public_snapshot_id, tconst);
+
+
+--
+-- Name: ix_public_reject_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_public_reject_rule ON public.public_reject USING btree (public_snapshot_id, dataset, rule);
+
+
+--
+-- Name: ix_public_title_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_public_title_type ON public.public_title USING btree (public_snapshot_id, title_type);
+
+
+--
 -- Name: ix_reject_rule; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -843,4 +964,4 @@ CREATE INDEX ix_title_year ON public.title USING btree (snapshot_id, year);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict CHh2Vu07rvgIMR3pVYMPAUjuhYqlwWd9dIzMjMBiZapbW6qcpSeH8p2Mh3Lwang
+\unrestrict 3gjGZhiU6hGAW10gcCHd9nB1TX4hP10LHc4FRexfqLeokFXKuxB1yOPQlzfzxOP

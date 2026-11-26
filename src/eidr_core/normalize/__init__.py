@@ -519,12 +519,13 @@ def sanitize_field(s) -> str:
     this exists for NEW consumers and for the eventual port, not as a shim
     MCP imports today.
 
-    The two MCP copies had drifted when this was extracted
-    (``shortdoi_audit.py``'s lacked the NUL removal and C0 sweep); they were
-    converged on 2026-08-26, and MCP's
-    ``tests/test_schema_contract.py::test_the_three_sanitize_field_copies_agree``
-    now pins all three to each other. A behaviour change here therefore
-    means the same edit to both MCP copies (done for the 0.68.0
+    MCP's two copies had drifted when this was extracted (the
+    ``shortdoi_audit.py`` copy lacked the NUL removal and C0 sweep); they were
+    converged on 2026-08-26. MCP retired ``shortdoi_audit.py`` on 2026-11-24,
+    so one MCP copy remains, and MCP's
+    ``tests/test_schema_contract.py::test_the_sanitize_field_copies_agree``
+    pins it to this function. A behaviour change here therefore means the
+    same edit to ``reset_alt_ids._sanitize_field`` (done for the 0.68.0
     strip-last change).
     """
     if s is None:

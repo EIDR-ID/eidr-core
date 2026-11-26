@@ -241,17 +241,72 @@ def _same_dates(da, db):
     return len(da) == len(db) and all(_same_date(x, y) for x, y in zip(da, db, strict=True))
 
 
-def dates_ambiguous(a_titles, b_titles):
+# --- a title date against the OTHER record's release date ---------------------
+# A daily programme's undated sibling ("Esporte Total: Season 2025: Episode
+# 182", system-generated) scored close to "04/09/2026 - Esporte Total" once
+# the date was set aside, so a sibling a year away reached Review beside the
+# true record and the recovered sole-Accept refused to clear it (BMR-Review
+# handoff of 2026-11-24, 14 rows). The undated record's own ReleaseDate says
+# which day it is, so it stands in for the date its title lacks (operator
+# approved 2026-11-26). Enabled by title_similarity(release_dates=...);
+# cmp_titles passes them when the registered parameters carry
+# TITLE_DATE_VS_RELEASE_DATE true beside TITLE_DATE_TOKENS true.
+
+def _date_fits(key, ymd):
+    """Can the date-token ``key`` name the calendar day ``ymd`` = (y, m, d)?
+
+    Read in BOTH orders, d/m and m/d: date_tokens keeps a written date
+    literally and "09/04/2026" is the 4th of September to one registrant and
+    the 9th of April to another. This rule declares two programmes different,
+    so it may fire only when NO reading fits; an ambiguous date that can be
+    the day is not evidence against it. (A ``y-m-d`` title is reordered by
+    date_tokens and so gets the same lenience; it errs the same safe way.) A
+    two-digit year matches on its last two digits, as ``_same_date`` does. An
+    ``md`` token has no year, so only its month and day are compared.
+    """
+    y, m, d = ymd
+    if key[0] == "md":
+        return (key[1], key[2]) in ((m, d), (d, m))
+    _, first, second, yy, yyyy = key
+    if yy != y % 100 or (yyyy is not None and yyyy != y):
+        return False
+    return (first, second) in ((d, m), (m, d))
+
+
+def _one_sided_date_differs(da, db, release_dates):
+    """True when exactly one title of a pair is dated and none of its dates
+    can be the OTHER record's release day.
+
+    ``release_dates`` is ``(a_date, b_date)``: the full release date, as
+    (y, m, d) or None, of the record each title belongs to. Only the
+    one-sided case reads it. When both titles are dated, the titles' own
+    dates are the direct evidence and ``_same_dates`` already decides; the
+    release date only stands in for a date a title does not carry.
+    """
+    if release_dates is None or bool(da) == bool(db):
+        return False
+    dates, other = (da, release_dates[1]) if da else (db, release_dates[0])
+    return other is not None and not any(_date_fits(k, other) for k in dates)
+
+
+def dates_ambiguous(a_titles, b_titles, *, release_dates=None):
     """True when ANY pair of raw titles has a date on exactly ONE side and the
     rest agrees (similarity >= 0.85, Episode rules) -- the undated title may
     be any one day's broadcast, so, like a one-sided part number, the pair may
-    not reach Accept on the title. Read only with dates enabled (0.77.0)."""
+    not reach Accept on the title. Read only with dates enabled (0.77.0).
+
+    With ``release_dates`` (as for ``title_similarity``), a one-sided pair
+    whose title date cannot be the undated record's release day is not
+    ambiguous: it is two different days, which ``title_similarity`` scores as
+    a different programme. Absent, nothing changes."""
     for a in a_titles:
         da, ra = date_tokens(a)
         for b in b_titles:
             db, rb = date_tokens(b)
-            if bool(da) != bool(db) and title_similarity(
-                    ra if da else a, rb if db else b, episodic=True) >= 0.85:
+            if (bool(da) != bool(db)
+                    and not _one_sided_date_differs(da, db, release_dates)
+                    and title_similarity(
+                        ra if da else a, rb if db else b, episodic=True) >= 0.85):
                 return True
     return False
 
@@ -290,7 +345,7 @@ def fuzzy(a, b):
 _fuzzy = fuzzy
 
 
-def title_similarity(a_raw, b_raw, *, episodic=False, dates=False):
+def title_similarity(a_raw, b_raw, *, episodic=False, dates=False, release_dates=None):
     """Pairwise title similarity in [0,1] honouring part/segment rules.
 
     `dates=True` (0.77.0; Episode/Season pairs only, so it acts only with
@@ -299,6 +354,15 @@ def title_similarity(a_raw, b_raw, *, episodic=False, dates=False):
     is compared; both dated and the dates differ -> COMBINATION_DIFFERS_QUALITY,
     the conflict "13/08/2026" against "18/08/2026" already scored; one side
     dated -> the rest is compared, and `dates_ambiguous` reports the pair.
+
+    `release_dates=(a_date, b_date)` (acts only with `dates` and `episodic`):
+    the full release date, (y, m, d) or None, of the record each title belongs
+    to. When only one title is dated and none of its dates can be the OTHER
+    record's release day (either d/m or m/d reading; see `_date_fits`), the
+    pair is two different days: COMBINATION_DIFFERS_QUALITY, as for two dated
+    titles. None (the default) is the 0.77.0 behaviour. Pure: the caller
+    decides which release dates may stand for a day (`compare.cmp_titles`
+    passes none that are estimated, inherited or epoch defaults).
 
     `episodic=True` switches on two EPISODE-ONLY semantics (operator,
     2026-09-01) that are wrong for films and are therefore off by default:
@@ -318,6 +382,8 @@ def title_similarity(a_raw, b_raw, *, episodic=False, dates=False):
         db, rb = date_tokens(b_raw)
         if da or db:
             if da and db and not _same_dates(da, db):
+                return COMBINATION_DIFFERS_QUALITY
+            if _one_sided_date_differs(da, db, release_dates):
                 return COMBINATION_DIFFERS_QUALITY
             ra, rb = (ra if da else a_raw), (rb if db else b_raw)
             if da and db and not norm_title(ra) and not norm_title(rb):

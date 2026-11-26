@@ -853,7 +853,7 @@ These recent changes may still be reaching consumers:
 | Normalize a country code (SU to SUHH) | `codes.normalize_country_code`; `normalize.norm_country` when comparing | |
 | Compare two records field by field | `compare.COMPARATORS` and the `compare.cmp_*` functions, after `compare.set_params` | the full scorer and verdict layer live in BMR-Review |
 | Load the compare-spec tuning values | `compare.spec.load_spec` | |
-| Turn engine qualities into De-Dupe UI field states | `compare.states.field_states`, `compare.states.band` | |
+| Turn engine qualities into De-Dupe UI field states | `compare.states.field_states`, `compare.states.band`; per list item `compare.states.field_item_states` | |
 | Parse a part number, or choose which titles to compare | `compare.titles.parse_part`, `compare.titles.select_titles`, `compare.titles.title_similarity` | |
 | Build a child's full record (inheritance, system-generated titles) | `inheritance.build_full_record`, `inheritance.build_full_base`, `inheritance.is_absent` | |
 | Sort titles or Alt IDs in canonical, display or star order | `ordering.title_sort_key`, `ordering.altid_canonical_key`, `ordering.altid_display_key`, `ordering.altid_star_key` | `specs/normalized-record.md` §4.2 |
@@ -1006,6 +1006,7 @@ edition's Changes entry.
 | [`eidr_core.compare.spec.load_spec`](#load_spec) | function | Loads compare-spec.json and returns its constants as a `{NAME: value}` dict with Python container semantics restored. |
 | [`eidr_core.compare.spec.spec_path`](#spec_path) | function | Returns the path of the packaged compare-spec.json, located through importlib.resources rather than a source-tree path. |
 | [`eidr_core.compare.states.band`](#band) | function | Bands one quality into a UI state: identical from `identical_at`, similar from `similar_at`, else mismatch or neutral. |
+| [`eidr_core.compare.states.field_item_states`](#field_item_states) | function | Builds the payload's per-item states (S-41): one comparison state per list item, aligned with the candidate's record view, keyed by UI field-manifest keys. |
 | [`eidr_core.compare.states.field_not_counted`](#field_not_counted) | function | Lists fields that have a real quality but were not counted in the score, naming the affected side. |
 | [`eidr_core.compare.states.field_states`](#field_states) | function | Builds the payload's `field_states` and `field_qualities` maps from an engine rationale, keyed by UI field-manifest keys. |
 | [`eidr_core.compare.states.ui_field_key`](#ui_field_key) | function | Maps an engine field name to its De-Dupe UI field-manifest key, such as `title` to `titles`. |
@@ -2649,10 +2650,10 @@ Defined in `src/eidr_core/compare/__init__.py`.
 | `a` | - | required | Submitted record: any object with a `titles` list (objects with `text`, optional `system_generated`, `title_class`) and optional `creation_type`. |
 | `b` | - | required | Candidate record, same shape as `a`. |
 
-**Returns** not annotated -- `FieldResult` with field `"title"`: quality from `accumulate` over the aligned pairs (above 1.0 when several titles match), or `None` with `meta={}` when a side has no title text or both sides hold only fallback titles. Otherwise `meta` has `best_sim`, `part_conflict`, `part_base_match`, `part_ambiguous`, plus `internal_title_used` when the Internal knob is registered and `date_ambiguous` when `TITLE_DATE_TOKENS` is registered (0.77.0).
+**Returns** not annotated -- `FieldResult` with field `"title"`: quality from `accumulate` over the aligned pairs (above 1.0 when several titles match), or `None` with `meta={}` when a side has no title text or both sides hold only fallback titles. Otherwise `meta` has `best_sim`, `part_conflict`, `part_base_match`, `part_ambiguous`, plus `internal_title_used` when the Internal knob is registered, `date_ambiguous` when `TITLE_DATE_TOKENS` is registered (0.77.0), and `date_differs_from_release_date` when `TITLE_DATE_VS_RELEASE_DATE` is registered.
 <!-- /dict -->
 
-**Does.** Compares two records' title lists with part and segment rules, greedy one-to-one alignment, and diminishing credit for extra matches. Real titles are preferred (`select_titles`): system-generated and, by default, Internal titles are fallback only, and the field is dropped when both sides fall back. Pair similarity is `titles.title_similarity`, with the episode rules on only when both records are Episode or Season. With `INTERNAL_TITLE_DISCOUNT` registered (a number in (0, 1]; compare-spec 2.20.0 sets 0.8), Internal titles are included, every pair touching one is multiplied by it, and an Internal pair counts only as the best aligned pair, never as an accumulation bonus; any other non-None value raises ValueError. Two more optional knobs (0.77.0; inert until registered, reserved for compare-spec 2.22.0 and 2.23.0): `TITLE_BONUS_MIN_BEST`, a number in (0, 1], makes the title quality the best pair alone when that pair is below it (detail `no bonus, weak best`); `TITLE_DATE_TOKENS`, a bool, turns on `title_similarity(dates=True)` for Episode/Season pairs, reads the part checks on the titles with their dates removed, and adds `date_ambiguous` to the meta (detail `date-ambiguous`). A malformed value raises ValueError on the first comparison.
+**Does.** Compares two records' title lists with part and segment rules, greedy one-to-one alignment, and diminishing credit for extra matches. Real titles are preferred (`select_titles`): system-generated and, by default, Internal titles are fallback only, and the field is dropped when both sides fall back. Pair similarity is `titles.title_similarity`, with the episode rules on only when both records are Episode or Season. With `INTERNAL_TITLE_DISCOUNT` registered (a number in (0, 1]; compare-spec 2.20.0 sets 0.8), Internal titles are included, every pair touching one is multiplied by it, and an Internal pair counts only as the best aligned pair, never as an accumulation bonus; any other non-None value raises ValueError. Two more optional knobs (0.77.0; inert until registered, reserved for compare-spec 2.22.0 and 2.23.0): `TITLE_BONUS_MIN_BEST`, a number in (0, 1], makes the title quality the best pair alone when that pair is below it (detail `no bonus, weak best`); `TITLE_DATE_TOKENS`, a bool, turns on `title_similarity(dates=True)` for Episode/Season pairs, reads the part checks on the titles with their dates removed, and adds `date_ambiguous` to the meta (detail `date-ambiguous`). A fourth, `TITLE_DATE_VS_RELEASE_DATE` (a bool; shipped inert after compare-spec 2.25.0, operator approved 2026-11-26), acts with `TITLE_DATE_TOKENS` on an Episode/Season pair: each record's release date, when it is a full date the record asserts (not estimated, not a 1970-01-01 epoch default, not inherited or system by `inheritance.provenance`), is passed as `title_similarity(release_dates=...)` and `dates_ambiguous(release_dates=...)`, so a one-sided title date that cannot be the other record's day scores 0.20 and is not ambiguous; meta `date_differs_from_release_date`, detail `title date differs from release date`. A malformed value raises ValueError on the first comparison.
 
 **Notes.** Needs registered parameters unless the field is dropped (`accumulate` reads `NL_MODIFIER`, `FIELD_BONUS_CAP`). For an Episode or Season pair, a part number on one side only (`Show Part 2` vs `Show`) reports `part_ambiguous: True`, `part_conflict: False` (since 0.69.0, operator ruling 2026-10-19; it reported a conflict) and scores `PART_AMBIGUOUS_QUALITY` (0.70); different part numbers still conflict, and films are unchanged (`Rocky 2` vs `Rocky` conflicts). `titles.parts_conflict` itself keeps the film meaning. The detail strings `no real title to compare` and `system-generated titles only - ignored` are pinned by De-Dupe UI's spec audit; do not reword them casually.
 
@@ -2947,19 +2948,20 @@ No parameters.
 ## `eidr_core.compare.states`
 
 <!-- dict-module:eidr_core.compare.states -->
-Source `src/eidr_core/compare/states.py`. Public names: 4 functions (declared by `__all__`).
+Source `src/eidr_core/compare/states.py`. Public names: 5 functions (declared by `__all__`).
 <!-- /dict-module -->
 
-**Purpose.** Turns the engine's per-field continuous qualities into the De-Dupe UI's four comparison states (identical, similar, mismatch, neutral) and maps engine field names to UI field-manifest keys. It implements the `states` section of compare-spec.json for payload producers building the per-candidate `scoring` object of dedupe-worklist.md section 4. Presentation only: it is never used in scoring.
+**Purpose.** Turns the engine's per-field continuous qualities into the De-Dupe UI's four comparison states (identical, similar, mismatch, neutral) and maps engine field names to UI field-manifest keys; `field_item_states` gives the same four states per list item, from the records. It implements the `states` section of compare-spec.json for payload producers building the per-candidate `scoring` object of dedupe-worklist.md section 4. Presentation only: it is never used in scoring.
 
 **Use it when.**
-* You build a work-list or Shim-mode scoring payload: `field_states` for `field_states` / `field_qualities`, `field_not_counted` for the optional `scoring.field_not_counted` map.
+* You build a work-list or Shim-mode scoring payload: `field_states` for `field_states` / `field_qualities`, `field_not_counted` for the optional `scoring.field_not_counted` map, `field_item_states` for the optional `scoring.field_item_states` map.
 * You need the UI manifest key for an engine field (`ui_field_key`).
 
 **Do not use it when.**
 * You are in the UI: dedupe-worklist.md says the UI renders the payload's states and never recomputes them.
 * You are scoring: the bands have no effect on the score.
 * Do not hardcode 0.985 / 0.75 or the engine-to-UI key table in a consumer; pass the spec's `states` section and call `band` / `ui_field_key`.
+* Do not keep a local copy of the per-item matching: `field_item_states` reads title pairs through the comparator's own similarity, so a copy misses every later title rule.
 
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.states -->
@@ -3048,6 +3050,31 @@ Defined in `src/eidr_core/compare/states.py`.
 <!-- /dict -->
 
 **Does.** Maps an engine field name to its De-Dupe UI field-manifest key, such as `title` to `titles`. Renamed: title, country, assoc_org, length, alt_id, sequence_number, distribution_number, house_sequence, time_slot; other names (release_date, director, actor, original_language, version_language, edit_class) pass through. `end_date` splits by creation type into `season_end_date` or `series_end_date`.
+
+### `field_item_states`
+
+<!-- dict:eidr_core.compare.states.field_item_states -->
+```python
+def field_item_states(rationale, submitted, candidate, cand_view, state_bands, creation_type: str | None = None) -> dict
+```
+
+Defined in `src/eidr_core/compare/states.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `rationale` | - | required | Engine rationale rows (dicts with `field`, `quality`); a list field is emitted only when it has a row, and a `title` row with quality None (both sides system-generated only) makes every title neutral. |
+| `submitted` | - | required | The submitted record, as the comparators read it (`titles`, `directors`, `actors`, `countries`, `original_languages`, `version_languages`, `assoc_orgs`, `alt_ids`, `creation_type`); None gives `{}`. |
+| `candidate` | - | required | The candidate record, same shape; the states are for its items. None gives `{}`. |
+| `cand_view` | - | required | The candidate's record view (BMR-Review `render_record`): lists `titles`, `directors`, `actors`, `countries`, `languages`, `version_languages`, `assoc_orgs`, `alt_ids` in display order, each entry a list whose first element is the displayed text (a sort name and an organization's alternate names are their own entries), an `alt_ids` entry beginning `[value, id_type, domain, relation]`. Empty or None gives `{}`. |
+| `state_bands` | - | required | The spec's `states` section, as for `band`; None is treated as `{}`. |
+| `creation_type` | `str \| None` | `None` | The pair's creation type, passed to `ui_field_key`. |
+
+**Returns** `dict` -- `{manifest key: [state, ...]}`, each list as long as the view list and in its order; fields not compared or with an empty view list are absent.
+<!-- /dict -->
+
+**Does.** Builds the payload's per-item states (S-41): one comparison state per list item, aligned with the candidate's record view, keyed by UI field-manifest keys. The matching is the comparators' own, item by item. Titles: each candidate title's best match against every submitted title, through the same `select_titles` sets, Internal-title discount and pairwise similarity `cmp_titles` uses (so every title knob reaches the items), banded with the title bands and never `mismatch`; a title outside the compared set is `neutral`. Directors and actors: best `fuzzy` over normalised display names, zero below `NAME_MATCH_MIN`, never `mismatch`; a sort name carries its person's state. Organizations: equal party id, else name `fuzzy`; alternate names carry the organization's state. Countries and languages: `identical` when the normalised code is in the submission, else `neutral`. Alt IDs: `cmp_alt_ids`'s rule -- equal value under the same Kind (identity relation only) is `identical`; the submission naming the Kind with no equal value anywhere is `mismatch`; everything else, including an extra value under a Kind that already matched and any non-identity relation, is `neutral`. Where one view entry stands for several items, the strongest state wins (mismatch over identical over similar). Emit it as `scoring.field_item_states` only when non-empty (compare-spec 2.25.0, porting requirement 8).
+
+**Notes.** Extracted from BMR-Review's `item_states.py`; output identical to it on every golden-pair record pair. Needs registered parameters (`NAME_MATCH_MIN`, the title knobs). It never changes q, the score, `field_states` or `field_not_counted`, and an item state may differ from its field's state (a second, unmatched director stays `neutral` under an `identical` field).
 
 ## `eidr_core.compare.titles`
 
@@ -3198,7 +3225,7 @@ Defined in `src/eidr_core/compare/titles.py`.
 
 <!-- dict:eidr_core.compare.titles.title_similarity -->
 ```python
-def title_similarity(a_raw, b_raw, *, episodic=False, dates=False)
+def title_similarity(a_raw, b_raw, *, episodic=False, dates=False, release_dates=None)
 ```
 
 Defined in `src/eidr_core/compare/titles.py`.
@@ -3209,6 +3236,7 @@ Defined in `src/eidr_core/compare/titles.py`.
 | `b_raw` | - | required | Second raw title string. |
 | `episodic` | - | `False` (keyword-only) | Turns on the episode-only rules: compound titles are combinations (a different set gives 0.20) and a part number on one side only is ambiguous (0.70). Off by default because both rules are wrong for films. |
 | `dates` | - | `False` (keyword-only) | Reads a date in a title as a date before any other rule (0.77.0; see `date_tokens`). Acts only with `episodic=True`. Equal dates: the rest is compared. Different dates: `COMBINATION_DIFFERS_QUALITY`. One side dated: the rest is compared. Off by default; `cmp_titles` passes it when `TITLE_DATE_TOKENS` is registered true. |
+| `release_dates` | - | `None` (keyword-only) | `(a_date, b_date)`: the full release date, `(y, m, d)` or None, of the record each title belongs to. Acts only with `dates` and `episodic`, and only when exactly one title is dated: if none of its dates can be the OTHER record's day (d/m or m/d reading; a two-digit year on its last two digits; a weekday `m/d` on month and day), the result is `COMBINATION_DIFFERS_QUALITY`. None is the 0.77.0 behaviour. `cmp_titles` passes it when `TITLE_DATE_VS_RELEASE_DATE` is registered true beside `TITLE_DATE_TOKENS`. |
 
 **Returns** not annotated -- `float` in [0, 1].
 <!-- /dict -->
@@ -3257,7 +3285,7 @@ Defined in `src/eidr_core/compare/titles.py`.
 
 <!-- dict:eidr_core.compare.titles.dates_ambiguous -->
 ```python
-def dates_ambiguous(a_titles, b_titles)
+def dates_ambiguous(a_titles, b_titles, *, release_dates=None)
 ```
 
 Defined in `src/eidr_core/compare/titles.py`.
@@ -3266,6 +3294,7 @@ Defined in `src/eidr_core/compare/titles.py`.
 |---|---|---|---|
 | `a_titles` | - | required | Raw title strings of one record. |
 | `b_titles` | - | required | Raw title strings of the other. |
+| `release_dates` | - | `None` (keyword-only) | As for `title_similarity`: a one-sided pair whose title date cannot be the undated record's day is two different days, not ambiguous, and does not count. None changes nothing. |
 
 **Returns** not annotated -- `bool`.
 <!-- /dict -->

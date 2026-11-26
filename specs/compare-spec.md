@@ -233,7 +233,11 @@ BMR-Review.
    `mismatch` (no conflict is counted there); a sort name and an
    organization's alternate names carry the state of their person or
    organization. Pinned by `item-states-list-fields` and
-   `item-states-sort-and-alternate-names`. (b) **S-42:** the `date_ambiguous`
+   `item-states-sort-and-alternate-names`. The reference implementation is
+   `eidr_core.compare.states.field_item_states` (extracted from BMR-Review
+   after 2.25.0, output unchanged); its title states use the comparator's own
+   pairwise similarity, so a port must apply every title rule to them too.
+   (b) **S-42:** the `date_ambiguous`
    Review cap (2.23.0) is an independent check AFTER the part-number chain,
    pinned by `episode-title-date-cap-holds-after-part-override`. (c) **S-43:**
    strict Alt ID / name / organization keys in fixtures (golden-pairs.md §2);
@@ -269,6 +273,37 @@ the version reserved for it, and these become porting requirements then.
   `part_ambiguous`). The part checks read the titles with their dates
   removed. The meta key is present only with the knob set. A non-bool value
   is refused.
+
+**Shipped inert, awaiting their version.** Read from an OPTIONAL parameter
+as above: absent, the engine scores exactly as before (the whole golden
+corpus is unchanged with it absent, and also with it set, since no fixture
+yet carries the shape). BMR-Review sets it in its own measured cycle, at the
+version eidr-core reserves for it, and it becomes a porting requirement then.
+
+* **`TITLE_DATE_VS_RELEASE_DATE` = true (operator approved 2026-11-26; BMR-Review handoff of 2026-11-24, section 1 follow-up; Episode/Season pairs only, and only with `TITLE_DATE_TOKENS` true).**
+  When exactly ONE title of a pair is dated, the undated record's own
+  release date stands in for the date its title lacks: if none of the title's
+  dates can be that day, the pair is two different days and scores
+  `COMBINATION_DIFFERS_QUALITY` (0.20), as two differently dated titles do,
+  and is not `date_ambiguous`. The case: '04/09/2026 - Esporte Total' against
+  a sibling system-titled 'Esporte Total: Season 2025: Episode 182' with
+  ReleaseDate 2025-09-04 is a different programme; the true record with
+  ReleaseDate 2026-09-04 is not, and stays `date_ambiguous` as before. A date
+  token "can be" the day under EITHER reading, d/m or m/d (`date_tokens`
+  keeps a written date literally, and 09/04/2026 is the 4th of September to
+  one registrant and the 9th of April to another), so an ambiguous date never
+  fires; a two-digit year matches on its last two digits; a weekday `m/d`
+  has no year and compares month and day only. The release date is used only
+  when the record asserts a full calendar date: not year-only, not estimated
+  (RD:Pro), not a 1970-01-01 epoch default, and not inherited or
+  system-supplied by provenance (absent provenance counts as the record's
+  own). When both titles are dated, their own dates decide and release dates
+  are not read. With the knob present, `cmp_titles` meta carries
+  `date_differs_from_release_date` (true when the rule met any title pair) and
+  the detail gains `title date differs from release date`. The per-item title
+  states read the pair under the same rule (they share the comparator's
+  similarity). A non-bool value is refused; set without `TITLE_DATE_TOKENS`
+  it does nothing.
 
 ## Date profiles: the ANCHOR is per creation type, the SHAPE is measured
 

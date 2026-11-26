@@ -41,6 +41,7 @@ from . import nonlinear
 from ._params import set_source as set_params  # the public registration API, re-exported
 from .titles import (
     _numbered_parts_conflict,
+    _one_sided_date_differs,
     date_tokens,
     dates_ambiguous,
     fuzzy,
@@ -179,6 +180,80 @@ def _title_date_tokens():
     return v
 
 
+def _title_date_vs_release_date():
+    """Does a one-sided title date meet the other record's release date?
+
+    Read OPTIONALLY, as ``TITLE_DATE_TOKENS`` is: absent (or no source
+    registered) means today's behaviour byte for byte. Shipped inert; the
+    operator approved the rule on 2026-11-26 (BMR-Review handoff of
+    2026-11-24, section 1 follow-up) and BMR-Review sets the knob in its own
+    measured cycle. A present value must be a bool. It acts only where title
+    dates are read at all, i.e. with ``TITLE_DATE_TOKENS`` true on an
+    Episode/Season pair; set without it, it is validated and does nothing,
+    so an arm that switches date tokens off need not also unset this.
+    """
+    if config.get_source() is None:
+        return False
+    v = getattr(config, "TITLE_DATE_VS_RELEASE_DATE", None)
+    if v is None:
+        return False
+    if not isinstance(v, bool):
+        raise ValueError(f"TITLE_DATE_VS_RELEASE_DATE must be true or false, got {v!r}")
+    return v
+
+
+def _release_day(rec):
+    """``rec``'s release date as (y, m, d) when it may stand for the day an
+    undated title would name, else None.
+
+    Only a full date the record ASSERTS: a year-only date names no day; an
+    estimated one (RD:Pro) is by its own flag not the known day; a 1970-01-01
+    epoch default is two systems defaulting, not a broadcast; and an
+    inherited or system-supplied date is the parent's, so a child's title
+    date differing from it proves nothing. Provenance absent is unknown and
+    counts as the record's own, as everywhere else in the engine. Each guard
+    makes the rule fire less, never more.
+    """
+    from eidr_core.inheritance import provenance
+
+    y, ymd = parse_date(getattr(rec, "release_date", None))
+    if ymd is None or getattr(rec, "date_estimated", False) or _epoch_suspect(y, ymd):
+        return None
+    if provenance(rec).get("release_date") in ("inherited", "system"):
+        return None
+    return ymd
+
+
+def _title_simf(a, b):
+    """The pairwise title similarity ``cmp_titles`` applies to records a, b.
+
+    ``(simf, episodic, dates_on, release_dates)``. One place, so the
+    comparator and the per-item states (``compare.states.field_item_states``)
+    can never read a title pair under different rules: while the item states
+    lived in BMR-Review they rebuilt these flags themselves, and a new rule
+    here would silently have missed them.
+
+    ``release_dates`` is None unless ``TITLE_DATE_VS_RELEASE_DATE`` is on and
+    dates are read for this pair; it is never computed otherwise, so the
+    knob-absent path does not even parse a release date.
+    """
+    episodic = ((getattr(a, "creation_type", None) or "") in ("Episode", "Season")
+                and (getattr(b, "creation_type", None) or "") in ("Episode", "Season"))
+    # Date tokens are an Episode/Season rule (operator, 2026-11-23), like the
+    # compound-title and part rules this flag already gates. Both knobs are
+    # read (and validated) for every compared pair, so a malformed knob fails
+    # on the first comparison, not on the first Episode.
+    dates_on = _title_date_tokens() and episodic
+    vs_release = _title_date_vs_release_date()
+    release_dates = None
+    if dates_on and vs_release:
+        days = (_release_day(a), _release_day(b))
+        release_dates = days if days != (None, None) else None
+    simf = partial(title_similarity, episodic=episodic, dates=dates_on,
+                   release_dates=release_dates)
+    return simf, episodic, dates_on, release_dates
+
+
 def _title_bonus_min_best():
     """The weakest best title pair that still earns the accumulation bonus,
     or ``None`` (0.77.0).
@@ -259,16 +334,13 @@ def cmp_titles(a, b):
         why = ("no real title to compare" if (not a_raw or not b_raw)
                else "system-generated titles only - ignored")
         return FieldResult("title", None, why, meta={})
-    _ep = ((getattr(a, "creation_type", None) or "") in ("Episode", "Season")
-           and (getattr(b, "creation_type", None) or "") in ("Episode", "Season"))
-    # Date tokens are an Episode/Season rule (operator, 2026-11-23), like the
-    # compound-title and part rules this flag already gates. Read (and
-    # validated) for every pair, so a malformed knob fails on the first
-    # comparison, not on the first Episode.
+    # The flags and the pairwise similarity come from _title_simf, which the
+    # per-item states share (see there).
     dates_knob = (config.get_source() is not None
                   and getattr(config, "TITLE_DATE_TOKENS", None) is not None)
-    dates_on = _title_date_tokens() and _ep
-    simf = partial(title_similarity, episodic=_ep, dates=dates_on)
+    vs_release_knob = (config.get_source() is not None
+                       and getattr(config, "TITLE_DATE_VS_RELEASE_DATE", None) is not None)
+    simf, _ep, dates_on, release_dates = _title_simf(a, b)
     internal_used = False
     if discount is None:
         qs = _greedy_align(a_raw, b_raw, simf=simf)
@@ -348,7 +420,13 @@ def cmp_titles(a, b):
                     continue
                 base_match = max(base_match, _title_base_ratio(x[0], y[0]))
     pamb = _ep and (not pconf) and parts_ambiguous(a_pt, b_pt)
-    damb = dates_on and dates_ambiguous(a_raw, b_raw)
+    damb = dates_on and dates_ambiguous(a_raw, b_raw, release_dates=release_dates)
+    # Did a one-sided title date meet a release day it cannot be, on ANY title
+    # pair (not only the best)? Reported so a reviewer can see why an
+    # otherwise close title scored 0.20, and so BMR-Review can count firings.
+    rdiff = release_dates is not None and any(
+        _one_sided_date_differs(date_tokens(x)[0], date_tokens(y)[0], release_dates)
+        for x in a_raw for y in b_raw)
     quality = nonlinear.accumulate(qs)
     cut = _title_bonus_min_best()
     weak = cut is not None and 0.0 < best < cut and quality > best
@@ -357,6 +435,7 @@ def cmp_titles(a, b):
     detail = (f"best={best:.2f} matches={sum(1 for q in qs if q>0)}"
               + (" part-ambiguous" if pamb else "")
               + (" date-ambiguous" if damb else "")
+              + (" title date differs from release date" if rdiff else "")
               + (" no bonus, weak best" if weak else ""))
     meta = {"best_sim": best, "part_conflict": pconf,
             "part_base_match": base_match,
@@ -366,6 +445,10 @@ def cmp_titles(a, b):
     # title may be any day's broadcast): BMR-Review's scorer caps it at Review.
     if dates_knob:
         meta["date_ambiguous"] = damb
+    # Likewise only with TITLE_DATE_VS_RELEASE_DATE present (False whenever
+    # dates are not read for the pair), so the meta without it is unchanged.
+    if vs_release_knob:
+        meta["date_differs_from_release_date"] = rdiff
     if inc:
         # Only with the knob present, so the knob-absent meta and rationale
         # stay identical to 0.39.0. best_sim above is the DISCOUNTED value:

@@ -950,9 +950,11 @@ edition's Changes entry.
 | [`eidr_core.bmr_map.header_base`](#header_base) | function | Strips the group number from a family column header, so template columns compare with `PRODUCED_BASES`. |
 | [`eidr_core.bmr_map.record_from_row`](#record_from_row) | function | Builds the self-defined record a row describes. |
 | [`eidr_core.bmr_map.record_from_xml`](#record_from_xml) | function | Builds the standard record (the shape XML_to_JSON builds from the mirror, which `row_from_record` takes) from registry XML, on the standard library's ElementTree, so `bmr_map` stays vendorable. |
+| [`eidr_core.bmr_map.record_to_xml`](#record_to_xml) | function | Writes a standard record back to registry XML, through `mddf_json.json_to_xml`, so element order is the schema's by construction. |
 | [`eidr_core.bmr_map.row_from_blocks`](#row_from_blocks) | function | Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title and an alternate is never promoted into `Title` (0.75.0; alternates from `AlternateResourceName`, or ResourceName entries 1..n in the older one-list shape); Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line; `Language Mode N` only from the template's own language family (Original Language on Abstraction templates, Version Language on Edit and Manifestation, none on Clip; 0.51.0). |
 | [`eidr_core.bmr_map.row_from_record`](#row_from_record) | function | Maps a whole record with the documented defaults: exactly what XML_to_JSON's `--sheet-out` did per record, minus the `Unique Row ID` column and the echo of an unconvertible row, which stay with the caller. |
 | [`eidr_core.bmr_map.select_blocks`](#select_blocks) | function | Picks the blocks a sheet is built from: `SelfDefinedMetadata`, so values the record does not define itself stay empty on the sheet. |
+| [`eidr_core.bmr_map.RecordXmlError`](#recordxmlerror-class) | class | The error `record_to_xml` raises when the record holds a field it has no element for, or no block to write. |
 | [`eidr_core.bmr_map.NEVER_PRODUCED`](#never_produced-constant) | constant | the template columns this module never writes, each for a stated reason: `Unique Row ID` (the caller's), `Assigned EIDR ID` and `Registration Errors & Notes` (the registry's and the reviewer's), `Metadata Authority` (the display name; only the Party ID column is written), `Operator's Notes` (written on Manifestation only). |
 | [`eidr_core.bmr_map.PRODUCED_BASES`](#produced_bases-constant) | constant | per supported template, every header base the mapper can write (derived from a record that takes every branch and pinned by a test, together with the rule that every stock template column is here or in `NEVER_PRODUCED`). |
 | [`eidr_core.bmr_map.SUPPORTED_TEMPLATES`](#supported_templates-constant) | constant | the template keys `row_from_blocks` writes; Compilation has a sheet but is refused. |
@@ -5576,15 +5578,16 @@ Defined in `src/eidr_core/verify/__init__.py`.
 ## `eidr_core.bmr_map`
 
 <!-- dict-module:eidr_core.bmr_map -->
-Source `src/eidr_core/bmr_map/__init__.py`. Public names: 8 functions, 3 constants (declared by `__all__`).
+Source `src/eidr_core/bmr_map/__init__.py`. Public names: 9 functions, 1 class, 3 constants (declared by `__all__`).
 <!-- /dict-module -->
 
-**Purpose.** The one implementation of mapping a standard record (the registry-shaped JSON XML_to_JSON emits) to a Template-22 BMR row, and a row back to the self-defined record it describes. Extracted 2026-10-13 (register B5) from XML_to_JSON's `_bmr_rows_from_standard_records` and `build_standard_record_from_bmr_row`, on the six conditions XML_to_JSON set and eidr-core accepted on 2026-09-24. Second consumer: python-tools (`FlattenTool -f bmr`, `-bmrin`). It is cell <-> field mechanism for one record and one row; routing, family expansion, row IDs, parent resolution and Full-record construction stay where they already live.
+**Purpose.** The one implementation of mapping a standard record (the registry-shaped JSON XML_to_JSON emits) to a Template-22 BMR row, and a row back to the self-defined record it describes. Extracted 2026-10-13 (register B5) from XML_to_JSON's `_bmr_rows_from_standard_records` and `build_standard_record_from_bmr_row`, on the six conditions XML_to_JSON set and eidr-core accepted on 2026-09-24. Second consumer: python-tools (`FlattenTool -f bmr`, `-bmrin`). It is cell <-> field mechanism for one record and one row; routing, family expansion, row IDs, parent resolution and Full-record construction stay where they already live. It also reads registry XML into a standard record (`record_from_xml`) and writes one back (`record_to_xml`, extracted 2026-11-26 from XML_to_JSON's `standard_render` for python-tools' `-bmrin`).
 
 **Use it when.** 
 * You turn a standard record into a BMR row: `row_from_record` (selects the self-defined block, takes Administrators from where the record carries them), or `row_from_blocks` if you hold the self-defined blocks. Never pass Full blocks: no BMR sheet carries inherited data (operator, 2026-11-13). Route first with `bmr_io.template_for_creation_type`, write with `bmr_io.write_sheet`.
 * You read a BMR row back into a record (for a Modify, or a `--sheet` pass): `record_from_row`, then resolve the parent with `bmr_io.resolve_parent` and build Full with `inheritance.build_full_base` if you need them.
 * You hold registry XML (a resolve result, an API Shim message): `record_from_xml` first, then `row_from_record`.
+* You submit a sheet row to the registry: `record_from_row`, then `record_to_xml`, and rename the root to the creation type. A `RecordXmlError` names a value the XML cannot carry; report it rather than submit without it.
 * Your guardrail checks that every column of a template is accounted for: compare the template's header bases (`header_base`) with `PRODUCED_BASES[template] | NEVER_PRODUCED`.
 
 **Do not use it when.** 
@@ -5593,7 +5596,8 @@ Source `src/eidr_core/bmr_map/__init__.py`. Public names: 8 functions, 3 constan
 * You want a per-family cap or a report of values with no column: `bmr_io.write_sheet` does both (`SCHEMA_MAX`, `WriteReport.dropped`); there is deliberately no second cap here.
 * You want `DisplayName` on a built record: it is a display convention of your output, not a registry field, and `record_from_row` leaves it out.
 * You want ShortDOI rows dropped from a registration: that is your policy; `record_from_row` keeps every Alt ID the row carries.
-* Vendoring: list `["bmr_map", "bmr_io", "inheritance", "ids", "ordering"]`; that closure is tested by a real sync.
+* You need Compilation or Service XML from `record_to_xml`: there is no Template-22 record shape for either (a Compilation raises on its keys).
+* Vendoring: list `["bmr_map", "bmr_io", "inheritance", "ids", "ordering", "mddf_json"]` (`mddf_json` since `record_to_xml`); that closure is tested by a real sync.
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_map -->
@@ -5781,6 +5785,37 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 <!-- /dict -->
 
 **Does.** Builds the standard record (the shape XML_to_JSON builds from the mirror, which `row_from_record` takes) from registry XML, on the standard library's ElementTree, so `bmr_map` stays vendorable. Values are as the XML states them, not normalised (`PT2H0M` stays `PT2H0M`); ShortDOI Alt IDs are kept (the caller decides); there is no `CreationType`, `DisplayName` or `ProvenanceMetadata`, which the blocks do not carry. Checked before release against XML_to_JSON's mirror export of the same 363 records: 722 of 722 rows equal, apart from the export's own rendering (duration normalisation, dropped ShortDOI, a Self `Status` the SelfDefined XML does not state). Not a substitute: the SDK codec (`eidr.codecs.xml.to_codec_dict`), whose MovieLabs JSON encoding differs in about 40 paths. Since 0.75.0: `AlternateResourceName` elements come back under their own key (a SelfDefined block with only an alternate has no `ResourceName`); an element without text (`<Description lang="en"/>`, a Details element with only a domain) is not read, since EIDR XML allows no empty element; a repeated class value is read once; languages are one entry per (code, mode), the `type` attribute unread.
+
+### `record_to_xml`
+
+<!-- dict:eidr_core.bmr_map.record_to_xml -->
+```python
+def record_to_xml(record: Mapping[str, Any], *, view: str = "SelfDefinedMetadata") -> str
+```
+
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `record` | `Mapping[str, Any]` | required | A standard record (`record_from_row`, `record_from_xml`, or XML_to_JSON's export). Only `record[view]` is read; `CreationType` and other keys are ignored. Never modified. |
+| `view` | `str` | `"SelfDefinedMetadata"` (keyword-only) | Which block to write: `"SelfDefinedMetadata"`, `"FullMetadata"`, `"ProvenanceMetadata"` or `"AliasContinuation"`. Anything else raises `ValueError`. |
+
+**Returns** `str` -- the view element as an XML document (with an XML declaration): the EIDR default namespace on the root, `md` and `xsi` declared only when used, children in the EIDR 2.7.0 schema's content-model order, attributes in the registry's alphabetical order.
+<!-- /dict -->
+
+**Does.** Writes a standard record back to registry XML, through `mddf_json.json_to_xml`, so element order is the schema's by construction. `record_from_xml(record_to_xml(r)) == r` for a record `record_from_xml` built, for Basic, Series, Season, Episode, Edit, Clip and Manifestation; a `record_from_row` record round-trips at the row level (its Alt IDs carry the sheet's Domain and no Type until they pass through XML). Measured on XML_to_JSON's 36 golden registry documents: all round-trip, and the text equals the registry's own except the deprecated language `type` attribute (which `record_from_xml` does not read) and a `Digital` block whose `Container` preceded its `Track` (an unbounded choice; tracks are written first). For a registration, rename the root to the creation type (`Episode`, `Basic`, ...): `create<Type>DataType` has the same children in the same order (tested). A creation carries no `ID`: a `record_from_row` record has none; drop it from a `record_from_xml` one. Nothing is filtered, so a ShortDOI Alt ID is written if the record holds one. Absent values are not written; an element with attributes but no text is not written, as both readers already treat it as no value. Raises `RecordXmlError` naming the key for anything it cannot place: an unknown key (including `ManifestationInfo` `Film`/`Tape` and an XML-built Compilation's entries), a non-object where an object belongs, a Domain on a non-Proprietary Alt ID, `SystemGenerated` true on an alternate title, a credit with a SortName and no DisplayName, two spellings of one field that disagree; and for a missing or empty view. Extracted from XML_to_JSON `standard_render.render_view_xml` (2026-11-26), which can delegate to it: it takes the whole record instead of the block, returns `str` and raises where that returned `None`, reads `Domain` beside `_domain` on Details and the element-named class key beside `Class` on the lightweight relationships, and raises where that dropped a value silently.
+
+### `RecordXmlError` (class)
+
+<!-- dict:eidr_core.bmr_map.RecordXmlError -->
+```python
+class RecordXmlError(ValueError)
+```
+
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+<!-- /dict -->
+
+**Does.** The error `record_to_xml` raises when the record holds a field it has no element for, or no block to write. A `ValueError`, so an existing `except ValueError` catches it; the message names the key and where it was found. It exists so a registration can never lose a value without a trace, as `WriteReport.dropped` does for a sheet.
 
 ## `eidr_core.verdicts`
 

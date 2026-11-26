@@ -11,11 +11,15 @@ is why this module is tested locally rather than left to consumers.
 from __future__ import annotations
 
 import copy
+import xml.etree.ElementTree as ET
+from pathlib import Path
+from typing import Any
 
 import pytest
 
 from eidr_core import bmr_map as M
 from eidr_core.bmr_io import TEMPLATES
+from eidr_core.mddf_json import SchemaSet, eidr_schema
 
 SELF_ONLY_TITLE = "Sheet Supplied Title"
 PID, PID2, REG = "10.5237/AAAA-BBBB", "10.5237/CCCC-DDDD", "10.5237/REG-0001"
@@ -646,3 +650,178 @@ def test_drop_withholds_only_a_generated_main_title():
             "AlternateResourceName": [{"Title": "Alt"}]}
     row = M.row_from_blocks(base, {}, "non_episodic", system_titles="drop")
     assert row.get("Title") is None and row["Alternate Title 1"] == "Alt"
+
+
+# ── standard record -> registry XML (record_to_xml; python-tools -bmrin) ────
+# Acceptance from python-tools' handoff of 2026-11-25, section 3: (1) the
+# round trip record_from_xml(record_to_xml(r)) == r for each creation type a
+# Template-22 sheet produces; (2) element order is the creation schema's;
+# (4) a field the writer cannot place raises, naming it. A wrong answer is
+# silent (a registration missing a value, or an element the registry
+# reorders or rejects), so it is pinned here. Measured before release on
+# XML_to_JSON's golden registry corpus (36 Self/Full documents, a5b0949):
+# every one round-trips, and the XML written equals the registry's own text
+# except the deprecated language `type` attribute (record_from_xml does not
+# read it) and one Digital block whose Container preceded its Track.
+
+_E = "{http://www.eidr.org/schema}"
+_SPECS = Path(M.__file__).resolve().parent.parent / "specs" / "mddf_json"
+
+_ROW = {"Structural Type": "Performance", "Mode": "AudioVisual",
+        "Title": "T", "Title Class": "release", "Title Language": "en",
+        "Alternate Title 1": "A", "Alt Title Language 1": "fr",
+        "Original Language 1": "en", "Language Mode 1": "Audio", "Version Language 1": "fr",
+        "Country of Origin 1": "US", "Release Date": "1999", "Publication Status": "valid",
+        "Approx Length": "PT1H", "Registrant": REG, "Metadata Authority Party ID 1": PID,
+        "Associated Org 1": "Org", "Associated Org Role 1": "producer",
+        "Associated Org Party ID 1": PID2,
+        "Alt ID 1": "p1", "Domain 1": "example.org", "Relation 1": "IsSameAs",
+        "IMDb": "tt1", "IMDb Relation": "IsSameAs", "ISAN": "0000-0001", "V-ISAN": "0000-0002",
+        "Director 1": "D", "Actor 1": "A", "Description": "d", "Description Language": "en",
+        "Registrant Extra": "x", "Parent EIDR/Row ID": "10.5240/P",
+        "End Date": "2001", "Series Class": "c", "Season Class 1": "s1", "Episode Class 1": "e1",
+        "Number Required": "true", "Season No.": "2", "Episode No.": "3",
+        "Distribution No.": "7", "Dist. No. Domain": "d.org", "House No.": "h",
+        "House No. Domain": "h.org", "Alternate No. 1": "a", "Alt. No. Domain 1": "a.org",
+        "Time Slot": "20:00:00", "Edit Use": "u", "Edit Class 1": "c1",
+        "Made for Region 1": "US", "Color Type": "color", "In 3D": "false",
+        "Edit Details 1": "dd", "Edit Details Domain 1": "x.org", "Manif Class 1": "m1",
+        "Manif Details 1": "md", "Manif Details Domain 1": "y.org",
+        "Start Time": "PT0S", "Content Duration": "PT1M", "Component Mode": "AudioVisual"}
+
+# Every creation type the Template-22 workbooks produce (Compilation is out of
+# scope: the mapper has no Header/Entry shape for it).
+_CREATION = [("non_episodic", "Movie", "Basic"), ("episodic", "Series", "Series"),
+             ("episodic", "Season", "Season"), ("episodic", "TV", "Episode"),
+             ("edit", "Movie", "Edit"), ("manifestation", "Movie", "Manifestation"),
+             ("clip", "Movie", "Clip")]
+
+
+def _sheet_record(template: str, referent: str) -> dict:
+    columns = {M.header_base(h) for h in TEMPLATES[template].headers}
+    row = {k: v for k, v in dict(_ROW, **{"Referent Type": referent}).items()
+           if M.header_base(k) in columns}
+    return M.record_from_row(row, template)
+
+
+@pytest.mark.parametrize("template,referent,ctype", _CREATION)
+def test_record_to_xml_round_trips_every_creation_type(template, referent, ctype):
+    r = _sheet_record(template, referent)
+    assert M.creation_type_from_row(template, {"Referent Type": referent}) == ctype
+    # A record_from_row record is not in record_from_xml's normal form (its
+    # Alt IDs carry the sheet's Domain and no Type), so it is compared at the
+    # row level: the sheet gets back exactly what it gave.
+    xml_r = M.record_from_xml(M.record_to_xml(r))
+    assert M.row_from_record(xml_r, template) == M.row_from_record(r, template)
+    # In the normal form the round trip is the identity, and the text is stable.
+    x = M.record_to_xml(xml_r)
+    assert M.record_from_xml(x) == xml_r
+    assert M.record_to_xml(M.record_from_xml(x)) == x
+
+
+@pytest.mark.parametrize("xml,view", [
+    (_MSG, "FullMetadata"), (_MSG, "SelfDefinedMetadata"),
+    ((_SPECS / "registry-edit-full.xml").read_text(encoding="utf-8"), "FullMetadata")])
+def test_record_to_xml_inverts_record_from_xml_on_registry_xml(xml, view):
+    r = M.record_from_xml(xml)
+    assert M.record_from_xml(M.record_to_xml(r, view=view)) == {view: r[view]}
+
+
+def test_registry_xml_comes_back_as_the_registry_wrote_it():
+    # The resolve document itself, less the deprecated language `type`
+    # attribute record_from_xml does not read (operator, 2026-11-15).
+    src = (_SPECS / "registry-edit-full.xml").read_text(encoding="utf-8")
+    out = M.record_to_xml(M.record_from_xml(src), view="FullMetadata")
+    assert out == src.replace(' type="primary"', "")
+
+
+def test_a_digital_block_in_schema_order_round_trips():
+    digital = ('<Digital><Track><md:Video><md:Encoding><md:Codec>H.264</md:Codec>'
+               '</md:Encoding></md:Video></Track><Container><md:Type>CFF</md:Type></Container>'
+               '</Digital>')
+    xml = ('<SelfDefinedMetadata xmlns="http://www.eidr.org/schema" '
+           'xmlns:md="http://www.movielabs.com/schema/md/v2.8/md"><BaseObjectData>'
+           '<StructuralType>Digital</StructuralType></BaseObjectData><ExtraObjectMetadata>'
+           f'<ManifestationInfo><Parent>10.5240/P</Parent>{digital}</ManifestationInfo>'
+           '</ExtraObjectMetadata></SelfDefinedMetadata>')
+    r = M.record_from_xml(xml)
+    out = M.record_to_xml(r)
+    assert M.record_from_xml(out) == r
+    assert digital in out
+
+
+def _assert_schema_order(el: ET.Element, typ: Any, sch: SchemaSet) -> None:
+    """Every element's children are in its type's content-model order."""
+    model = sch.content(typ)
+    last = -1
+    for child in el:
+        hit = model.children.get(child.tag)
+        assert hit is not None, f"{child.tag} is not allowed in {el.tag}"
+        assert hit.position >= last, f"{child.tag} is out of schema order in {el.tag}"
+        last = hit.position
+        _assert_schema_order(child, hit.type, sch)
+
+
+@pytest.mark.parametrize("template,referent,ctype", _CREATION)
+def test_record_to_xml_writes_the_creation_schemas_order(template, referent, ctype):
+    sch = eidr_schema()
+    out = ET.fromstring(M.record_to_xml(_sheet_record(template, referent)))
+    _assert_schema_order(out, sch.element_type(f"{_E}SelfDefinedMetadata"), sch)
+    # The view's root renamed to the creation type IS the creation element
+    # (python-tools' plan): the same children validate against the
+    # create<Type>DataType content model, in the same order.
+    _assert_schema_order(out, f"{_E}create{ctype}DataType", sch)
+
+
+@pytest.mark.parametrize("mutate,named", [
+    (lambda b, e: b.update(Rating="PG"), "Rating"),
+    (lambda b, e: b["AlternateID"].append({"AltID": "tt9", "Type": "IMDB",
+                                           "Domain": "imdb.com"}), "imdb.com"),
+    (lambda b, e: b["AlternateResourceName"][0].update(SystemGenerated="true"),
+     "SystemGenerated"),
+    (lambda b, e: b["Credits"]["Actor"].append({"SortName": "Doe, J"}), "SortName"),
+    (lambda b, e: b["Description"].update(value="other"), "Description"),
+    (lambda b, e: e["ManifestationInfo"].update(Film={"x": 1}), "Film"),
+    (lambda b, e: e["ManifestationInfo"]["Details"][0].update(Domain="z.org"), "_domain"),
+    (lambda b, e: b.update(Credits=["D"]), "Credits"),
+])
+def test_record_to_xml_refuses_what_it_cannot_place(mutate, named):
+    r = _sheet_record("manifestation", "Movie")
+    md = r["SelfDefinedMetadata"]
+    mutate(md["BaseObjectData"], md["ExtraObjectMetadata"])
+    with pytest.raises(M.RecordXmlError, match=named):
+        M.record_to_xml(r)
+
+
+def test_record_to_xml_refuses_a_missing_or_empty_view_and_an_unknown_one():
+    with pytest.raises(M.RecordXmlError, match="no FullMetadata block"):
+        M.record_to_xml(_sheet_record("edit", "Movie"), view="FullMetadata")
+    with pytest.raises(M.RecordXmlError, match="nothing to write"):
+        M.record_to_xml({"SelfDefinedMetadata": {"BaseObjectData": {"Mode": " "}}})
+    with pytest.raises(ValueError, match="view must be"):
+        M.record_to_xml(_sheet_record("edit", "Movie"), view="Self")
+
+
+def test_record_to_xml_refuses_a_compilation_rather_than_write_half_of_it():
+    xml = ('<SelfDefinedMetadata xmlns="http://www.eidr.org/schema" '
+           'xmlns:md="http://www.movielabs.com/schema/md/v2.8/md"><BaseObjectData>'
+           '<StructuralType>Abstraction</StructuralType></BaseObjectData><ExtraObjectMetadata>'
+           '<CompilationInfo><md:Entry><md:EntryNumber>1</md:EntryNumber></md:Entry>'
+           '</CompilationInfo></ExtraObjectMetadata></SelfDefinedMetadata>')
+    with pytest.raises(M.RecordXmlError, match="CompilationInfo"):
+        M.record_to_xml(M.record_from_xml(xml))
+
+
+def test_record_to_xml_declares_md_and_xsi_only_when_used():
+    out = M.record_to_xml({"SelfDefinedMetadata": {"BaseObjectData": {"Mode": "AudioVisual"}}})
+    assert "xmlns:md=" not in out and "xmlns:xsi=" not in out
+    assert out.endswith('<SelfDefinedMetadata xmlns="http://www.eidr.org/schema">'
+                        "<BaseObjectData><Mode>AudioVisual</Mode></BaseObjectData>"
+                        "</SelfDefinedMetadata>")
+
+
+def test_record_to_xml_does_not_mutate_its_input():
+    r = _sheet_record("episodic", "TV")
+    before = copy.deepcopy(r)
+    M.record_to_xml(r)
+    assert r == before

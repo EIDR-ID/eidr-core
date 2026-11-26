@@ -202,6 +202,24 @@ BMR-Review.
    section, in that operation order, and compute the ` est` suffix by
    comparing against the unflagged score rather than from the flag.
 
+7. **Aliases, the candidate union and E6 (2.24.0, 2026-11-26).** No value
+   moved (digest as 2.23.0). (a) **T48** (operator, 2026-10-26 and
+   2026-11-11): every alias -- the submission's parent, a candidate, a
+   candidate's parent -- is followed to its live target BEFORE evaluation,
+   through the record source (eidr-core `lookup.resolve_alias(es)`), and every
+   same-type child pair with no common family is a family mismatch (pinned by
+   `alias-parent-followed-to-the-candidates-parent`,
+   `family-unknown-different-parents-rejects` and
+   `family-unknown-different-parents-identity-altid-review`; the first needs
+   the golden-pair `aliases` block). (b) **S-37** (operator, 2026-11-24):
+   candidates are current when presented. Recovery ADDS to the offered
+   shortlist and never replaces it; each presented candidate carries `origin`
+   (`shortlist` | `recovery`) and, when reached through an alias,
+   `resolved_from`. (c) **S-38 / E6** (operator, 2026-11-24): an UNCLASSIFIED
+   Series meets a Basic with an exact title and the same year, Basic profile,
+   capped at Review (four pair fixtures, both directions; a classed Series, a
+   different year and a non-exact title stay ineligible).
+
 **Shipped inert in eidr-core 0.77.0; both LANDED 2026-11-24 (2.22.0, 2.23.0).** Two title
 rules from BMR-Review's handoff of 2026-11-23, approved by the operator the
 same day. Each is read from an OPTIONAL parameter, as

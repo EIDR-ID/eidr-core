@@ -2,7 +2,7 @@
 
 **Status:** all three modes LANDED — `pair` 2026-07-29; `case` ratified 2026-09-10 (S-26),
 evaluator 2026-09-11; `recovery_pool` ratified 2026-09-10 (S-9), first captured instance and
-evaluator 2026-09-11 (BMR-Review T17). Corpus: 35 `pair`, 13 `case`, 1 `recovery_pool` (49) at compare-spec 2.23.0.
+evaluator 2026-09-11 (BMR-Review T17). Corpus: 39 `pair`, 16 `case`, 1 `recovery_pool` (56) at compare-spec 2.24.0.
 **Owner of the format:** eidr-core. **Owner of the evaluator:** BMR-Review
 (`eidr_dedup_score/golden.py`). **Conforming implementation:** De-Dupe UI,
 in JavaScript, with no database.
@@ -135,6 +135,17 @@ confirms No Match, and the match stays in the registry.
   not system-titled as S-32 first described it: a pilot's system title
   (`<Series>: Season 1: Episode 1`) already contains the Series' title, so
   that shape passed with the block ignored and could pin nothing.
+* **A `pair` or `case` fixture may carry a top-level `aliases` block**
+  (defined at 2.24.0, 2026-11-26; BMR-Review T48):
+  `"aliases": { "<alias eidr_id>": "<live target eidr_id>", ... }`. The engine
+  follows an alias only through its record source (the operator, 2026-10-26
+  and 2026-11-11: follow ID aliases to their eventual target, BEFORE
+  evaluating), so without the block no fixture can say which id is an alias.
+  An evaluator's source offers it as its alias lookup (BMR-Review:
+  `alias_target`). Rule, as for `ancestry`: a loader that ignores the block
+  must make its fixture FAIL loudly, never pass;
+  `alias-parent-followed-to-the-candidates-parent` fails with the block
+  removed.
 * **A `mode` the evaluator does not yet implement must fail LOUDLY**, naming
   what it waits for, rather than being absent. (`recovery_pool` raised
   `NotImplementedError` for the one day between ratification and its first

@@ -1,0 +1,76 @@
+{
+  "id": "crosstype-unclassified-series-different-year-stays-ineligible",
+  "added": "2026-11-24",
+  "why": "E6 (BMR-Review proposal 2026-11-19; operator ruling 2026-11-24, De-Dupe UI S-38: 'extend the cross-type list'): a Series that states NO Series Class against a Basic with an exact title and the same year is eligible on the Basic profile, capped at Review -- the SVT shape of audit rounds 8-9, a one-off programme registered as an unclassified Series that the registry holds as a Basic. A different year: still ineligible.",
+  "submitted": {
+    "creation_type": "Series",
+    "titles": [
+      {
+        "text": "My life as Roger Moore",
+        "lang": "sv",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2023",
+    "countries": [
+      "SE"
+    ],
+    "original_languages": [
+      "sv"
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/4A7C-21E0-9B3F-58D6-E1A2-K",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "My life as Roger Moore",
+        "lang": "sv",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2024",
+    "countries": [
+      "SE"
+    ],
+    "original_languages": [
+      "sv"
+    ],
+    "length_minutes": "58"
+  },
+  "invariants": {
+    "verdict_in": [
+      "Reject"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.24.0",
+    "confidence": 10.7,
+    "verdict": "Reject",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 0.71,
+      "director": null,
+      "actor": null,
+      "country": 1.0,
+      "assoc_org": null,
+      "length": null,
+      "original_language": 1.0,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "mismatch",
+      "director": "neutral",
+      "actor": "neutral",
+      "country_of_origin": "identical",
+      "associated_org": "neutral",
+      "duration": "neutral",
+      "original_language": "identical",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0
+  }
+}

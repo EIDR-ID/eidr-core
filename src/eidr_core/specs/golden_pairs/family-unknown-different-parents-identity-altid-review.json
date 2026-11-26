@@ -1,0 +1,78 @@
+{
+  "id": "family-unknown-different-parents-identity-altid-review",
+  "added": "2026-11-24",
+  "mode": "case",
+  "creation_type": "Episode",
+  "tamr_kind": "NOMATCH",
+  "why": "The exception to family-unknown-different-parents-rejects (BMR-Review 1e0e7f5, operator 2026-11-11): the same pair sharing an identity Alt ID (IMDb, relation IsSameAs) is held at Review -- never Accept, never Reject. A misassigned season keeps its external ids, so a shared identity id may surface the pair for a human; the ancestry disagreement is what the reviewer resolves. A case fixture, because the score is the same before and after 1e0e7f5 (an ineligible pair either way): what moved is that the pair is now a FAMILY MISMATCH, which the reason states ('no common Family ID') and which a shared identity Alt ID can surface; notes_match pins it.",
+  "submitted": {
+    "creation_type": "Episode",
+    "release_date": "2026",
+    "length_minutes": "30",
+    "titles": [
+      {
+        "text": "Pilot",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "parent_id": "S0007",
+    "alt_ids": [
+      {
+        "value": "tt5550001",
+        "id_type": "IMDB",
+        "relation": "IsSameAs"
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "eidr_id": "10.5240/FEED-0000-0000-0016-0002-H",
+      "creation_type": "Episode",
+      "release_date": "2026",
+      "length_minutes": "30",
+      "titles": [
+        {
+          "text": "Pilot",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "original_languages": [
+        "en"
+      ],
+      "parent_id": "S0012",
+      "alt_ids": [
+        {
+          "value": "tt5550001",
+          "id_type": "IMDB",
+          "relation": "IsSameAs"
+        }
+      ]
+    }
+  ],
+  "invariants": {
+    "assessment_in": [
+      "Review"
+    ],
+    "notes_match": [
+      "no common Family ID"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.24.0",
+    "assessment": "Review",
+    "proposed_id": "10.5240/FEED-0000-0000-0016-0002-H",
+    "confidence": 30.0,
+    "clears_without_review": false,
+    "notes": [
+      "alt-id match: +8.0",
+      "ineligible match: episodes: no common Family ID (not the same series)",
+      "different Family ID but a shared identity alt-id: possible misassigned season/series -- held for manual review, may not Accept"
+    ],
+    "reason": "Tamr found no match, but a registry search found a candidate in the Review band — confirm it is the same work, or reject it."
+  }
+}

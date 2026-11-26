@@ -1,0 +1,63 @@
+{
+  "id": "family-unknown-different-parents-rejects",
+  "added": "2026-11-24",
+  "mode": "case",
+  "creation_type": "Episode",
+  "tamr_kind": "NOMATCH",
+  "why": "BMR-Review 1e0e7f5 (2026-11-11, operator ruling of that day; T48): EVERY same-type child pair without a common family is a family mismatch, including a pair whose Family IDs are unknown and whose parents differ. Before, the mismatch fired only when both families were known; with a family unknown the gate fell back to comparing parents. Two Episodes titled 'Pilot', same year, length and language, under different parents that are in-sheet Row IDs (deferred, so no Family ID can be known on either side): rejected. Pair of family-unknown-different-parents-identity-altid-review: a shared identity Alt ID is the one thing that surfaces such a pair, at Review. A case fixture, because the score is the same before and after 1e0e7f5 (an ineligible pair either way): what moved is that the pair is now a FAMILY MISMATCH, which the reason states ('no common Family ID') and which a shared identity Alt ID can surface; notes_match pins it.",
+  "submitted": {
+    "creation_type": "Episode",
+    "release_date": "2026",
+    "length_minutes": "30",
+    "titles": [
+      {
+        "text": "Pilot",
+        "lang": "en",
+        "is_resource": true
+      }
+    ],
+    "original_languages": [
+      "en"
+    ],
+    "parent_id": "S0007"
+  },
+  "candidates": [
+    {
+      "eidr_id": "10.5240/FEED-0000-0000-0016-0002-H",
+      "creation_type": "Episode",
+      "release_date": "2026",
+      "length_minutes": "30",
+      "titles": [
+        {
+          "text": "Pilot",
+          "lang": "en",
+          "is_resource": true
+        }
+      ],
+      "original_languages": [
+        "en"
+      ],
+      "parent_id": "S0012"
+    }
+  ],
+  "invariants": {
+    "assessment_in": [
+      "Disagree: all candidates rejected",
+      "Agree: no match"
+    ],
+    "notes_match": [
+      "no common Family ID"
+    ]
+  },
+  "expected": {
+    "spec_version": "2.24.0",
+    "assessment": "Agree: no match",
+    "proposed_id": "NO MATCH",
+    "confidence": 10.7,
+    "clears_without_review": true,
+    "notes": [
+      "ineligible match: episodes: no common Family ID (not the same series)"
+    ],
+    "reason": ""
+  }
+}

@@ -1,0 +1,20 @@
+{
+ "id": "pro-rd-rule6-shape-no-change",
+ "set": "pro_flags",
+ "rule": "17",
+ "why": "Section 4: a supplied RD:Pro; earlier full date (rule 6's shape): no change, flag not copied.",
+ "mutation": "rule 17 copying RD:Pro;",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [
+   [
+    "17",
+    "registrant_extra:rd"
+   ]
+  ],
+  "merged": []
+ }
+}

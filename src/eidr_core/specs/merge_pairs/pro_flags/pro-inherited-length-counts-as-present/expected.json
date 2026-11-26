@@ -1,0 +1,20 @@
+{
+ "id": "pro-inherited-length-counts-as-present",
+ "set": "pro_flags",
+ "rule": "15",
+ "why": "Section 4.2: an Episode whose length is inherited (absent from its own block, present in FullMetadata) does not take the supplied length.",
+ "mutation": "rule 15 deciding presence on the self-defined block",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [
+   [
+    "15",
+    "approximate_length"
+   ]
+  ],
+  "merged": []
+ }
+}

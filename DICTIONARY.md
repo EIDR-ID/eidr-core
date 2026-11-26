@@ -1305,6 +1305,19 @@ edition's Changes entry.
 | [`eidr_core.mddf_json.MddfJsonWarning`](#mddfjsonwarning-class) | class | A `UserWarning` subclass, so callers can filter or escalate it. |
 | [`eidr_core.mddf_json.SchemaSet`](#schemaset-class) | class | Reads complexType, sequence/choice/all, group refs, element refs, xs:any, complexContent extension (base first) and restriction, simpleContent. |
 | [`eidr_core.mddf_json.SignedXmlError`](#signedxmlerror-class) | class | A `MddfJsonError` subclass, so a caller can treat it apart from other failures. |
+| [`eidr_core.merge.merge`](#merge) | function | Reads both sides into the standard record shape (`bmr_map.record_from_xml`), runs the pre-process steps and rules 1 to 28 of merge-rules 1.0.0 in order on a copy of the current `SelfDefinedMetadata` (rule 18 alone under `altids_only`), and writes the result with `bmr_map.record_to_xml`, so every element is in the schema's content-model order. |
+| [`eidr_core.merge.spec_values_digest`](#spec_values_digest) | function | Hashes the values merge-rules pins per version: the two knobs, `RULES`, `HELD_RULES` and the `FIELD_KEYS` families. |
+| [`eidr_core.merge.Change`](#change-class) | class | One edit made to the modification base, in the order the rules made it. |
+| [`eidr_core.merge.ChangeReport`](#changereport-class) | class | What `merge` did: a contract from v1 (ruled 2026-09-23) that MergeTool's JSON output and eidr-wikidata's ledger read. |
+| [`eidr_core.merge.Conflict`](#conflict-class) | class | A supplied value withheld and not written. |
+| [`eidr_core.merge.MergeOptions`](#mergeoptions-class) | class | How to merge. |
+| [`eidr_core.merge.Skip`](#skip-class) | class | A supplied value a rule declined. |
+| [`eidr_core.merge.FIELD_KEYS`](#field_keys-constant) | constant | the field key of every report entry, family -> description (merge-rules section 5.1, ruled 2026-11-26: eidr-wikidata's proposal). |
+| [`eidr_core.merge.FUZZY_THRESHOLD`](#fuzzy_threshold-constant) | constant | a fuzzy-compared text (titles, credit names) is different when the Levenshtein distance of the normalised strings is above this. |
+| [`eidr_core.merge.FUZZY_THRESHOLD_ORG`](#fuzzy_threshold_org-constant) | constant | the same for org names (so Company and Co still match). |
+| [`eidr_core.merge.HELD_RULES`](#held_rules-constant) | constant | the section 5 held items, (id, name). |
+| [`eidr_core.merge.RULES`](#rules-constant) | constant | (id, .NET name, class) in the order the rules run: the pre-process steps (`pre.1`-`pre.7`), then rules 1 to 28 (18a before 18); class `skip` rules only report. |
+| [`eidr_core.merge.SPEC_VERSION`](#spec_version-constant) | constant | the merge-rules.md version this engine implements; eidr-core assigns it. |
 | [`eidr_core.normalize.ascii_fold`](#ascii_fold) | function | Folds Latin diacritics and ligatures to ASCII so they do not count as differences. |
 | [`eidr_core.normalize.cmp_key`](#cmp_key) | function | Builds the canonical comparison key; equal keys are treated as a match. |
 | [`eidr_core.normalize.days_between`](#days_between) | function | Returns the absolute number of days between two `(year, month, day)` tuples. |
@@ -1418,6 +1431,7 @@ Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 9 functions, 2 cl
 * You read an AltIDTool edit file that may hold removals, blank lines or `//` comments: `parse_edit_line`.
 * You write a REMOVAL line for an edit file: `format_removal`. It writes only the two forms spec v1.6 accepts and raises on every other.
 * You apply altidtool-format rule 6 (a second `IsSameAs` value of one Kind is a conflict) and need the Kinds exempt from it: `multi_form_domains()`.
+* You need C5's per-Alt-ID identity vocabulary in vendorable code: `AltId`, `kind_key`, `is_audited`, `is_single_form`, `same_relation`, `IS_SAME_AS` are defined here since 2026-11-26 (moved from `altid_audit`, which re-exports them, so they are documented under `eidr_core.altid_audit`). The merge engine needed them and must vendor; `altid_audit` cannot.
 
 **Do not use it when.** The job is one of these:
 * Do not reimplement the line format (an f-string with `\t`, a fixed-5 writer, trailing tabs). Call `format_line` or `write_lines`, and `format_removal` for a removal line. The empty-Domain placeholder and "Relation only when non-empty" rules are easy to get wrong.
@@ -6388,7 +6402,7 @@ Defined in `src/eidr_core/verdicts/__init__.py`.
 ## `eidr_core.altid_audit`
 
 <!-- dict-module:eidr_core.altid_audit -->
-Source `src/eidr_core/altid_audit/__init__.py`. Public names: 6 functions, 8 classes, 6 constants (declared by `__all__`).
+Source `src/eidr_core/altid_audit/__init__.py`. Public names: 6 functions, 8 classes, 6 constants (declared by `__all__`). Some are defined in, and also importable from: `src/eidr_core/altidtool_io/__init__.py`.
 <!-- /dict-module -->
 
 **Purpose.** The one shared Alt-ID audit: given the Alt IDs a source asserts for a record, check them against the mirror and say which are safe to send to AltIDTool, which are already there, and which conflict, and why. Reconciliation plan component C5, extracted 2026-10-15 from BMRtoAltID `bmr_altid/audit.py` and `mirror.py` on the interfaces ruled in eidr-core-ops `PHASE2-3-INTERFACES-2026-10-15.md`. BMRtoAltID audits through it since its adoption, and the release was checked back to back against BMRtoAltID's own audit on the live mirror: AltIDTool files and reports identical. The ladder: alias following, the identity lookups (IsSameAs or blank only), agreement with the asserted record, rule 6 (one identity value per single-form Kind), rule 7 (already on the record under another relation), and the AltIDTool emission checks. Since the operator's rulings of 2026-11-24 the checks are relation-aware throughout, and that vetting policy is written in this module's docstring, not in `specs/altidtool-format.md`: one Kind+value never goes on a record twice whatever the relation (a value the source offers under two relations is withheld, every copy; an exact repeat is written once), a value held or proposed under a non-identity relation is never a duplicate or a conflict, and the rival values rule 6 withholds come back in `RowAudit.research` for the Help Desk. Input is Alt ID tuples, not sheet rows; reading a source and formatting a report stay with the caller.
@@ -6465,7 +6479,7 @@ Defined in `src/eidr_core/altid_audit/__init__.py`.
 def is_audited(alt: AltId) -> bool
 ```
 
-Defined in `src/eidr_core/altid_audit/__init__.py`.
+Defined in `src/eidr_core/altidtool_io/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
@@ -6483,7 +6497,7 @@ Defined in `src/eidr_core/altid_audit/__init__.py`.
 def is_single_form(alt: AltId, multi_form_domains: frozenset[str] | None) -> bool
 ```
 
-Defined in `src/eidr_core/altid_audit/__init__.py`.
+Defined in `src/eidr_core/altidtool_io/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
@@ -6502,7 +6516,7 @@ Defined in `src/eidr_core/altid_audit/__init__.py`.
 def kind_key(alt: AltId) -> tuple[str, str, str]
 ```
 
-Defined in `src/eidr_core/altid_audit/__init__.py`.
+Defined in `src/eidr_core/altidtool_io/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
@@ -6520,7 +6534,7 @@ Defined in `src/eidr_core/altid_audit/__init__.py`.
 def same_relation(existing: set[str], relation: str) -> bool
 ```
 
-Defined in `src/eidr_core/altid_audit/__init__.py`.
+Defined in `src/eidr_core/altidtool_io/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
@@ -6557,7 +6571,7 @@ Defined in `src/eidr_core/altid_audit/__init__.py`.
 class AltId(NamedTuple)
 ```
 
-Defined in `src/eidr_core/altid_audit/__init__.py`.
+Defined in `src/eidr_core/altidtool_io/__init__.py`.
 
 | Field | Type | Default | Purpose |
 |---|---|---|---|
@@ -6721,7 +6735,7 @@ Defined in `src/eidr_core/altid_audit/__init__.py`.
 ### `IS_SAME_AS` (constant)
 
 <!-- dict:eidr_core.altid_audit.IS_SAME_AS -->
-Defined in `src/eidr_core/altid_audit/__init__.py`.
+Defined in `src/eidr_core/altidtool_io/__init__.py`.
 
 **Value** `IS_SAME_AS = "IsSameAs"` -- the identity relation's name; blank means the same.
 <!-- /dict -->
@@ -9629,14 +9643,231 @@ Defined in `src/eidr_core/scripts.py`.
 **Value** `UNSPACED = frozenset({"Han", "Hiragana", "Katakana", "Thai", "Lao", "Khmer", "Myanmar", "Tibetan"})` -- Scripts written without spaces between words, so a length in words means nothing: `profile` counts their letters as tokens (and Kana's too). Needs no extra.
 <!-- /dict -->
 
+## `eidr_core.merge`
+
+<!-- dict-module:eidr_core.merge -->
+Source `src/eidr_core/merge/__init__.py`. Public names: 2 functions, 5 classes, 6 constants (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** The merge engine (S3; `specs/merge-rules.md` 1.0.0): compares a supplied record (a BMR sheet row, a confirmed Wikidata pair, any other source) with the record the registry holds and says what to submit. `merge(current, supplied)` returns a `ChangeReport`; `changed` False means submit nothing, True means `merged_xml` is the Modify. It replaces the .NET BMR tool's Merge mode (`CompareEidrRecord.cs`): the ruled rule table (28 rules, the pre-process steps, rule 18 = BMRtoAltID's Alt ID rules, relation-aware as C5), the operator's `RD:Pro;`/`AL:Pro;` rulings and "inherited counts as present". Pure (no I/O, SDK, registry or mirror) and stdlib-only, so it vendors.
+
+**Use it when.** You are in one of these situations:
+* You merge a supplied record into an existing registry record and need the Modify, or to know there is nothing to submit (python-tools' MergeTool, eidr-wikidata's unattended caller for confirmed pairs).
+* You need only the Alt ID part (BMRtoAltID's standard mode): `MergeOptions(altids_only=True)`; `ChangeReport.altid_lines` holds the AltIDTool lines.
+* You record what a merge contributed (the two-phase ledger): every `Change` carries a field key stable across sheet and record (`FIELD_KEYS`; Alt IDs as `alt_id:<type>|<domain>`) and the normalised value.
+
+**Do not use it when.** The job is one of these:
+* Fetching the record, submitting the Modify or running AltIDTool: the caller's (the engine is pure).
+* Replacing values (MergeTool `--replace`): the replace-class rules 2, 4, 5, 6 and 7 are HELD (merge-rules section 5), and `MergeOptions(replace=True)` raises `ValueError`. So are AddTitleClass, SetStructuralType and the post-process primary-title overwrite; none runs.
+* Auditing Alt IDs against OTHER records (an Alt ID held elsewhere, alias chains): that needs the mirror, which is `altid_audit`'s. Rule 18 judges the record against itself and the supplied record.
+* Reading a sheet row: `bmr_map.record_from_row` (B5) builds the supplied record; pass the record (a Mapping) or its XML.
+* Deciding inheritance on a child record without the registry's FullMetadata: pass it (in the same document or as `full=`). Without it, rule 15 skips a child whose own length is absent instead of guessing.
+* Vendored copies: pass `MergeOptions(multi_form_domains=...)`; `altidtool_io.multi_form_domains()` reads package data a vendored copy lacks, and is called only when a Proprietary identity value needs it.
+
+**Used by.**
+<!-- dict-usedby:eidr_core.merge -->
+No consumer imports it directly (scan of 2026-11-26).
+<!-- /dict-usedby -->
+
+**Specs.** `specs/merge-rules.md` 1.0.0 (the rule table, the field-key table in section 5.1, the held items); fixtures under `src/eidr_core/specs/merge_pairs/` (authored by `tools/gen_merge_pairs.py`, checked by `tests/test_merge_pairs.py`); the values pin `tests/merge_rules_values_pin.json`.
+
+### `merge`
+
+<!-- dict:eidr_core.merge.merge -->
+```python
+def merge(current: str | bytes | ET.Element, supplied: str | bytes | ET.Element | Mapping[str, Any], options: MergeOptions | None = None, *, full: str | bytes | ET.Element | None = None) -> ChangeReport
+```
+
+Defined in `src/eidr_core/merge/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `current` | `str \| bytes \| ET.Element` | required | The registry's XML for the record: must hold its `SelfDefinedMetadata` (the modification base); may also hold its `FullMetadata` (a resolve message carrying both). A `FullMetadata` alone raises `ValueError`: merging into it would bake inherited values into the record. |
+| `supplied` | `str \| bytes \| ET.Element \| Mapping[str, Any]` | required | The supplied record: XML (a `SelfDefinedMetadata` or `FullMetadata` block, or a creation element such as `Basic` or `Episode`) or a standard record (`bmr_map.record_from_row`, which reads families sparsely). |
+| `options` | `MergeOptions \| None` | `None` | `MergeOptions`; None is the default (add-only, every rule). |
+| `full` | `str \| bytes \| ET.Element \| None` | `None` (keyword-only) | The registry's `FullMetadata` as a separate document, when `current` does not carry it. Rule 15 decides presence on it (an inherited length counts as present). |
+
+**Returns** `ChangeReport` -- `changed`, `merged_xml` (None when nothing changed), `changes`, `conflicts`, `skipped`, `altid_lines`, `spec_version`.
+<!-- /dict -->
+
+**Does.** Reads both sides into the standard record shape (`bmr_map.record_from_xml`), runs the pre-process steps and rules 1 to 28 of merge-rules 1.0.0 in order on a copy of the current `SelfDefinedMetadata` (rule 18 alone under `altids_only`), and writes the result with `bmr_map.record_to_xml`, so every element is in the schema's content-model order. Caps are the schema's `maxOccurs`; Alt ID types, patterns and relations come from the bundled schema. Raises `ValueError` for `options.replace` and for input without the blocks named above.
+
+### `spec_values_digest`
+
+<!-- dict:eidr_core.merge.spec_values_digest -->
+```python
+def spec_values_digest() -> str
+```
+
+Defined in `src/eidr_core/merge/__init__.py`.
+
+No parameters.
+
+**Returns** `str` -- the sha256 hex digest of the pinned values.
+<!-- /dict -->
+
+**Does.** Hashes the values merge-rules pins per version: the two knobs, `RULES`, `HELD_RULES` and the `FIELD_KEYS` families. `tests/merge_rules_values_pin.json` keeps one digest per `SPEC_VERSION`, so a knob or rule change without a version bump fails eidr-core's suite.
+
+### `Change` (class)
+
+<!-- dict:eidr_core.merge.Change -->
+```python
+class Change(NamedTuple)
+```
+
+Defined in `src/eidr_core/merge/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `rule` | `str` | required | The rule id from `RULES` (`"3"`, `"18a"`, `"pre.1"`). |
+| `field` | `str` | required | themoviedb.org/movie`. |
+| `action` | `str` | required | `add`, `replace` or `remove`. |
+| `old` | `str \| None` | required | The value before (None for an add). |
+| `new` | `str \| None` | required | The value after (None for a remove). |
+| `value` | `str` | required | The normalised value the ledger keys on: the value `strip().lower()` (for a title-language change, the title's text). |
+<!-- /dict -->
+
+**Does.** One edit made to the modification base, in the order the rules made it.
+
+### `ChangeReport` (class)
+
+<!-- dict:eidr_core.merge.ChangeReport -->
+```python
+@dataclass(frozen=True)
+class ChangeReport
+```
+
+Defined in `src/eidr_core/merge/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `changed` | `bool` | required | False means the caller submits nothing. |
+| `merged_xml` | `str \| None` | required | The modification base with the edits applied, as EIDR XML in schema order; None when `changed` is False. |
+| `changes` | `tuple[Change, ...]` | `()` | Every edit, as `Change`. |
+| `conflicts` | `tuple[Conflict, ...]` | `()` | Every supplied value withheld because it contradicts the record or itself, as `Conflict`; never written. |
+| `skipped` | `tuple[Skip, ...]` | `()` | Every supplied value a rule declined, with the reason, as `Skip`. |
+| `altid_lines` | `tuple[str, ...]` | `()` | One AltIDTool line per Alt ID rule 18 added, composed by `altidtool_io.format_line`; empty when the current record has no ID. |
+| `spec_version` | `str` | `SPEC_VERSION` | The merge-rules version the report was made under. |
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `as_dict` | `def as_dict() -> dict[str, Any]` | The report as JSON-ready data with named fields (MergeTool `-f json`, the ledger). |
+<!-- /dict -->
+
+**Does.** What `merge` did: a contract from v1 (ruled 2026-09-23) that MergeTool's JSON output and eidr-wikidata's ledger read.
+
+### `Conflict` (class)
+
+<!-- dict:eidr_core.merge.Conflict -->
+```python
+class Conflict(NamedTuple)
+```
+
+Defined in `src/eidr_core/merge/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `rule` | `str` | required | The rule id (`"18"` for every Alt ID conflict). |
+| `field` | `str` | required | `. |
+| `code` | `str` | required | `ALT_ID_RELATION_CONFLICT`, `SAME_KIND_CONFLICT`, `MISSING_ALT_ID_TYPE`, `NON_ASCII_VALUE` (C5's vocabulary), or `ALT_ID_UNKNOWN_TYPE`, `ALT_ID_INVALID_RELATION`, `ALT_ID_INVALID_VALUE`, `ALT_ID_MISSING_DOMAIN`, `ALT_ID_INVALID_DOMAIN` (rule 18.7, from the schema). |
+| `detail` | `str` | required | Prose for a human; not part of the contract. |
+<!-- /dict -->
+
+**Does.** A supplied value withheld and not written. Each conflict holds back only its own Alt ID; the row's others still go.
+
+### `MergeOptions` (class)
+
+<!-- dict:eidr_core.merge.MergeOptions -->
+```python
+@dataclass(frozen=True)
+class MergeOptions
+```
+
+Defined in `src/eidr_core/merge/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `replace` | `bool` | `False` | Run the replace-class rules. They are held (section 5), so True raises `ValueError`. |
+| `altids_only` | `bool` | `False` | Run rule 18 alone, with no pre-process: nothing but Alt IDs can change. |
+| `multi_form_domains` | `frozenset[str] \| None` | `None` | Rule 18.5's exempt Proprietary domains (lowercase). None reads `altidtool_io.multi_form_domains()`; a vendored copy must pass the set. |
+<!-- /dict -->
+
+**Does.** How to merge. Frozen; the default is add-only with every rule.
+
+### `Skip` (class)
+
+<!-- dict:eidr_core.merge.Skip -->
+```python
+class Skip(NamedTuple)
+```
+
+Defined in `src/eidr_core/merge/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `rule` | `str` | required | The rule id. |
+| `field` | `str` | required | The field key. |
+| `reason` | `str` | required | Why the rule declined (a similar title present, a schema maximum, a Pro flag, an inherited value); prose, not part of the contract. |
+<!-- /dict -->
+
+**Does.** A supplied value a rule declined. An exact duplicate and an Alt ID already present under the same relation are silent, not skips.
+
+### `FIELD_KEYS` (constant)
+
+<!-- dict:eidr_core.merge.FIELD_KEYS -->
+Defined in `src/eidr_core/merge/__init__.py`.
+
+**Value** `FIELD_KEYS: dict[str, str] = { "title:primary": "the main title (ResourceName); value = its text", "title:alternate"...` -- the field key of every report entry, family -> description (merge-rules section 5.1, ruled 2026-11-26: eidr-wikidata's proposal). `<x>` parts are lowercased; Alt IDs use the ledger's `alt_id:<type>|<domain>`.
+<!-- /dict -->
+
+### `FUZZY_THRESHOLD` (constant)
+
+<!-- dict:eidr_core.merge.FUZZY_THRESHOLD -->
+Defined in `src/eidr_core/merge/__init__.py`.
+
+**Value** `FUZZY_THRESHOLD = 4` -- a fuzzy-compared text (titles, credit names) is different when the Levenshtein distance of the normalised strings is above this. The .NET constant, carried verbatim: a reviewable knob, not a ruling.
+<!-- /dict -->
+
+### `FUZZY_THRESHOLD_ORG` (constant)
+
+<!-- dict:eidr_core.merge.FUZZY_THRESHOLD_ORG -->
+Defined in `src/eidr_core/merge/__init__.py`.
+
+**Value** `FUZZY_THRESHOLD_ORG = 6` -- the same for org names (so Company and Co still match). The .NET constant, a reviewable knob.
+<!-- /dict -->
+
+### `HELD_RULES` (constant)
+
+<!-- dict:eidr_core.merge.HELD_RULES -->
+Defined in `src/eidr_core/merge/__init__.py`.
+
+**Value** `HELD_RULES: tuple[tuple[str, str], ...] = ( ("AddTitleClass", "title @titleClass"), ("2", "ReplaceMode"), ("4", "ReplaceReleaseYe...` -- the section 5 held items, (id, name). None of them runs.
+<!-- /dict -->
+
+### `RULES` (constant)
+
+<!-- dict:eidr_core.merge.RULES -->
+Defined in `src/eidr_core/merge/__init__.py`.
+
+**Value** `RULES: tuple[tuple[str, str, str], ...] = ( ("pre.1", "RemoveRepeatingTitles", "pre"), ("pre.2", "RemoveRepeatingDirectors", "pre...` -- (id, .NET name, class) in the order the rules run: the pre-process steps (`pre.1`-`pre.7`), then rules 1 to 28 (18a before 18); class `skip` rules only report.
+<!-- /dict -->
+
+### `SPEC_VERSION` (constant)
+
+<!-- dict:eidr_core.merge.SPEC_VERSION -->
+Defined in `src/eidr_core/merge/__init__.py`.
+
+**Value** `SPEC_VERSION = "1.0.0"` -- the merge-rules.md version this engine implements; eidr-core assigns it.
+<!-- /dict -->
+
 ## Specs and data files
 
 The `specs/` directory holds language-neutral contracts. Python and
 JavaScript implementations both prove conformance against them. **A change
 to anything under `specs/` needs a version bump and regenerated golden-pair
 expectations.** A consumer's failing conformance test is the cross-project
-alert that a spec moved. The one exception is `merge-rules.md`, a DRAFT with
-no version yet.
+alert that a spec moved. `merge-rules.md` joined the versioned specs at
+1.0.0 (2026-11-26).
 
 | Spec | What it fixes | Status | Machine-readable data | Implemented or checked by |
 |---|---|---|---|---|
@@ -9649,7 +9880,7 @@ no version yet.
 | `specs/altid-display-order.md`, `specs/title-display-order.md` | The display order of Alt IDs and titles that the API Shim must emit | handoffs to the API Shim team, 2026-07-29 and 2026-07-30 | none | the API Shim (outside this portfolio) |
 | `specs/db-schema-contracts.md` | The schema contracts of the portfolio databases: mirror, DQ, language registry, IMDb snapshot | approved and landed 2026-08-03 | `src/eidr_core/specs/db_schemas/<db>/` (manifest, DDL, CHANGES), regenerated by `D:\Software\eidr-core-ops\tools\dump_db_schema.py` | `eidr_core.db_schemas.assert_tables`; every program that reads one of those databases |
 | `specs/vendoring.md` | How a package that cannot depend on eidr-core carries one implementation anyway (`vendor.toml`, `sync`, `check`) | 1.0.0 (2026-09-11) | the consumer's `vendor.toml` | `python -m eidr_core.vendor`; python-sdk vendors `ids`, python-tools vendors `altidtool_io` |
-| `specs/merge-rules.md` | The MergeTool rule table: merging a supplied record into the registry record | DRAFT, no version, nothing built | none | nobody yet (planned `eidr_core.merge`) |
+| `specs/merge-rules.md` | The MergeTool rule table: merging a supplied record into the registry record, the field keys of its report | 1.0.0 (2026-11-26); values pin `tests/merge_rules_values_pin.json` | `src/eidr_core/specs/merge_pairs/<set>/<fixture>/` (current.xml, supplied.xml or supplied_row.json, full.xml, expected.json), authored by `tools/gen_merge_pairs.py` | `eidr_core.merge`, checked by `tests/test_merge_pairs.py`; adopters python-tools (MergeTool), eidr-wikidata, BMRtoAltID |
 
 ## Conventions every consumer follows
 

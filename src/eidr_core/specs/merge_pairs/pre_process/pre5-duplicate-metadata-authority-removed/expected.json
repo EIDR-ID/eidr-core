@@ -1,0 +1,24 @@
+{
+ "id": "pre5-duplicate-metadata-authority-removed",
+ "set": "pre_process",
+ "rule": "pre.5",
+ "why": "A repeated Metadata Authority party ID is removed.",
+ "mutation": "pre.5 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "pre.5",
+    "metadata_authority",
+    "remove",
+    "10.5237/9999-0000",
+    null,
+    "10.5237/9999-0000"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

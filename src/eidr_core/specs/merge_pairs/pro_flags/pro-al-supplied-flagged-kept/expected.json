@@ -1,0 +1,24 @@
+{
+ "id": "pro-al-supplied-flagged-kept",
+ "set": "pro_flags",
+ "rule": "15",
+ "why": "Section 4.1: a supplied AL:Pro; length never replaces EIDR's unflagged one.",
+ "mutation": "rule 15 ignoring the supplied flag",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [
+   [
+    "15",
+    "approximate_length"
+   ],
+   [
+    "17",
+    "registrant_extra:al"
+   ]
+  ],
+  "merged": []
+ }
+}

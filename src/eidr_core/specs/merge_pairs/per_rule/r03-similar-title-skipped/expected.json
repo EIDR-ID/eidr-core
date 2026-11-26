@@ -1,0 +1,20 @@
+{
+ "id": "r03-similar-title-skipped",
+ "set": "per_rule",
+ "rule": "3",
+ "why": "A supplied title within FUZZY_THRESHOLD of an EIDR title is not added and is reported (distance 1: Exemple/Example).",
+ "mutation": "rule 3 adding without the fuzzy test",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [
+   [
+    "3",
+    "title:alternate"
+   ]
+  ],
+  "merged": []
+ }
+}

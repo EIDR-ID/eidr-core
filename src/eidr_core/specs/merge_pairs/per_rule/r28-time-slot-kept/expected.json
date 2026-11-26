@@ -1,0 +1,15 @@
+{
+ "id": "r28-time-slot-kept",
+ "set": "per_rule",
+ "rule": "28",
+ "why": "An existing TimeSlot is kept.",
+ "mutation": "rule 28 replacing a slot",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

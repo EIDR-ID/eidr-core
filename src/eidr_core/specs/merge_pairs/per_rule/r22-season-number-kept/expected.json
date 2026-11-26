@@ -1,0 +1,15 @@
+{
+ "id": "r22-season-number-kept",
+ "set": "per_rule",
+ "rule": "22",
+ "why": "An existing SequenceNumber is kept.",
+ "mutation": "rule 22 replacing a number",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

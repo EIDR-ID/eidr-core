@@ -1,0 +1,21 @@
+{
+ "id": "altid-same-kind-withheld-on-ordinary-kind",
+ "set": "rule_18",
+ "rule": "18",
+ "why": "18.5: a second IsSameAs value of a single-form Kind the record already claims is withheld as SAME_KIND_CONFLICT.",
+ "mutation": "rule 6 not applied",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [
+   [
+    "18",
+    "alt_id:imdb|",
+    "SAME_KIND_CONFLICT"
+   ]
+  ],
+  "skipped": [],
+  "merged": []
+ }
+}

@@ -1,0 +1,15 @@
+{
+ "id": "altid-blank-relation-reads-is-same-as",
+ "set": "rule_18",
+ "rule": "18",
+ "why": "18.2: a whitespace-only relation is blank, so IsSameAs.",
+ "mutation": "same_relation not stripping",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

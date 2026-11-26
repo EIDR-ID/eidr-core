@@ -1,0 +1,24 @@
+{
+ "id": "r26-house-sequence-added",
+ "set": "per_rule",
+ "rule": "26",
+ "why": "An Episode with no HouseSequence takes the supplied one with its domain.",
+ "mutation": "rule 26 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "26",
+    "house_sequence:example.com",
+    "add",
+    null,
+    "H-101",
+    "h-101"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

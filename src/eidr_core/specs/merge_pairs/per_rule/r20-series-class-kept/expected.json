@@ -1,0 +1,15 @@
+{
+ "id": "r20-series-class-kept",
+ "set": "per_rule",
+ "rule": "20",
+ "why": "A Series that has a SeriesClass keeps it.",
+ "mutation": "rule 20 replacing a class",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

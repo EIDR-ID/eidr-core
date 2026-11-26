@@ -1,0 +1,32 @@
+{
+ "id": "r08-country-added",
+ "set": "per_rule",
+ "rule": "8",
+ "why": "A supplied country not present is added.",
+ "mutation": "rule 8 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "8",
+    "country_of_origin",
+    "add",
+    null,
+    "FR",
+    "fr"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": [
+   [
+    "BaseObjectData/CountryOfOrigin",
+    [
+     "US",
+     "FR"
+    ]
+   ]
+  ]
+ }
+}

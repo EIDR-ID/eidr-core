@@ -1,0 +1,24 @@
+{
+ "id": "r23-season-class-added",
+ "set": "per_rule",
+ "rule": "23",
+ "why": "Every supplied SeasonClass not present is added.",
+ "mutation": "rule 23 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "23",
+    "season_class",
+    "add",
+    null,
+    "Main",
+    "main"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

@@ -1,0 +1,15 @@
+{
+ "id": "r09-supplied-und-never-added",
+ "set": "per_rule",
+ "rule": "9",
+ "why": "A supplied und is never added (cond_OriginalLanguageMatch).",
+ "mutation": "rule 9 adding und",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

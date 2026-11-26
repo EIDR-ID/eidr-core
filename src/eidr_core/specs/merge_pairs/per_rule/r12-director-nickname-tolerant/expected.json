@@ -1,0 +1,15 @@
+{
+ "id": "r12-director-nickname-tolerant",
+ "set": "per_rule",
+ "rule": "12",
+ "why": "A quoted nickname does not make a director different: 'Robert \"Bobby Joe\" Jones' is 'Robert Jones' (distance 10 with the nickname, 0 without).",
+ "mutation": "rule 12 without the nickname steps",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

@@ -1,0 +1,38 @@
+{
+ "id": "pro-flags-not-copied-beside-rt",
+ "set": "pro_flags",
+ "rule": "17",
+ "why": "Section 4.1: rule 17 copies RT:Podcast; and never RD:Pro; or AL:Pro;.",
+ "mutation": "rule 17 copying Pro flags",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "17",
+    "registrant_extra:rt",
+    "add",
+    null,
+    "RT:Podcast;",
+    "podcast"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [
+   [
+    "17",
+    "registrant_extra:rd"
+   ],
+   [
+    "17",
+    "registrant_extra:al"
+   ]
+  ],
+  "merged": [
+   [
+    "BaseObjectData/RegistrantExtra",
+    "RT:Podcast;"
+   ]
+  ]
+ }
+}

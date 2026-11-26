@@ -1,0 +1,30 @@
+{
+ "id": "net1-blank-domain-reported-not-fatal",
+ "set": "net_regression",
+ "rule": "18",
+ "why": "A blank 'Domain N' beside a value threw and failed the whole .NET row. Here that one Alt ID is reported (a Proprietary Alt ID needs a domain) and the row's other Alt ID is still added.",
+ "mutation": "rule 18 validation disabled, or a row-level failure",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "18",
+    "alt_id:proprietary|themoviedb.org/movie",
+    "add",
+    null,
+    "603",
+    "603"
+   ]
+  ],
+  "conflicts": [
+   [
+    "18",
+    "alt_id:proprietary|",
+    "ALT_ID_MISSING_DOMAIN"
+   ]
+  ],
+  "skipped": [],
+  "merged": []
+ }
+}

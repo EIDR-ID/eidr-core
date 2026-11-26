@@ -1,0 +1,32 @@
+{
+ "id": "r15-movie-under-45-minutes-becomes-short",
+ "set": "per_rule",
+ "rule": "15",
+ "why": "ReferentType is preserved except Movie with a resulting length under 45 minutes becomes Short.",
+ "mutation": "rule 15 without the Movie/Short switch",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "15",
+    "approximate_length",
+    "add",
+    null,
+    "PT30M",
+    "pt30m"
+   ],
+   [
+    "15",
+    "referent_type",
+    "replace",
+    "Movie",
+    "Short",
+    "short"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

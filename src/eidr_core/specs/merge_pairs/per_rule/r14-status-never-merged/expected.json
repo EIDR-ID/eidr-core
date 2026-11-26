@@ -1,0 +1,20 @@
+{
+ "id": "r14-status-never-merged",
+ "set": "per_rule",
+ "rule": "14",
+ "why": "Rule 14 is skipped (the registry will not allow it); a different supplied Status is reported, never written.",
+ "mutation": "rule 14 writing the Status",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [
+   [
+    "14",
+    "status"
+   ]
+  ],
+  "merged": []
+ }
+}

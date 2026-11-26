@@ -1,0 +1,15 @@
+{
+ "id": "r01-title-language-not-from-und",
+ "set": "per_rule",
+ "rule": "1",
+ "why": "A supplied title that is itself 'und' gives nothing to copy.",
+ "mutation": "rule 1 copying any supplied lang",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

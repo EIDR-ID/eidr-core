@@ -1,0 +1,24 @@
+{
+ "id": "net4-end-date-condition-live",
+ "set": "net_regression",
+ "rule": "21",
+ "why": "AddMissingEndDate's condition null-dereferenced and never fired; rule 21 adds the EndDate to a Series that has a SeriesInfo but no EndDate.",
+ "mutation": "rule 21 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "21",
+    "end_date",
+    "add",
+    null,
+    "2005-06-01",
+    "2005-06-01"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

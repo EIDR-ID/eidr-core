@@ -1,0 +1,24 @@
+{
+ "id": "r25-distribution-number-added",
+ "set": "per_rule",
+ "rule": "25",
+ "why": "An Episode with no DistributionNumber takes the supplied one; the key carries its domain.",
+ "mutation": "rule 25 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "25",
+    "distribution_number:example.com",
+    "add",
+    null,
+    "5",
+    "5"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

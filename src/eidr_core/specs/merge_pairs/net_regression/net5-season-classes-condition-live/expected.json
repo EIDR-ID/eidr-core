@@ -1,0 +1,24 @@
+{
+ "id": "net5-season-classes-condition-live",
+ "set": "net_regression",
+ "rule": "23",
+ "why": "AddMissingSeasonClasses copied the season-NUMBER condition (EIDR without a number, supplied with one), so a Season that already had its number never got classes. Here both carry SequenceNumber and the class is still added.",
+ "mutation": "rule 23 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "23",
+    "season_class",
+    "add",
+    null,
+    "Main",
+    "main"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

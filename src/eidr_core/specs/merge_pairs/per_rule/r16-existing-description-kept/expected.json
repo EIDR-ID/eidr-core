@@ -1,0 +1,15 @@
+{
+ "id": "r16-existing-description-kept",
+ "set": "per_rule",
+ "rule": "16",
+ "why": "EIDR's own description is never replaced.",
+ "mutation": "rule 16 replacing a description",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

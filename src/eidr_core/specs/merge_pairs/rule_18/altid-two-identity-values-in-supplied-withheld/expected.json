@@ -1,0 +1,26 @@
+{
+ "id": "altid-two-identity-values-in-supplied-withheld",
+ "set": "rule_18",
+ "rule": "18",
+ "why": "Rule 6 on the supplied side: two identity values of one single-form Kind; at most one is right, so both are withheld.",
+ "mutation": "rule 6 applied only against the record",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [
+   [
+    "18",
+    "alt_id:imdb|",
+    "SAME_KIND_CONFLICT"
+   ],
+   [
+    "18",
+    "alt_id:imdb|",
+    "SAME_KIND_CONFLICT"
+   ]
+  ],
+  "skipped": [],
+  "merged": []
+ }
+}

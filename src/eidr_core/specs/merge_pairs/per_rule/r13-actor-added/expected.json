@@ -1,0 +1,24 @@
+{
+ "id": "r13-actor-added",
+ "set": "per_rule",
+ "rule": "13",
+ "why": "As rule 12, for actors.",
+ "mutation": "rule 13 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "13",
+    "actor",
+    "add",
+    null,
+    "Keanu Reeves",
+    "keanu reeves"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

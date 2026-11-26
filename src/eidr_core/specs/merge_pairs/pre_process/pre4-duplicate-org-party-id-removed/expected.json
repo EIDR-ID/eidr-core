@@ -1,0 +1,24 @@
+{
+ "id": "pre4-duplicate-org-party-id-removed",
+ "set": "pre_process",
+ "rule": "pre.4",
+ "why": "An org repeating another's (role, EIDR party ID) is removed.",
+ "mutation": "pre.4 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "pre.4",
+    "associated_org:producer",
+    "remove",
+    "Acme",
+    null,
+    "10.5237/1234-5678"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

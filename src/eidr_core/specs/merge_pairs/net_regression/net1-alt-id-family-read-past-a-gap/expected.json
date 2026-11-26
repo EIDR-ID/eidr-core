@@ -1,0 +1,24 @@
+{
+ "id": "net1-alt-id-family-read-past-a-gap",
+ "set": "net_regression",
+ "rule": "18",
+ "why": "SpreadsheetData.cs stopped at the first blank 'Alt ID N', losing every Alt ID to its right. B5 reads the family sparsely (bmr_io.family_layout), so 'Alt ID 3' beside a blank 'Alt ID 1' and 'Alt ID 2' still arrives and is added.",
+ "mutation": "B5 reading families densely, or rule 18 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "18",
+    "alt_id:proprietary|themoviedb.org/movie",
+    "add",
+    null,
+    "603",
+    "603"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

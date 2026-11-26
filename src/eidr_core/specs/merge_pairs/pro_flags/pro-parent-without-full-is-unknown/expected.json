@@ -1,0 +1,20 @@
+{
+ "id": "pro-parent-without-full-is-unknown",
+ "set": "pro_flags",
+ "rule": "15",
+ "why": "Section 4.2: an Episode with no own length and no FullMetadata given cannot be judged; skipped with the reason, never added.",
+ "mutation": "rule 15 treating absent as none",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [
+   [
+    "15",
+    "approximate_length"
+   ]
+  ],
+  "merged": []
+ }
+}

@@ -1,0 +1,20 @@
+{
+ "id": "r19-series-info-flags-not-merged",
+ "set": "per_rule",
+ "rule": "19",
+ "why": "Rule 19 is skipped: SeriesInfo flags are reported, never written.",
+ "mutation": "rule 19 writing flags",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [
+   [
+    "19",
+    "series_info"
+   ]
+  ],
+  "merged": []
+ }
+}

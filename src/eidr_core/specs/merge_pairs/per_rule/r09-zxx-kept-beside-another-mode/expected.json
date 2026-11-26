@@ -1,0 +1,38 @@
+{
+ "id": "r09-zxx-kept-beside-another-mode",
+ "set": "per_rule",
+ "rule": "9",
+ "why": "zxx is dropped only beside another language OF ITS MODE: a silent Audio track and English intertitles (Visual) both stay. Scope: pins the per-mode reading of 'drop zxx if anything else is present' (open question in the S3 report).",
+ "mutation": "the zxx/und drop applied across modes",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "9",
+    "original_language",
+    "add",
+    null,
+    "en (Visual)",
+    "en|visual"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": [
+   [
+    "BaseObjectData/OriginalLanguage",
+    [
+     {
+      "value": "zxx",
+      "_mode": "Audio"
+     },
+     {
+      "value": "en",
+      "_mode": "Visual"
+     }
+    ]
+   ]
+  ]
+ }
+}

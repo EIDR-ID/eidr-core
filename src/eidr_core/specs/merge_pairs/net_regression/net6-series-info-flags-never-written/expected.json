@@ -1,0 +1,20 @@
+{
+ "id": "net6-series-info-flags-never-written",
+ "set": "net_regression",
+ "rule": "19",
+ "why": "AddMissingSeriesInfo wrote malformed XML (<NumberRequired>false</NumberRequired). Rule 19 is skipped: the flags are reported and nothing is written.",
+ "mutation": "rule 19 writing SeriesInfo flags",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [
+   [
+    "19",
+    "series_info"
+   ]
+  ],
+  "merged": []
+ }
+}

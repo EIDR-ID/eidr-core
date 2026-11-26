@@ -1,0 +1,24 @@
+{
+ "id": "r11-org-added",
+ "set": "per_rule",
+ "rule": "11",
+ "why": "A supplied org with no (party ID or fuzzy name) + role match is added; the key carries the role, the value the party ID.",
+ "mutation": "rule 11 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "11",
+    "associated_org:producer",
+    "add",
+    null,
+    "Acme Pictures",
+    "10.5237/1234-5678"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

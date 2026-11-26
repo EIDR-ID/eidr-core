@@ -12,7 +12,7 @@ import unicodedata
 from datetime import date
 from typing import overload
 
-# EIDR country code-set crosswalk (SU→SUHH, …), single-homed in eidr_core so
+# EIDR country code-set crosswalk (SU→SUHH, …), single-homed in the codes module so
 # eidr-wikidata and BMR-Review share ONE map (register R1 / OVERLAPS.md 9a).
 # Exposed here as canon_country: uppercase-canonical, preserves "XX",
 # empty→"". Used by cmp_countries (via norm_country) and the Series gate.

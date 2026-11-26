@@ -1,0 +1,24 @@
+{
+ "id": "r24-episode-class-added",
+ "set": "per_rule",
+ "rule": "24",
+ "why": "Every supplied EpisodeClass not present is added (exact; no fuzzy).",
+ "mutation": "rule 24 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "24",
+    "episode_class",
+    "add",
+    null,
+    "Pilot",
+    "pilot"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

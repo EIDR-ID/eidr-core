@@ -1,0 +1,24 @@
+{
+ "id": "net2-alt-id-type-from-the-schema",
+ "set": "net_regression",
+ "rule": "18",
+ "why": "SpreadsheetData.cs knew 25 named types and turned anything else into Proprietary with the type as its domain. ShortDOI is a schema type missing from that list: it arrives as Type ShortDOI (key alt_id:shortdoi|), not Proprietary/ShortDOI.",
+ "mutation": "a hardcoded type list without ShortDOI",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "18",
+    "alt_id:shortdoi|",
+    "add",
+    null,
+    "10/abc12",
+    "10/abc12"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

@@ -1,0 +1,29 @@
+{
+ "id": "r20-series-class-added",
+ "set": "per_rule",
+ "rule": "20",
+ "why": "A Series with no SeriesClass takes the supplied one.",
+ "mutation": "rule 20 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "20",
+    "series_class",
+    "add",
+    null,
+    "Mini-series",
+    "mini-series"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": [
+   [
+    "ExtraObjectMetadata/SeriesInfo/SeriesClass",
+    "Mini-series"
+   ]
+  ]
+ }
+}

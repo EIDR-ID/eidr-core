@@ -1,0 +1,29 @@
+{
+ "id": "r03-different-title-added",
+ "set": "per_rule",
+ "rule": "3",
+ "why": "A supplied title fuzzy-different from every EIDR title becomes an alternate, with its lang.",
+ "mutation": "rule 3 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "3",
+    "title:alternate",
+    "add",
+    null,
+    "Un film d'exemple",
+    "un film d'exemple"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": [
+   [
+    "BaseObjectData/AlternateResourceName/0/_lang",
+    "fr"
+   ]
+  ]
+ }
+}

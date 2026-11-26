@@ -1,0 +1,15 @@
+{
+ "id": "r15-unflagged-length-kept",
+ "set": "per_rule",
+ "rule": "15",
+ "why": "An unflagged EIDR length is never replaced (the .NET round-figure replacement is not ruled and not carried).",
+ "mutation": "rule 15 replacing an unflagged length",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "id": "pre2-duplicate-director-removed",
+ "set": "pre_process",
+ "rule": "pre.2",
+ "why": "A director repeated (normalized DisplayName) is removed.",
+ "mutation": "pre.2 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "pre.2",
+    "director",
+    "remove",
+    "JANE DOE",
+    null,
+    "jane doe"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

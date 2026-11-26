@@ -1,0 +1,15 @@
+{
+ "id": "identical-records-change-nothing",
+ "set": "per_rule",
+ "rule": null,
+ "why": "The base pair: a supplied record equal to the registry's changes nothing, so the caller submits nothing (changed false, merged_xml null).",
+ "mutation": "any rule that edits without its condition holding",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

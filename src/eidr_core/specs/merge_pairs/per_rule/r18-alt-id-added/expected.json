@@ -1,0 +1,27 @@
+{
+ "id": "r18-alt-id-added",
+ "set": "per_rule",
+ "rule": "18",
+ "why": "A supplied Alt ID absent from the record is added, and its AltIDTool line composed by format_line (18.6).",
+ "mutation": "rule 18 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "18",
+    "alt_id:proprietary|themoviedb.org/movie",
+    "add",
+    null,
+    "603",
+    "603"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": [],
+  "altid_lines": [
+   "10.5240/7791-8534-2C23-9030-8610-5\tProprietary\t603\tthemoviedb.org/movie"
+  ]
+ }
+}

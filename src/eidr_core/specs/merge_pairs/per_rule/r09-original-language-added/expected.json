@@ -1,0 +1,24 @@
+{
+ "id": "r09-original-language-added",
+ "set": "per_rule",
+ "rule": "9",
+ "why": "A supplied (code, mode) pair not present is added.",
+ "mutation": "rule 9 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "9",
+    "original_language",
+    "add",
+    null,
+    "fr (Audio)",
+    "fr|audio"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

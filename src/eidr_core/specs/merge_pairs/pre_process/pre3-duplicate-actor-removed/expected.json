@@ -1,0 +1,24 @@
+{
+ "id": "pre3-duplicate-actor-removed",
+ "set": "pre_process",
+ "rule": "pre.3",
+ "why": "An actor repeated is removed.",
+ "mutation": "pre.3 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "pre.3",
+    "actor",
+    "remove",
+    "Ann Lee",
+    null,
+    "ann lee"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

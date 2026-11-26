@@ -1,0 +1,20 @@
+{
+ "id": "pro-rd-rule4-shape-no-change",
+ "set": "pro_flags",
+ "rule": "17",
+ "why": "Section 4: a supplied RD:Pro; year more than a year earlier (rule 4's shape). Rules 4-6 are held, so nothing touches the date; the flag is never copied. The held rule's own RD:Pro; guard is in the S3 dry run.",
+ "mutation": "rule 17 copying RD:Pro;",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [
+   [
+    "17",
+    "registrant_extra:rd"
+   ]
+  ],
+  "merged": []
+ }
+}

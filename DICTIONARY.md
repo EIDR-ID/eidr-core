@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.79.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.80.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -80,6 +80,70 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.80.0 (2026-11-26)
+
+Handoffs of 2026-11-24/25 from eidr-imdb, eidr-wikidata, python-tools and
+LanguageTool, built on the operator's instructions. compare-spec 2.24.0 and
+2.25.0 landed in the same cycle (spec and corpus only; see `compare-spec.md`
+porting requirements 7 and 8, and `golden-pairs.md` §2 and §3).
+
+* **New `confirmed_pairs` (C6):** the append-only history of adjudicated
+  source/EIDR pairs, confirmations AND rejections, for eidr-imdb and
+  eidr-wikidata alike. `PairRecord`; `ddl()` / `ensure_table()` (one schema for
+  PostgreSQL, DuckDB, SQLite; table `pair_verdicts`); `record` (a new verdict
+  ends the one it supersedes with an ending row; nothing is edited or
+  deleted); `end_pairs`; `in_force(at=)` (what we believed on a date);
+  `history`; `is_confirmed`, `is_rejected`, `ever_rejected`; `follow_aliases`
+  (through `lookup.resolve_aliases`, rows untouched); `pairs_from_verdicts`
+  (C4 resolutions to pairs); `on_write=` runs the caller's hook (a backup)
+  after the commit. Placeholders follow the driver's paramstyle.
+* **New `altid_apply` (C7):** `apply_file` dry-runs an AltIDTool edit file by
+  default, with the operator's guard of 2026-11-24: a record whose dry run
+  removes a value that is neither re-added nor intended for it is withheld
+  with a reason (pass `intended={}` for an add-only file). Kept from
+  eidr-imdb's applier: the production gate, the staleness verdict, resume by
+  record, `submitted: false` never applied. Differential-checked identical on
+  eidr-imdb's files.
+* **`altidtool_io.format_removal(eidr_id, alt_type, domain="")`:** writes the
+  two removal forms spec v1.6 accepts and raises `ValueError` on every form it
+  refuses, by deferring to `parse_edit_line`.
+* **New `external.tmdb`:** `TmdbClient` (`find_imdb`, `facts`, `credits`,
+  `bmr_facts`) on the failover chassis and a machine-wide pacer, extracted
+  from eidr-dq and BMR-Review. The caller supplies the User-Agent; the API key
+  never appears in log lines; only allow-listed fields come back.
+* **New `uri_mapping`:** `UriMapping.resolvable(alt_type, domain, value) ->
+  Resolvability(url, reason, kind, detail)`, extracted from eidr-wikidata. A
+  Kind allowed without a URL gives `url` None, never an exception. No copy of
+  the data lives here (R8): `load(path, fetch_fallback=fetch_published)`.
+  Named types (IMDB) resolve, and the HTML entry wins over API entries (both
+  differ from eidr-wikidata's `resolution_url`).
+* **`altid_audit` (C5) follows the relation-aware vetting rulings of
+  2026-11-24.** A value offered for one record under two relations is withheld,
+  every copy, as `ALT_ID_RELATION_CONFLICT` (both used to be written); an exact
+  repeat is written once. New `Research` / `RowAudit.research`: values withheld
+  as two identity values of one Kind for one record, listed for the Help Desk.
+  Unchanged but pinned: a value another record holds only under a non-identity
+  relation, and any non-identity proposal, is never a duplicate.
+* **`bmr_map.record_to_xml(record, *, view="SelfDefinedMetadata")`** and
+  **`RecordXmlError`:** a standard record back to EIDR XML in schema order,
+  inverting `record_from_xml` (Compilation and Service unsupported); a field
+  the XML cannot carry raises, naming it. Extracted from XML_to_JSON's
+  `standard_render.render_view_xml`. `bmr_map`'s vendoring closure now
+  includes `mddf_json`.
+* **`bmr_map`, `bmr_io`, `inheritance`, `ordering`, `mddf_json` are `mypy
+  --strict` clean** (annotations only), enforced per module in CI. `ordering`'s
+  keys return precise tuple types.
+* **`normalize.norm_title(..., *, trailing_articles=False)`**: True moves a
+  trailing article back to the front (`Matrix, The` -> `matrix`). Default
+  byte-identical. **New `normalize.title_numbers(text)`** (digits and
+  well-formed Roman numerals of two or more letters) and
+  **`normalize.romanization_key(folded)`** (transliterations only).
+* **New `scripts`** (`char_script`, `profile` -> `ScriptProfile`,
+  `is_non_latin`, `UNSPACED`), from LanguageTool; needs the new `scripts`
+  extra (regex). A Common/Inherited letter resolves through Script_Extensions
+  (so the katakana long-vowel mark counts as kana). Which language a script
+  implies stays in LanguageTool.
 
 ### 0.79.0 (2026-11-26)
 

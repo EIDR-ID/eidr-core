@@ -317,8 +317,13 @@ def test_real_altidtool_io_vendors_and_works_without_eidr_core(tmp_path, source)
         "sys.modules['eidr_core'] = None\n"
         f"sys.path.insert(0, {str(tmp_path / 'consumer' / 'src')!r})\n"
         "from eidr._core.altidtool_io import format_line, parse_line, multi_form_domains\n"
+        "from eidr._core.altidtool_io import format_removal, parse_edit_line\n"
         "line = format_line('10.5240/7791-8534-2C23-9030-8610-5', 'IMDB', 'tt0000001')\n"
         "assert parse_line(line).value == 'tt0000001'\n"
+        # format_removal (2026-11-26) is stdlib-only like the rest; python-tools
+        # gains it with its next pin move, so the vendored copy must carry it.
+        "gone = format_removal('10.5240/7791-8534-2C23-9030-8610-5', 'IMDB')\n"
+        "assert parse_edit_line(gone).alt_type == 'IMDB'\n"
         "try:\n"
         "    multi_form_domains()\n"
         "except RuntimeError as e:\n"

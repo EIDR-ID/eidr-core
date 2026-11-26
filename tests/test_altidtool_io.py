@@ -18,6 +18,7 @@ from eidr_core.altidtool_io import (
     AltIdRemoval,
     AltIdRow,
     format_line,
+    format_removal,
     parse_edit_line,
     parse_line,
 )
@@ -181,3 +182,105 @@ def test_format_line_round_trips_through_both_parsers():
                 AltIdRow(ID, "IMDB", "tt2", "", "Deprecated")):
         line = format_line(*row)
         assert parse_line(line) == row and parse_edit_line(line) == row
+
+
+# -- format_removal: the writer for the two removal forms (eidr-imdb R4.1g,
+# 2026-11-24). The writer and parse_edit_line must never disagree, so each
+# direction is tested against the other rather than against a copied rule:
+# every valid removal the parser reads is reproduced by the writer, and
+# every form the spec refuses is refused by both.
+
+@pytest.mark.parametrize("alt_type,domain,line", [
+    ("IMDB", "", f"{ID}\tIMDB"),
+    ("ISAN", "", f"{ID}\tISAN"),
+    ("Proprietary", "themoviedb.org/movie", f"{ID}\tProprietary\t\tthemoviedb.org/movie"),
+    ("proprietary", "wikidata.org", f"{ID}\tproprietary\t\twikidata.org"),
+])
+def test_format_removal_writes_the_two_v16_forms_and_round_trips(alt_type, domain, line):
+    assert format_removal(ID, alt_type, domain) == line
+    assert parse_edit_line(line) == AltIdRemoval(ID, alt_type, domain)
+
+
+@pytest.mark.parametrize("line", [
+    # Every spelling parse_edit_line accepts as a removal (the valid-removal
+    # table above): the writer rebuilds it from the parsed fields, and the
+    # rebuilt line parses to the same removal.
+    f"{ID}\tIMDB", f"{ID}\tISAN\t", f"{ID}\tIMDB\t\t\t",
+    f"{ID}\tProprietary\t\tthemoviedb.org/movie",
+    f"{ID}\tProprietary\t\tthemoviedb.org/movie\t",
+    f"{ID}\t proprietary \t \t wikidata.org \n",
+])
+def test_every_removal_the_parser_reads_the_writer_reproduces(line):
+    parsed = parse_edit_line(line)
+    assert isinstance(parsed, AltIdRemoval)
+    assert parse_edit_line(format_removal(*parsed)) == parsed
+
+
+@pytest.mark.parametrize("line", [
+    # The refused table above, every spelling: none of them can come out of
+    # the writer, whatever fields a caller passes. Splitting the line into
+    # (id, type, domain) the way the columns read and handing those to the
+    # writer must raise, because the writer composes only lines the parser
+    # accepts and a refused line has no accepted spelling.
+    f"{ID}\t", f"{ID}\t\t", f"{ID}\t\t\tthemoviedb.org/movie",
+    f"{ID}\tProprietary", f"{ID}\tPROPRIETARY", f"{ID}\tProprietary\t\t",
+    f"{ID}\tIMDB\t\timdb.com",
+])
+def test_every_removal_the_parser_refuses_the_writer_refuses(line):
+    with pytest.raises(ValueError):
+        parse_edit_line(line)
+    cols = (line.split("\t") + ["", "", ""])[:4]
+    with pytest.raises(ValueError):
+        format_removal(cols[0], cols[1], cols[3])
+
+
+@pytest.mark.parametrize("alt_type,domain,match", [
+    ("", "", "no Type would remove every Alt ID"),                 # ID<TAB>
+    ("", "themoviedb.org/movie", "no Type would remove every Alt ID"),
+    ("Proprietary", "", "must name its Domain"),
+    ("PROPRIETARY", "", "must name its Domain"),
+    ("IMDB", "imdb.com", "Proprietary removals only"),
+])
+def test_format_removal_refuses_what_v16_refuses_with_the_parsers_reason(
+        alt_type, domain, match):
+    with pytest.raises(ValueError, match=match):
+        format_removal(ID, alt_type, domain)
+
+
+@pytest.mark.parametrize("eidr_id,alt_type,domain", [
+    (ID, "IMDB\t", ""), (ID, "IM\nDB", ""), (f"{ID}\r", "IMDB", ""),
+    (ID, "Proprietary", "wiki\tdata.org"), (ID, "Proprietary", "wikidata.org\n"),
+])
+def test_format_removal_refuses_a_tab_or_line_break_in_any_field(eidr_id, alt_type, domain):
+    # An interior newline would split the line in the file, and the parser,
+    # which reads one line at a time, could never see that.
+    with pytest.raises(ValueError, match="tab or line break"):
+        format_removal(eidr_id, alt_type, domain)
+
+
+@pytest.mark.parametrize("eidr_id,alt_type,domain", [
+    (ID, " IMDB", ""),                         # the reader trims: would not read back
+    (f" {ID}", "IMDB", ""),
+    (ID, "Proprietary", " wikidata.org"),
+    ("// note", "IMDB", ""),                  # the reader takes it for a comment
+])
+def test_format_removal_refuses_fields_that_would_read_back_differently(
+        eidr_id, alt_type, domain):
+    with pytest.raises(ValueError, match="would read back as"):
+        format_removal(eidr_id, alt_type, domain)
+
+
+@pytest.mark.parametrize("eidr_id,alt_type,domain", [
+    ("", "IMDB", ""),                          # no EIDR ID
+    (ID, "Proprietary", "   "),                # whitespace-only domain is no domain
+])
+def test_format_removal_refuses_an_empty_id_or_blank_domain(eidr_id, alt_type, domain):
+    with pytest.raises(ValueError):
+        format_removal(eidr_id, alt_type, domain)
+
+
+def test_a_line_from_format_removal_is_never_an_addition_to_parse_line():
+    # parse_line stays strict: a feed generator handed a removal line by
+    # mistake must still fail loudly.
+    with pytest.raises(ValueError):
+        parse_line(format_removal(ID, "IMDB"))

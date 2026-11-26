@@ -26,6 +26,9 @@ removes every Alt ID of a named type, ``ID<TAB>Proprietary<TAB><TAB>Domain``
 removes every Proprietary Alt ID of that domain, and every other removal is
 refused -- above all any spelling that would remove ALL of a record's Alt
 IDs, and a bare ``Proprietary`` removal that names no domain.
+``format_removal`` writes exactly those two forms. It asks ``parse_edit_line``
+for the verdict on every line it composes, so the writer and the reader
+cannot disagree about which removals exist.
 
 BMR-Review's dedupe pipeline does not emit this format; MCP's
 ``eidrtoaltid.py`` is a different artifact (an extract REPORT with a header
@@ -40,7 +43,7 @@ from typing import NamedTuple
 
 __all__ = ["AltIdRow", "AltIdRemoval", "format_line", "write_lines", "parse_line",
            "multi_form_domains",
-           "parse_edit_line",
+           "parse_edit_line", "format_removal",
            "is_identity_relation", "identity_relation_sql",
            "emission_problem"]
 
@@ -218,6 +221,58 @@ def parse_edit_line(line: str) -> AltIdRow | AltIdRemoval | None:
         raise ValueError(f"refused: a Domain belongs to Proprietary removals only "
                          f"(spec v1.6): {line!r}")
     return AltIdRemoval(eidr_id, alt_type)
+
+
+def format_removal(eidr_id: str, alt_type: str, domain: str = "") -> str:
+    """Compose one REMOVAL line for an AltIDTool edit file (spec v1.6).
+
+    Writes the only two removals v1.6 accepts, and nothing else:
+
+    * ``format_removal(id, "IMDB")`` -> ``ID<TAB>IMDB``: remove every Alt ID
+      of that named type.
+    * ``format_removal(id, "Proprietary", "themoviedb.org/movie")`` ->
+      ``ID<TAB>Proprietary<TAB><TAB>themoviedb.org/movie``: remove the
+      Proprietary Alt IDs of that domain only.
+
+    Raises ``ValueError`` for every form v1.6 refuses -- an empty Type (a
+    remove-all), ``Proprietary`` with no domain, a domain on a named type --
+    and for any field the line could not carry intact: a tab, CR or LF
+    inside a field, surrounding whitespace (the reader trims it), an empty
+    EIDR ID, or one starting with ``//`` (the reader takes the line for a
+    comment). The guarantee is ``parse_edit_line(format_removal(i, t, d)) ==
+    AltIdRemoval(i, t, d)`` whenever this returns.
+
+    Returns the line without a newline, like ``format_line``. The type and
+    domain are written as given; ``proprietary`` in any case is Proprietary,
+    as the reader treats it.
+    """
+    # Requested by eidr-imdb (R4.1g, 2026-11-24), which wrote
+    # f"{eidr_id}\tIMDB\n" by hand. A removal is the one AltIDTool line whose
+    # mistakes delete registry data, so the hand-written form is the thing to
+    # replace, not to copy.
+    for label, field in (("EIDR ID", eidr_id), ("Type", alt_type), ("Domain", domain)):
+        # A tab adds a column and a line break ends the line, so either would
+        # let the file say something other than what was asked. The reader
+        # never sees an interior newline (it gets one line at a time), so this
+        # check cannot be left to it.
+        if any(c in field for c in "\t\r\n"):
+            raise ValueError(f"refused: the {label} of an AltIDTool removal contains a "
+                             f"tab or line break: {field!r}")
+    line = (f"{eidr_id}\t{alt_type}\t\t{domain}" if domain
+            else f"{eidr_id}\t{alt_type}")
+    # The verdict is the parser's, not a second copy of its rules: every
+    # form v1.6 refuses raises here with the parser's own reason, and a
+    # ruling that changes the parser changes this writer with it.
+    parsed = parse_edit_line(line)
+    expected = AltIdRemoval(eidr_id, alt_type, domain)
+    # Whatever the parser accepts but reads differently (padding it trims, an
+    # ID it takes for a comment) is refused too, so a file built from these
+    # lines reads back as exactly the removals its author asked for.
+    if not isinstance(parsed, AltIdRemoval) or parsed != expected:
+        raise ValueError(f"refused: {line!r} would read back as {parsed!r}, not as "
+                         f"{expected!r} (check for surrounding whitespace or a "
+                         f"leading //)")
+    return line
 
 
 def multi_form_domains() -> frozenset[str]:

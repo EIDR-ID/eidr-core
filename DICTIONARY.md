@@ -862,7 +862,8 @@ These recent changes may still be reaching consumers:
 | Copy chosen rows of a BMR sheet, or fill one column | `bmr_io.subset_rows`, `bmr_io.fill_column`; `bmr_io.check_sheet` first | |
 | Resolve a BMR row's parent | `bmr_io.index_rows`, then `bmr_io.resolve_parent` or `bmr_io.parent_chain` | |
 | Route a creation type to its Template-22 template | `bmr_io.template_for_creation_type` | |
-| Write or read an AltIDTool line | `altidtool_io.format_line`, `altidtool_io.write_lines`, `altidtool_io.parse_line`, `altidtool_io.parse_edit_line` | `specs/altidtool-format.md` |
+| Write or read an AltIDTool line | `altidtool_io.format_line`, `altidtool_io.write_lines`, `altidtool_io.parse_line`, `altidtool_io.parse_edit_line`, `altidtool_io.format_removal` | `specs/altidtool-format.md` |
+| Apply an AltIDTool file without removing an ID by accident | `altid_apply.apply_file` (dry run by default; the intended-removal guard) | record outcomes from `ApplyResult.entries` with `altid_apply.applied_ids` |
 | Know which Alt ID Kinds are exempt from rule 6 | `altidtool_io.multi_form_domains` | never keep your own copy of the list |
 | Check that a database has the tables and columns you read | `db_schemas.assert_tables` | |
 | Carry eidr-core code into a package that cannot depend on it | `python -m eidr_core.vendor` (`sync`, `check`) | `specs/vendoring.md` |
@@ -876,6 +877,30 @@ edition's Changes entry.
 <!-- dict-index -->
 | Name | Kind | Does |
 |---|---|---|
+| [`eidr_core.altid_apply.applied_ids`](#applied_ids) | function | Returns the EIDR IDs the registry accepted, by `is_applied`. |
+| [`eidr_core.altid_apply.apply_file`](#apply_file) | function | Runs eidr-imdb's apply sequence without its database. |
+| [`eidr_core.altid_apply.build_command`](#build_command) | function | Builds the AltIDTool command line. |
+| [`eidr_core.altid_apply.check_staleness`](#check_staleness) | function | Decides whether a file built from one registry reading may still be applied. |
+| [`eidr_core.altid_apply.detail_text`](#detail_text) | function | Formats one record's registry outcome for the caller to store. |
+| [`eidr_core.altid_apply.file_mtime`](#file_mtime) | function | Returns a file's modification time, timezone-aware, so that comparing it with a database's aware timestamp cannot silently misjudge. |
+| [`eidr_core.altid_apply.filter_file`](#filter_file) | function | Writes the blocks not in `skip`, in file order, with each record's lines verbatim and in their original order. |
+| [`eidr_core.altid_apply.is_applied`](#is_applied) | function | Says whether the registry accepted a record's change. |
+| [`eidr_core.altid_apply.parse_file`](#parse_file) | function | Reads an edit file into per-record blocks, grouping as AltIDTool does. |
+| [`eidr_core.altid_apply.parse_report`](#parse_report) | function | Reads AltIDTool's JSON report. |
+| [`eidr_core.altid_apply.production_gate`](#production_gate) | function | Refuses `prod`, `production` (any case) and any `http(s)://` URL without the operator's sign-off (ruling D9: development runs against Sandbox 2). |
+| [`eidr_core.altid_apply.read_intended`](#read_intended) | function | Reads an intended-removal list, the shape of eidr-imdb's `altid_remove.intended.tsv`. |
+| [`eidr_core.altid_apply.run_tool`](#run_tool) | function | Runs AltIDTool through an injectable runner, so tests never touch a registry. |
+| [`eidr_core.altid_apply.unintended_removals`](#unintended_removals) | function | The guard's arithmetic: for each record, the values `removed` minus `added` minus the record's intended removals. |
+| [`eidr_core.altid_apply.ApplyRefused`](#applyrefused-class) | class | Raised when a precondition fails: the production gate, the file, the staleness check, the intended list, or the report shape. |
+| [`eidr_core.altid_apply.ApplyResult`](#applyresult-class) | class | What `apply_file` did, for the caller to record and report. |
+| [`eidr_core.altid_apply.Block`](#block-class) | class | One record's lines from an edit file. |
+| [`eidr_core.altid_apply.Staleness`](#staleness-class) | class | The verdict of `check_staleness`, passed to `apply_file(staleness=)`. |
+| [`eidr_core.altid_apply.Withheld`](#withheld-class) | class | A record the guard kept back, and why. |
+| [`eidr_core.altid_apply.APPLIED_STATUS`](#applied_status-constant) | constant | The only `submit.status` that means the registry accepted a record's change; `unchanged`, `dryrun`, `pending` and `rejected` are not applied. |
+| [`eidr_core.altid_apply.PRODUCTION_REGISTRIES`](#production_registries-constant) | constant | Registry names that need the operator's sign-off (compared lowercased and stripped). |
+| [`eidr_core.altid_apply.SIGNOFF_FLAG`](#signoff_flag-constant) | constant | The sign-off flag a refusal names by default (eidr-imdb's spelling); pass `signoff_flag=` for another. |
+| [`eidr_core.altid_apply.STALE_WARN_AFTER`](#stale_warn_after-constant) | constant | How old a file may be before `check_staleness` warns. |
+| [`eidr_core.altid_apply.SUBMIT_FIELDS`](#submit_fields-constant) | constant | The keys of each report entry's `submit` object, every one present after `parse_report`. |
 | [`eidr_core.altid_audit.audit`](#audit) | function | Audits one record's Alt IDs: `audit_rows` over a single `AuditRow`. |
 | [`eidr_core.altid_audit.audit_rows`](#audit_rows) | function | Audits rows in batches: aliases, identity lookups and the targets' existing Alt IDs are fetched once per batch, then each row is adjudicated. |
 | [`eidr_core.altid_audit.is_audited`](#is_audited) | function | Says whether the Alt ID asserts identity, so the audit tests it. |
@@ -897,6 +922,7 @@ edition's Changes entry.
 | [`eidr_core.altid_audit.MIRROR_NEEDS`](#mirror_needs-constant) | constant | the mirror tables and columns the client reads, for `db_schemas.assert_tables`. |
 | [`eidr_core.altidtool_io.emission_problem`](#emission_problem) | function | Checks a line against the format's two constraints, in this order: `MISSING_ALT_ID_TYPE` (AltIDTool needs a Type; a defect to fix in the source), then `NON_ASCII_VALUE` (its input is ASCII; a transport limit), naming the first offending field. |
 | [`eidr_core.altidtool_io.format_line`](#format_line) | function | Composes one AltIDTool input line from its fields under the canonical variable-width rules. |
+| [`eidr_core.altidtool_io.format_removal`](#format_removal) | function | Composes one removal line for an AltIDTool edit file, in one of the two forms spec v1.6 accepts, and raises ValueError for every other. |
 | [`eidr_core.altidtool_io.identity_relation_sql`](#identity_relation_sql) | function | Returns the identity-relation test as a SQL condition for mirror queries. |
 | [`eidr_core.altidtool_io.is_identity_relation`](#is_identity_relation) | function | Tests whether an Alt ID with this relation is an identity link (altidtool-format rule 1: a blank relation means `IsSameAs`). |
 | [`eidr_core.altidtool_io.multi_form_domains`](#multi_form_domains) | function | Returns the Proprietary domains exempt from altidtool-format rule 6, read from the packaged `multi_form_kinds.json`. |
@@ -1235,7 +1261,7 @@ edition's Changes entry.
 ## `eidr_core.altidtool_io`
 
 <!-- dict-module:eidr_core.altidtool_io -->
-Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 8 functions, 2 classes (declared by `__all__`).
+Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 9 functions, 2 classes (declared by `__all__`).
 <!-- /dict-module -->
 
 **Purpose.** The one implementation of the EIDR AltIDTool input-file line format: tab-separated `EIDR_ID, Type, Value[, Domain][, Relation]`, UTF-8, no header, 3 to 5 columns wide. It was extracted on 2026-08-04 from eidr-wikidata `bmr/altidtool.py` (the production feed generator) so that every producer composes lines the same way and every reader parses them the same way. Since spec v1.1 it also reads AltIDTool edit files (removal lines and `//` comments). Since v1.4 it also hosts the declared list of Proprietary domains exempt from rule 6 (`multi_form_domains`).
@@ -1244,10 +1270,11 @@ Source `src/eidr_core/altidtool_io/__init__.py`. Public names: 8 functions, 2 cl
 * You write a file for the AltIDTool. Compose each line with `format_line`, or write the whole file with `write_lines`.
 * You read back an additions-only file that a portfolio producer wrote: `parse_line`.
 * You read an AltIDTool edit file that may hold removals, blank lines or `//` comments: `parse_edit_line`.
+* You write a REMOVAL line for an edit file: `format_removal`. It writes only the two forms spec v1.6 accepts and raises on every other.
 * You apply altidtool-format rule 6 (a second `IsSameAs` value of one Kind is a conflict) and need the Kinds exempt from it: `multi_form_domains()`.
 
 **Do not use it when.** The job is one of these:
-* Do not reimplement the line format (an f-string with `\t`, a fixed-5 writer, trailing tabs). Call `format_line` or `write_lines`. The empty-Domain placeholder and "Relation only when non-empty" rules are easy to get wrong.
+* Do not reimplement the line format (an f-string with `\t`, a fixed-5 writer, trailing tabs). Call `format_line` or `write_lines`, and `format_removal` for a removal line. The empty-Domain placeholder and "Relation only when non-empty" rules are easy to get wrong.
 * Do not keep a local copy of the multi-form domain list. Call `multi_form_domains()`.
 * Other formats: MCP's `eidrtoaltid.py` extract report (it has a header and its own columns), remediation action TSVs, and BMR-Review's de-dupe outputs are not this format.
 * Do not read an edit file with `parse_line`. It refuses removals (1 or 2 columns, or an empty Value) and `//` comments with a `ValueError` (since 0.68.0 for the empty-Value and comment cases). Use `parse_edit_line`.
@@ -1265,7 +1292,7 @@ Scan of 2026-11-24; regenerated at each release from the consumer trees.
 * **python-tools**: (vendors the module, pin `b6de446`)
 <!-- /dict-usedby -->
 
-**Specs.** `specs/altidtool-format.md` v1.5 fixes the column layout, the removal lines (v1.1), the identity and relation rules 1-6, and the multi-form exemption. `src/eidr_core/specs/multi_form_kinds.json` holds the exempt list, with the measurement or operator ruling behind each entry.
+**Specs.** `specs/altidtool-format.md` v1.6 fixes the column layout, the removal lines (v1.1, narrowed in v1.6), the identity and relation rules 1-6, and the multi-form exemption. `src/eidr_core/specs/multi_form_kinds.json` holds the exempt list, with the measurement or operator ruling behind each entry.
 
 ### `format_line`
 
@@ -1460,6 +1487,26 @@ Defined in `src/eidr_core/altidtool_io/__init__.py`.
 <!-- /dict -->
 
 **Does.** Checks a line against the format's two constraints, in this order: `MISSING_ALT_ID_TYPE` (AltIDTool needs a Type; a defect to fix in the source), then `NON_ASCII_VALUE` (its input is ASCII; a transport limit), naming the first offending field. Extracted from BMRtoAltID's `emit.py` (C5 item 13), because every producer of the format needs it. Run it before `format_line`; the audit already does.
+
+### `format_removal`
+
+<!-- dict:eidr_core.altidtool_io.format_removal -->
+```python
+def format_removal(eidr_id: str, alt_type: str, domain: str = "") -> str
+```
+
+Defined in `src/eidr_core/altidtool_io/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `eidr_id` | `str` | required | Column 1: the EIDR ID of the record losing the Alt IDs. Refused when empty, padded, starting with `//`, or holding a tab or line break. |
+| `alt_type` | `str` | required | Column 2: a named type (`IMDB`, `ISAN`, ...) or `Proprietary` (any case). Refused when empty: a removal with no Type would remove every Alt ID on the record. |
+| `domain` | `str` | `""` | Column 4, for `Proprietary` only, and required there: the domain whose Proprietary Alt IDs go. Refused on a named type. |
+
+**Returns** `str` -- One line with no trailing newline: `ID<TAB>Type` for a named type, `ID<TAB>Proprietary<TAB><TAB>Domain` for one Proprietary domain.
+<!-- /dict -->
+
+**Does.** Composes one removal line for an AltIDTool edit file, in one of the two forms spec v1.6 accepts, and raises ValueError for every other. The verdict comes from `parse_edit_line`: the writer composes the line, parses it back, and refuses it unless it reads back as exactly `AltIdRemoval(eidr_id, alt_type, domain)`, so the writer and the parser cannot disagree. A refused form raises with the parser's own reason (a remove-all, Proprietary with no Domain, a Domain on a named type). It also refuses a tab, CR or LF inside any field (which would change the line's columns or split it), padding the parser would trim, and an ID starting with `//` (which the parser takes for a comment). Stdlib only; the vendored copy carries it.
 
 ## `eidr_core.bmr_io`
 
@@ -7843,6 +7890,456 @@ Defined in `src/eidr_core/mddf_json/__init__.py`.
 <!-- /dict -->
 
 **Does.** A `MddfJsonError` subclass, so a caller can treat it apart from other failures.
+
+## `eidr_core.altid_apply`
+
+<!-- dict-module:eidr_core.altid_apply -->
+Source `src/eidr_core/altid_apply/__init__.py`. Public names: 14 functions, 5 classes, 5 constants (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** The AltIDTool apply wrapper (reconciliation C7). It feeds an AltIDTool edit file to python-tools' `AltIDTool` and makes sure no Alt ID is removed as a side effect. Extracted on 2026-11-26 from eidr-imdb `src/eidr_imdb/applier.py` and its `apply` command, on the operator's instruction of 2026-11-24, which also added the guard: "Alt ID updates should not remove existing IDs unless that's the specific intent (never as a side effect)." `apply_file` dry-runs by default, withholds every record whose dry run would remove a value that is neither re-added nor intended, and submits the rest only on request. It keeps eidr-imdb's production gate, staleness check, resume by record, and the rule that `submitted: false` is never applied. eidr-core does not depend on python-tools: the interpreter that runs AltIDTool must have it.
+
+**Use it when.** You are in one of these situations:
+* You apply an AltIDTool edit file (additions, relation changes, or intended removals) to a registry. Call `apply_file` with the file, the intended removals (`{}` for an add-only file; `read_intended` reads a list), and your staleness verdict, and record outcomes from `ApplyResult.entries`.
+* You keep a resume store. Mark `applied_ids(result.entries)` done, and pass that set back as `done`.
+* You need one piece on its own: the guard (`unintended_removals`), the gate (`production_gate`), the freshness verdict (`check_staleness`), or the report reader (`parse_report`, `is_applied`, `detail_text`).
+
+**Do not use it when.** The job is one of these:
+* Writing the edit file. Use `altidtool_io.format_line` for additions and `altidtool_io.format_removal` for removal lines.
+* Deciding what to add or remove. That is the producer's job (`altid_audit` for additions from a source). This module applies a decided file.
+* Storing outcomes. The module returns them, and your tables (eidr-imdb's `correction.apply_status`) record them. Your export manifest and your pull table stay yours too.
+* Treating `submitted: false` or `unchanged` as done. Only `is_applied` decides.
+* Removing IDs with no intended-removal list. With `intended={}` every record whose dry run removes anything is withheld, and that is the point.
+
+**Used by.**
+<!-- dict-usedby:eidr_core.altid_apply -->
+No consumer imports it yet (new; eidr-imdb adopts it on a branch).
+<!-- /dict-usedby -->
+
+**Specs.** `specs/altidtool-format.md` v1.6 (the line format and the removal forms `parse_file` enforces). The `-f json` report shape and file-order application are python-tools' contracts (`eidr_tools/altids.py`, `tools/altidtool.py`).
+
+### `applied_ids`
+
+<!-- dict:eidr_core.altid_apply.applied_ids -->
+```python
+def applied_ids(entries: Iterable[Mapping[str, Any]]) -> set[str]
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `entries` | `Iterable[Mapping[str, Any]]` | required | Report entries, as `parse_report` returns them (`ApplyResult.entries`). |
+
+**Returns** `set[str]` -- The `id` of every entry whose `submit.status` is `success`.
+<!-- /dict -->
+
+**Does.** Returns the EIDR IDs the registry accepted, by `is_applied`. Store exactly these as done and pass them back as `apply_file(done=)` on the next run, so the resume's two halves share one definition of success.
+
+### `apply_file`
+
+<!-- dict:eidr_core.altid_apply.apply_file -->
+```python
+def apply_file(path: Path, *, registry: str, out_dir: Path, intended: Mapping[str, Collection[str]], staleness: Staleness | None, submit: bool = False, signed_off: bool = False, force_stale: bool = False, done: Collection[str] = (), secrets_path: str | None = None, python: str | None = None, runner: Runner = subprocess.run, cwd: Path | None = None, log: Callable[[str], None] | None = None, signoff_flag: str = SIGNOFF_FLAG) -> ApplyResult
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `path` | `Path` | required | The AltIDTool edit file: an add-only file, or a removal file (removal lines and the restated values that follow them). |
+| `registry` | `str` | required (keyword-only) | The registry name AltIDTool gets as `--registry` (`sandbox2`). `prod`, `production` and any URL need `signed_off`. |
+| `out_dir` | `Path` | required (keyword-only) | Where the run writes `<stem>.pending.tsv` (the filtered input), `<stem>.dryrun_report.json` and `<stem>.apply_report.json`, the preview XML under `dryrun/<stem>/`, and `<stem>.withheld_unintended_removal.tsv`. Created if missing. |
+| `intended` | `Mapping[str, Collection[str]]` | required (keyword-only) | The removals intended per record, `{eidr_id: values}`. Pass `{}` for an add-only file, so that any removal at all is withheld. `read_intended` reads a list from a file. |
+| `staleness` | `Staleness \| None` | required (keyword-only) | The freshness verdict from `check_staleness`, or `None` when the caller has no baseline to check against. Required, so that skipping the check is a decision rather than an omission. |
+| `submit` | `bool` | `False` (keyword-only) | Submit after the guard. `False` (the default) stops after the dry run and the guard. |
+| `signed_off` | `bool` | `False` (keyword-only) | The operator's production sign-off (ruling D9). |
+| `force_stale` | `bool` | `False` (keyword-only) | Proceed even though `staleness.refuse` is set. The refusal becomes a warning. The guard still withholds any record that would lose an ID it was not meant to lose. |
+| `done` | `Collection[str]` | `()` (keyword-only) | EIDR IDs already applied (from the caller's resume store, filled from `applied_ids`). They are left out of both runs. |
+| `secrets_path` | `str \| None` | `None` (keyword-only) | Passed to AltIDTool as `-c`. |
+| `python` | `str \| None` | `None` (keyword-only) | The interpreter that has python-tools installed. Default: the running one (`sys.executable`). |
+| `runner` | `Runner` | `subprocess.run` (keyword-only) | `subprocess.run`, or a stand-in with its shape. Tests inject one, so no registry is reached. |
+| `cwd` | `Path \| None` | `None` (keyword-only) | The working directory for AltIDTool. Default: inherited. |
+| `log` | `Callable[[str], None] \| None` | `None` (keyword-only) | Called with each progress line (counts, exit codes, the tool's stderr, WITHHELD). Silent when `None`. |
+| `signoff_flag` | `str` | `SIGNOFF_FLAG` (keyword-only) | The caller's spelling of its sign-off flag, quoted in the production gate's refusal. |
+
+**Returns** `ApplyResult` -- An `ApplyResult`: the dry-run report, the withheld records with reasons, and (when submitted) the submit report, from which the caller records outcomes.
+<!-- /dict -->
+
+**Does.** Runs eidr-imdb's apply sequence without its database. First the production gate. Then `parse_file`, which refuses the whole file on any line `parse_edit_line` refuses. Then the staleness verdict: a refusal stops the run unless `force_stale`. Then it leaves out the records in `done`. Then it ALWAYS dry-runs AltIDTool, even with `submit`, because the dry run is the only reading of the target registry's live records. Then comes the guard (operator, 2026-11-24: "Alt ID updates should not remove existing IDs unless that's the specific intent (never as a side effect)"). It withholds a record whose dry run removes a value that is neither re-added nor in `intended[eidr_id]`, and a record missing from the dry-run report, since nothing shows its removals are safe. The withheld records go to the withheld TSV. A stale TSV from an earlier run is deleted on a clean run. Only with `submit` are the remaining records sent. Raises `ApplyRefused` when the gate, the file, the staleness check or the report shape refuses; nothing has been submitted then.
+
+### `build_command`
+
+<!-- dict:eidr_core.altid_apply.build_command -->
+```python
+def build_command(*, infile: Path, registry: str, report: Path, dryrun_prefix: Path | None, secrets_path: str | None = None, python: str | None = None) -> list[str]
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `infile` | `Path` | required (keyword-only) | The (filtered) edit file, passed as `-i`. |
+| `registry` | `str` | required (keyword-only) | Passed as `--registry`, always: the tool assumes no registry. |
+| `report` | `Path` | required (keyword-only) | Where the `-f json` document goes (`-o`), so progress notes on stdout cannot corrupt it. |
+| `dryrun_prefix` | `Path \| None` | required (keyword-only) | `--dryrun` prefix for the preview XML; `None` for a real submission. |
+| `secrets_path` | `str \| None` | `None` (keyword-only) | Passed as `-c` when given. |
+| `python` | `str \| None` | `None` (keyword-only) | The interpreter; default `sys.executable`. |
+
+**Returns** `list[str]` -- The argument list: `[python, '-m', 'eidr_tools.tools.altidtool', '--registry', R, '-i', F, '-multi', '-f', 'json', '-o', O]`, plus `-c` and `--dryrun` when given.
+<!-- /dict -->
+
+**Does.** Builds the AltIDTool command line. It runs the module under a named interpreter rather than the console script, which PATH would choose. It always passes `-multi`, so the tool never replaces whole Kinds on its own; an edit file that wants a family replaced says so with its own removal line.
+
+### `check_staleness`
+
+<!-- dict:eidr_core.altid_apply.check_staleness -->
+```python
+def check_staleness(path: Path, file_time: datetime, pull_id: int | str, pulled_at: datetime | None, newest: tuple[int | str, datetime] | None, now: datetime, *, warn_after: timedelta = STALE_WARN_AFTER) -> Staleness
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `path` | `Path` | required | The edit file, named in the messages. |
+| `file_time` | `datetime` | required | When the file was written (`file_mtime`). Timezone-aware. |
+| `pull_id` | `int \| str` | required | The id of the registry reading (pull) the file was built from. |
+| `pulled_at` | `datetime \| None` | required | When that pull was taken; `None` when the caller has no record of it, which refuses. |
+| `newest` | `tuple[int \| str, datetime] \| None` | required | `(id, time)` of the newest pull the caller holds, or `None`. |
+| `now` | `datetime` | required | The current time, timezone-aware. |
+| `warn_after` | `timedelta` | `STALE_WARN_AFTER` (keyword-only) | How old a file may be before a warning. Default `STALE_WARN_AFTER` (24 hours). |
+
+**Returns** `Staleness` -- A `Staleness`: `refuse` set when the file must not be applied, `warnings` otherwise, and the file's `age`.
+<!-- /dict -->
+
+**Does.** Decides whether a file built from one registry reading may still be applied. It refuses when the pull is unrecorded, when the file predates its own pull, or when a newer pull exists (a block that restates a record would delete whatever the registry gained in between). Past `warn_after` it only warns, because elapsed time is weaker evidence than a newer pull. Pure; the caller reads the pulls from its own store.
+
+### `detail_text`
+
+<!-- dict:eidr_core.altid_apply.detail_text -->
+```python
+def detail_text(submit: Mapping[str, Any]) -> str
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `submit` | `Mapping[str, Any]` | required | A report entry's `submit` object. |
+
+**Returns** `str` -- `token=... submitted=... code=... type=...`, then ` error=...` when there is one.
+<!-- /dict -->
+
+**Does.** Formats one record's registry outcome for the caller to store. The token comes first, even on a rejection, because `StatusTool -tok` reconciles a run interrupted between the registry's answer and the caller's record. Then the registry's `code`/`type` pair verbatim, so a validation error can be told from an authorization error without parsing prose.
+
+### `file_mtime`
+
+<!-- dict:eidr_core.altid_apply.file_mtime -->
+```python
+def file_mtime(path: Path) -> datetime
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `path` | `Path` | required | Any file. |
+
+**Returns** `datetime` -- Its modification time as a UTC-aware `datetime`.
+<!-- /dict -->
+
+**Does.** Returns a file's modification time, timezone-aware, so that comparing it with a database's aware timestamp cannot silently misjudge.
+
+### `filter_file`
+
+<!-- dict:eidr_core.altid_apply.filter_file -->
+```python
+def filter_file(blocks: list[Block], skip: Collection[str], dest: Path) -> tuple[int, int]
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `blocks` | `list[Block]` | required | The file's blocks, from `parse_file`. |
+| `skip` | `Collection[str]` | required | EIDR IDs to leave out (done, or withheld). |
+| `dest` | `Path` | required | The file to write; its directory is created. |
+
+**Returns** `tuple[int, int]` -- `(records, lines)` written.
+<!-- /dict -->
+
+**Does.** Writes the blocks not in `skip`, in file order, with each record's lines verbatim and in their original order. AltIDTool applies lines in file order, so a removal followed by restated values only works in the order the builder wrote them.
+
+### `is_applied`
+
+<!-- dict:eidr_core.altid_apply.is_applied -->
+```python
+def is_applied(entry: Mapping[str, Any]) -> bool
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `entry` | `Mapping[str, Any]` | required | A report entry, or its `submit` object. |
+
+**Returns** `bool` -- True only when `submit.status` is `success`.
+<!-- /dict -->
+
+**Does.** Says whether the registry accepted a record's change. The status decides, not the `submitted` flag: `submitted: false` (`unchanged`: nothing to do, or `dryrun`: nothing attempted) is never applied, and neither are `pending` and `rejected`.
+
+### `parse_file`
+
+<!-- dict:eidr_core.altid_apply.parse_file -->
+```python
+def parse_file(path: Path) -> list[Block]
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `path` | `Path` | required | The edit file (UTF-8). |
+
+**Returns** `list[Block]` -- One `Block` per record, in first-appearance order, each holding that record's lines verbatim and in order.
+<!-- /dict -->
+
+**Does.** Reads an edit file into per-record blocks, grouping as AltIDTool does. Blank lines and `//` comments are skipped. Every line goes through `altidtool_io.parse_edit_line`, and one line it refuses (no EIDR ID, more than five columns, any removal spec v1.6 refuses) raises `ApplyRefused` for the whole file, as AltIDTool would refuse it. A missing file or one with no edit lines raises too.
+
+### `parse_report`
+
+<!-- dict:eidr_core.altid_apply.parse_report -->
+```python
+def parse_report(text: str) -> list[dict[str, Any]]
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `text` | `str` | required | The `-f json` document AltIDTool wrote. |
+
+**Returns** `list[dict[str, Any]]` -- One dict per record, each with a complete `submit` object (`SUBMIT_FIELDS`, plus `file` on a dry run). `[]` for empty text.
+<!-- /dict -->
+
+**Does.** Reads AltIDTool's JSON report. A missing `submit` reads as `submitted: false` with an empty status, which is not applied: the safe direction. Raises `ApplyRefused` unless the text is one JSON array of objects, because any other shape means a tool version whose report has not been agreed.
+
+### `production_gate`
+
+<!-- dict:eidr_core.altid_apply.production_gate -->
+```python
+def production_gate(registry: str, signed_off: bool, *, signoff_flag: str = SIGNOFF_FLAG) -> str | None
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `registry` | `str` | required | The registry name or URL the run would use. |
+| `signed_off` | `bool` | required | Whether the operator has signed off on production. |
+| `signoff_flag` | `str` | `SIGNOFF_FLAG` (keyword-only) | The caller's flag, named in the refusal. |
+
+**Returns** `str | None` -- The refusal text, or `None` when the registry may be used.
+<!-- /dict -->
+
+**Does.** Refuses `prod`, `production` (any case) and any `http(s)://` URL without the operator's sign-off (ruling D9: development runs against Sandbox 2). A URL is refused because it cannot be shown to be a sandbox. Every other name passes.
+
+### `read_intended`
+
+<!-- dict:eidr_core.altid_apply.read_intended -->
+```python
+def read_intended(path: Path | None) -> dict[str, set[str]]
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `path` | `Path \| None` | required | A tab-separated list with one header line, then `eidr_id<TAB>value` per intended removal (more columns are ignored). `None` for an add-only file. |
+
+**Returns** `dict[str, set[str]]` -- `{eidr_id: {value, ...}}`; `{}` for `None`.
+<!-- /dict -->
+
+**Does.** Reads an intended-removal list, the shape of eidr-imdb's `altid_remove.intended.tsv`. Raises `ApplyRefused` when a path is given and missing, because a removal file is never applied without the list that says which removals are meant.
+
+### `run_tool`
+
+<!-- dict:eidr_core.altid_apply.run_tool -->
+```python
+def run_tool(cmd: list[str], cwd: Path | None = None, runner: Runner = subprocess.run) -> subprocess.CompletedProcess[str]
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `cmd` | `list[str]` | required | The command line from `build_command`. |
+| `cwd` | `Path \| None` | `None` | Working directory, or `None` to inherit. |
+| `runner` | `Runner` | `subprocess.run` | `subprocess.run` or a stand-in with its shape. |
+
+**Returns** `subprocess.CompletedProcess[str]` -- The completed process (text mode, output captured, never raising on a non-zero exit).
+<!-- /dict -->
+
+**Does.** Runs AltIDTool through an injectable runner, so tests never touch a registry.
+
+### `unintended_removals`
+
+<!-- dict:eidr_core.altid_apply.unintended_removals -->
+```python
+def unintended_removals(entries: Iterable[Mapping[str, Any]], intended: Mapping[str, Collection[str]]) -> dict[str, list[str]]
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `entries` | `Iterable[Mapping[str, Any]]` | required | Report entries with `id`, `removed` and `added` value lists. |
+| `intended` | `Mapping[str, Collection[str]]` | required | The removals intended per record, `{eidr_id: values}`. |
+
+**Returns** `dict[str, list[str]]` -- `{eidr_id: sorted values}` for each record that would lose a value without intent; failing records only.
+<!-- /dict -->
+
+**Does.** The guard's arithmetic: for each record, the values `removed` minus `added` minus the record's intended removals. A value removed and re-added is a restatement or a relabel, not a loss. Anything left over is a side effect. It compares VALUES, because the report carries no Type or Domain, so a value removed under one Kind and added under another reads as re-added.
+
+### `ApplyRefused` (class)
+
+<!-- dict:eidr_core.altid_apply.ApplyRefused -->
+```python
+class ApplyRefused(Exception)
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+<!-- /dict -->
+
+**Does.** Raised when a precondition fails: the production gate, the file, the staleness check, the intended list, or the report shape. Nothing has been submitted when it is raised.
+
+### `ApplyResult` (class)
+
+<!-- dict:eidr_core.altid_apply.ApplyResult -->
+```python
+@dataclass
+class ApplyResult
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `records` | `int` | required | Records in the file. |
+| `done` | `frozenset[str]` | required | The `done` set the run was given. |
+| `dry_run` | `list[dict[str, Any]]` | `field(default_factory=list)` | The dry-run report entries. |
+| `withheld` | `dict[str, Withheld]` | `field(default_factory=dict)` | The records the guard kept back, by EIDR ID. |
+| `submit_requested` | `bool` | `False` | Whether `submit` was set. |
+| `submitted_records` | `int` | `0` | Records sent in the submit pass (0 when not submitted, or when everything was withheld). |
+| `entries` | `list[dict[str, Any]]` | `field(default_factory=list)` | The submit report entries; record outcomes from these. Empty when nothing was submitted. |
+| `late_removals` | `dict[str, list[str]]` | `field(default_factory=dict)` | Unintended removals visible only in the submit report: the registry changed between the dry run and the submission. They have happened and need a human to restore them. |
+| `warnings` | `list[str]` | `field(default_factory=list)` | Staleness warnings, and the forced refusal when `force_stale` was used. |
+| `returncodes` | `list[int]` | `field(default_factory=list)` | AltIDTool's exit code for each run, in order. |
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `applied` | `def applied() -> set[str]` (property) | Records the registry accepted in the submit pass (`applied_ids(entries)`). |
+| `not_applied` | `def not_applied() -> set[str]` (property) | Records in the submit report that were not accepted, including `unchanged`. |
+<!-- /dict -->
+
+**Does.** What `apply_file` did, for the caller to record and report.
+
+### `Block` (class)
+
+<!-- dict:eidr_core.altid_apply.Block -->
+```python
+@dataclass
+class Block
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `eidr_id` | `str` | required | The record, as written in column 1. |
+| `lines` | `list[str]` | `field(default_factory=list)` | The record's lines, verbatim and in file order. |
+<!-- /dict -->
+
+**Does.** One record's lines from an edit file.
+
+### `Staleness` (class)
+
+<!-- dict:eidr_core.altid_apply.Staleness -->
+```python
+@dataclass
+class Staleness
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `refuse` | `str \| None` | `None` | Why the file must not be applied, or `None`. |
+| `warnings` | `list[str]` | `field(default_factory=list)` | Softer findings (the file is old). |
+| `age` | `timedelta` | `timedelta(0)` | Time since the file was written. |
+<!-- /dict -->
+
+**Does.** The verdict of `check_staleness`, passed to `apply_file(staleness=)`.
+
+### `Withheld` (class)
+
+<!-- dict:eidr_core.altid_apply.Withheld -->
+```python
+@dataclass
+class Withheld
+```
+
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `eidr_id` | `str` | required | The withheld record. |
+| `values` | `tuple[str, ...]` | required | The values its dry run would have removed without intent. Empty when it had no dry-run reading. |
+| `reason` | `str` | required | Why it was withheld and what to do next. |
+<!-- /dict -->
+
+**Does.** A record the guard kept back, and why.
+
+### `APPLIED_STATUS` (constant)
+
+<!-- dict:eidr_core.altid_apply.APPLIED_STATUS -->
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+**Value** `APPLIED_STATUS = "success"` -- The only `submit.status` that means the registry accepted a record's change; `unchanged`, `dryrun`, `pending` and `rejected` are not applied.
+<!-- /dict -->
+
+### `PRODUCTION_REGISTRIES` (constant)
+
+<!-- dict:eidr_core.altid_apply.PRODUCTION_REGISTRIES -->
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+**Value** `PRODUCTION_REGISTRIES = frozenset({"prod", "production"})` -- Registry names that need the operator's sign-off (compared lowercased and stripped).
+<!-- /dict -->
+
+### `SIGNOFF_FLAG` (constant)
+
+<!-- dict:eidr_core.altid_apply.SIGNOFF_FLAG -->
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+**Value** `SIGNOFF_FLAG = "--i-have-operator-signoff"` -- The sign-off flag a refusal names by default (eidr-imdb's spelling); pass `signoff_flag=` for another.
+<!-- /dict -->
+
+### `STALE_WARN_AFTER` (constant)
+
+<!-- dict:eidr_core.altid_apply.STALE_WARN_AFTER -->
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+**Value** `STALE_WARN_AFTER = timedelta(hours=24)` -- How old a file may be before `check_staleness` warns. eidr-imdb set it from measured churn (107 IMDb Alt IDs gained in six days).
+<!-- /dict -->
+
+### `SUBMIT_FIELDS` (constant)
+
+<!-- dict:eidr_core.altid_apply.SUBMIT_FIELDS -->
+Defined in `src/eidr_core/altid_apply/__init__.py`.
+
+**Value** `SUBMIT_FIELDS = ("submitted", "token", "status", "code", "type", "error")` -- The keys of each report entry's `submit` object, every one present after `parse_report`.
+<!-- /dict -->
 
 ## Specs and data files
 

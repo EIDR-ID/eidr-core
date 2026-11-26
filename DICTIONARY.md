@@ -888,6 +888,7 @@ edition's Changes entry.
 | [`eidr_core.altid_audit.Finding`](#finding-class) | class | One thing the audit found. |
 | [`eidr_core.altid_audit.MirrorClient`](#mirrorclient-class) | class | Batched, read-only mirror queries, three per batch. |
 | [`eidr_core.altid_audit.MirrorError`](#mirrorerror-class) | class | Any failure talking to the mirror. |
+| [`eidr_core.altid_audit.Research`](#research-class) | class | One rival value withheld under rule 6, as an entry for the Help Desk's research list (`RowAudit.research`; operator, 2026-11-24: "Keep the duplicate IDs out of the registry. |
 | [`eidr_core.altid_audit.RowAudit`](#rowaudit-class) | class | The audit of one row. |
 | [`eidr_core.altid_audit.ALT_ID_TABLES`](#alt_id_tables-constant) | constant | the two mirror tables of Alt IDs; `_self` is the default (Alt IDs are never inherited, so they hold the same values). |
 | [`eidr_core.altid_audit.DEFAULT_BATCH_ALT_IDS`](#default_batch_alt_ids-constant) | constant | Alt IDs per mirror batch. |
@@ -6082,10 +6083,10 @@ Defined in `src/eidr_core/verdicts/__init__.py`.
 ## `eidr_core.altid_audit`
 
 <!-- dict-module:eidr_core.altid_audit -->
-Source `src/eidr_core/altid_audit/__init__.py`. Public names: 6 functions, 7 classes, 6 constants (declared by `__all__`).
+Source `src/eidr_core/altid_audit/__init__.py`. Public names: 6 functions, 8 classes, 6 constants (declared by `__all__`).
 <!-- /dict-module -->
 
-**Purpose.** The one shared Alt-ID audit: given the Alt IDs a source asserts for a record, check them against the mirror and say which are safe to send to AltIDTool, which are already there, and which conflict, and why. Reconciliation plan component C5, extracted 2026-10-15 from BMRtoAltID `bmr_altid/audit.py` and `mirror.py` on the interfaces ruled in eidr-core-ops `PHASE2-3-INTERFACES-2026-10-15.md`. BMRtoAltID audits through it since its adoption, and the release was checked back to back against BMRtoAltID's own audit on the live mirror: AltIDTool files and reports identical. The ladder: alias following, the identity lookups (IsSameAs or blank only), agreement with the asserted record, rule 6 (one identity value per single-form Kind), rule 7 (already on the record under another relation), and the AltIDTool emission checks. Input is Alt ID tuples, not sheet rows; reading a source and formatting a report stay with the caller.
+**Purpose.** The one shared Alt-ID audit: given the Alt IDs a source asserts for a record, check them against the mirror and say which are safe to send to AltIDTool, which are already there, and which conflict, and why. Reconciliation plan component C5, extracted 2026-10-15 from BMRtoAltID `bmr_altid/audit.py` and `mirror.py` on the interfaces ruled in eidr-core-ops `PHASE2-3-INTERFACES-2026-10-15.md`. BMRtoAltID audits through it since its adoption, and the release was checked back to back against BMRtoAltID's own audit on the live mirror: AltIDTool files and reports identical. The ladder: alias following, the identity lookups (IsSameAs or blank only), agreement with the asserted record, rule 6 (one identity value per single-form Kind), rule 7 (already on the record under another relation), and the AltIDTool emission checks. Since the operator's rulings of 2026-11-24 the checks are relation-aware throughout, and that vetting policy is written in this module's docstring, not in `specs/altidtool-format.md`: one Kind+value never goes on a record twice whatever the relation (a value the source offers under two relations is withheld, every copy; an exact repeat is written once), a value held or proposed under a non-identity relation is never a duplicate or a conflict, and the rival values rule 6 withholds come back in `RowAudit.research` for the Help Desk. Input is Alt ID tuples, not sheet rows; reading a source and formatting a report stay with the caller.
 
 **Use it when.** 
 * You are about to write AltIDTool lines for Alt IDs a source asserts about a known record: `audit_rows` over your rows with a `MirrorClient` on your own mirror connection, then write `RowAudit.lines`.
@@ -6150,7 +6151,7 @@ Defined in `src/eidr_core/altid_audit/__init__.py`.
 **Returns** `Iterator[RowAudit]` -- one `RowAudit` per row, in input order.
 <!-- /dict -->
 
-**Does.** Audits rows in batches: aliases, identity lookups and the targets' existing Alt IDs are fetched once per batch, then each row is adjudicated. An unexpected error in one row comes back as that row's `error`; `MirrorError` propagates and ends the run.
+**Does.** Audits rows in batches: aliases, identity lookups and the targets' existing Alt IDs are fetched once per batch, then each row is adjudicated. An unexpected error in one row comes back as that row's `error`; `MirrorError` propagates and ends the run. Each row is judged against the mirror only, never against other rows, so a batch boundary cannot change an answer; the price is that one identity value offered for two records in one run, both new to the registry, is not caught here (eidr-wikidata runs its `SAME_BATCH` guard over the finished file).
 
 ### `is_audited`
 
@@ -6368,9 +6369,10 @@ Defined in `src/eidr_core/altid_audit/__init__.py`.
 | `audited` | `int` | `0` | Alt IDs tested for identity. |
 | `skipped` | `int` | `0` | Alt IDs passed untested (a relation other than IsSameAs). |
 | `already_present` | `int` | `0` | Alt IDs already on the record under the same relation: skipped silently. |
-| `relation_conflicts` | `int` | `0` | Alt IDs on the record under another relation: `ALT_ID_RELATION_CONFLICT`. |
+| `relation_conflicts` | `int` | `0` | `ALT_ID_RELATION_CONFLICT`s: Alt IDs on the record under another relation (rule 7), and every copy of a value the source offers under two relations (2026-11-24). |
 | `already_contributed` | `int` | `0` | Alt IDs the `contributed` gate held back. |
 | `alias_followed` | `bool` | `False` | True when the asserted ID was an alias and its target was used. |
+| `research` | `tuple[Research, ...]` | `()` | The values withheld because the record would hold two different identity values of one single-form Kind, one entry each, for the Help Desk (operator, 2026-11-24). Empty with no record or a row-level finding. |
 
 | Method | Signature | Purpose |
 |---|---|---|
@@ -6426,6 +6428,26 @@ Defined in `src/eidr_core/altid_audit/__init__.py`.
 
 **Value** `MIRROR_NEEDS = { "content_core": ["content_id", "status", "target_id"], "content_alternate_ids_self": ...` -- the mirror tables and columns the client reads, for `db_schemas.assert_tables`.
 <!-- /dict -->
+
+### `Research` (class)
+
+<!-- dict:eidr_core.altid_audit.Research -->
+```python
+class Research(NamedTuple)
+```
+
+Defined in `src/eidr_core/altid_audit/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `eidr_id` | `str` | required | The record the value was offered for (after aliases). |
+| `alt_id` | `AltId` | required | The withheld Alt ID, its `source` naming where it came from. |
+| `offered` | `tuple[str, ...]` | required | Every distinct identity value of the Kind the source offered for the record, sorted, this one included. More than one: the source contradicts itself. |
+| `on_record` | `tuple[str, ...]` | required | The identity values of the Kind the record already claims, sorted. A value here not in `offered`: the source contradicts the record. |
+| `reason` | `str` | required | The `SAME_KIND_CONFLICT` finding text; both, joined, when the value conflicts on the row and with the record. |
+<!-- /dict -->
+
+**Does.** One rival value withheld under rule 6, as an entry for the Help Desk's research list (`RowAudit.research`; operator, 2026-11-24: "Keep the duplicate IDs out of the registry. Create a research report for the Help Desk to resolve each and decide how to handle."). Data only: the report's shape is the caller's. Built from the `SAME_KIND_CONFLICT` findings, so the list and the findings agree; the multi-form Kinds never appear. Nothing needs to remember it: the ladder withholds the rivals on every run while the source offers them, and once the Help Desk puts a value on the record rule 7 stops it being proposed again.
 
 ## `eidr_core.lookup`
 

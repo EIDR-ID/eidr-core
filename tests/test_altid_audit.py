@@ -6,6 +6,10 @@ back differential on the live mirror. What is tested here is what only this
 module decides: the two quarantine modes, the ledger gate, containment, and
 that the batch size and the single-row form never change an answer -- a
 batching bug would produce plausible, wrong lines, not an error.
+
+The operator's relation-aware vetting rulings of 2026-11-24 are policy this
+module now owns, so each row of that rulings table has its own test below,
+with the Help Desk research list and the multi-form exemption.
 """
 from __future__ import annotations
 
@@ -224,3 +228,199 @@ def test_a_blank_domain_is_sent_as_the_mirrors_empty_domain():
     sql, params = seen[0]
     assert params[1] == ["", "a.com"]
     assert "COALESCE(a.domain, '') = k.d" in sql
+
+
+# -- the operator's Alt ID vetting rulings of 2026-11-24 ---------------------
+# One test per row of the rulings table (eidr-core-ops handoffs-received
+# HANDOFF-FROM-EIDR-WIKIDATA-2026-11-24-altid-vetting-rules-and-review-
+# backlog.md, section 1), on the cases eidr-wikidata pinned for its local
+# copy (tests/test_bmr/test_altid_same_batch.py, test_altid_multivalue.py),
+# plus the multi-form exemption. Each runs in both quarantine modes where
+# the mode could change the answer: a rule that holds in one mode only is a
+# silent divergence between BMRtoAltID and eidr-wikidata.
+
+def imdb(value, relation="", source="IMDb"):
+    return AltId("IMDB", "", value, relation, source)
+
+
+MODES = ("row", "alt_id")
+
+
+def test_ruling_1_a_value_already_on_the_record_under_any_relation_is_withheld():
+    for mode in MODES:
+        # Under another relation: rule 7, reported.
+        fake = Fake([(E1, "IMDB", "", "tt1", "Deprecated")])
+        [r] = audit_rows([row(4, E1, imdb("tt1"))], fake, quarantine=mode)
+        assert [f.error_class for f in r.findings] == ["ALT_ID_RELATION_CONFLICT"]
+        assert r.additions == () and r.relation_conflicts == 1 and r.clean
+        # Under the same relation (blank = IsSameAs): presence, silent.
+        fake = Fake([(E1, "IMDB", "", "tt1", "IsSameAs")])
+        [r] = audit_rows([row(4, E1, imdb("tt1"))], fake, quarantine=mode)
+        assert r.findings == () and r.additions == () and r.already_present == 1
+
+
+def test_ruling_2_one_value_offered_under_two_relations_withholds_every_copy():
+    # Before 2026-11-24 both lines were written: the identity copy passed the
+    # audit, the Deprecated copy was not audited, and neither was on E1.
+    for mode in MODES:
+        [r] = audit_rows([row(4, E1, imdb("tt1"), imdb("tt1", "Deprecated"), B)],
+                         Fake(), quarantine=mode)
+        assert [(f.error_class, f.relation) for f in r.findings] == [
+            ("ALT_ID_RELATION_CONFLICT", ""),
+            ("ALT_ID_RELATION_CONFLICT", "Deprecated")]
+        assert "Deprecated, IsSameAs" in r.findings[0].detail
+        # Per Alt ID, like rule 7: the record is not in question, so B is
+        # still written even under row quarantine.
+        assert r.lines == [f"{E1}\tProprietary\t2\tb.com"]
+        assert r.relation_conflicts == 2 and r.clean and r.research == ()
+
+
+def test_ruling_2_an_exact_repeat_is_written_once():
+    # Blank and IsSameAs are one relation, and relation names fold case.
+    [r] = audit_rows([row(4, E1, imdb("tt1"), imdb("tt1", "IsSameAs"),
+                          imdb("tt2", "Deprecated"), imdb("tt2", "deprecated"))],
+                     Fake())
+    assert r.lines == [f"{E1}\tIMDB\ttt1", f"{E1}\tIMDB\ttt2\t\tDeprecated"]
+    assert r.findings == () and r.audited == 1 and r.skipped == 1
+
+
+def test_ruling_3_an_identity_value_another_record_holds_as_identity_is_withheld():
+    fake = Fake([(E2, "IMDB", "", "tt1", None)])
+    for mode in MODES:
+        [r] = audit_rows([row(4, E1, imdb("tt1"))], fake, quarantine=mode)
+        assert [f.error_class for f in r.findings] == ["ASSERTED_ID_MISMATCH"]
+        assert r.findings[0].conflicting == (E2,) and r.additions == ()
+
+
+def test_ruling_4_a_value_another_record_holds_only_as_non_identity_is_written():
+    fake = Fake([(E2, "IMDB", "", "tt1", "Deprecated"),
+                 (E2, "IMDB", "", "tt2", "IsEntirelyContainedBy")])
+    for mode in MODES:
+        [r] = audit_rows([row(4, E1, imdb("tt1"))], fake, quarantine=mode)
+        assert r.findings == () and r.clean
+        assert r.lines == [f"{E1}\tIMDB\ttt1"]
+
+
+def test_ruling_4_the_mirror_lookup_counts_only_identity_holders():
+    # The fake above filters like the real query; this pins the real one, so
+    # a reworded predicate cannot quietly start counting Deprecated holders.
+    seen = []
+
+    class Cur:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def execute(self, sql, params):
+            seen.append((sql, params))
+
+        def fetchall(self):
+            return []
+
+    class Conn:
+        def cursor(self):
+            return Cur()
+
+    MirrorClient(Conn()).lookup_alt_ids([("IMDB", "", "tt1")])
+    sql, params = seen[0]
+    assert "WHERE a.relation IS NULL OR a.relation = %s" in sql
+    assert params[-1] == "IsSameAs"
+
+
+def test_ruling_5_a_non_identity_proposal_is_never_a_duplicate_of_another_record():
+    fake = Fake([(E2, "IMDB", "", "tt1", None)])
+    for mode in MODES:
+        [r] = audit_rows([row(4, E1, imdb("tt1", "Deprecated"))], fake,
+                         quarantine=mode)
+        assert r.findings == () and r.skipped == 1 and r.audited == 0
+        assert r.lines == [f"{E1}\tIMDB\ttt1\t\tDeprecated"]
+
+
+def test_ruling_6_two_identity_values_of_one_kind_are_withheld_for_research():
+    for mode in MODES:
+        [r] = audit_rows([row(4, E1, imdb("tt1"), imdb("tt2"), B)], Fake(),
+                         quarantine=mode)
+        assert [f.error_class for f in r.findings] == ["SAME_KIND_CONFLICT"] * 2
+        assert not any("\ttt" in line for line in r.lines)
+        # The Help Desk's list: one entry per withheld value, the source's
+        # rivals named, nothing on the record yet.
+        assert [(x.eidr_id, x.alt_id.value, x.offered, x.on_record)
+                for x in r.research] == [
+            (E1, "tt1", ("tt1", "tt2"), ()), (E1, "tt2", ("tt1", "tt2"), ())]
+        assert r.research[0].reason == r.findings[0].detail
+    # Row quarantine withholds B too (rule 6 is an identity finding);
+    # alt_id quarantine writes it.
+    [r] = audit_rows([row(4, E1, imdb("tt1"), imdb("tt2"), B)], Fake())
+    assert r.additions == () and r.collateral == (B,)
+    [r] = audit_rows([row(4, E1, imdb("tt1"), imdb("tt2"), B)], Fake(),
+                     quarantine="alt_id")
+    assert r.lines == [f"{E1}\tProprietary\t2\tb.com"]
+
+
+def test_ruling_6_a_value_against_another_the_record_claims_is_listed_too():
+    fake = Fake([(E1, "IMDB", "", "tt9", None)])
+    [r] = audit_rows([row(4, E1, imdb("tt1"))], fake, quarantine="alt_id")
+    assert [f.error_class for f in r.findings] == ["SAME_KIND_CONFLICT"]
+    assert [(x.alt_id.value, x.offered, x.on_record) for x in r.research] == [
+        ("tt1", ("tt1",), ("tt9",))]
+    # Row-side AND record-side: listed once, with both reasons.
+    [r] = audit_rows([row(4, E1, imdb("tt1"), imdb("tt2"))], fake)
+    assert [(x.alt_id.value, x.offered, x.on_record) for x in r.research] == [
+        ("tt1", ("tt1", "tt2"), ("tt9",)), ("tt2", ("tt1", "tt2"), ("tt9",))]
+    assert "the row asserts" in r.research[0].reason
+    assert "already claims" in r.research[0].reason
+
+
+def test_ruling_6_a_non_identity_value_is_never_a_rival():
+    # On the row (eidr-wikidata's test_a_deprecated_second_value_is_not_a_rival)
+    # and on the record.
+    fake = Fake([(E1, "IMDB", "", "tt9", "Deprecated")])
+    [r] = audit_rows([row(4, E1, imdb("tt1"), imdb("tt2", "Deprecated"))], fake)
+    assert r.findings == () and r.research == ()
+    assert r.lines == [f"{E1}\tIMDB\ttt1", f"{E1}\tIMDB\ttt2\t\tDeprecated"]
+
+
+def test_ruling_6_research_needs_a_record_not_itself_in_question():
+    # No record, or a deleted one: nothing would be written to anything, so
+    # there is nothing for the Help Desk to resolve on a record.
+    [r] = audit_rows([row(4, "", imdb("tt1"), imdb("tt2"))], Fake())
+    assert r.research == () and r.findings[0].error_class == "SAME_KIND_CONFLICT"
+    fake = Fake(aliases={E1: TOMBSTONE_ID})
+    [r] = audit_rows([row(4, E1, imdb("tt1"), imdb("tt2"), imdb("tt3"),
+                          imdb("tt3", "Deprecated"))], fake)
+    assert r.research == () and r.relation_conflicts == 0
+    assert r.findings[0].error_class == "ASSERTED_ID_DELETED"
+
+
+def test_the_multi_form_kinds_stay_exempt_from_the_multi_value_rule():
+    from eidr_core.altidtool_io import multi_form_domains
+    exempt = multi_form_domains()
+    assert "pbs.org" in exempt
+    pbs = [AltId("Proprietary", "pbs.org", v, "", "Alt ID") for v in ("1", "2")]
+    fake = Fake([(E1, "Proprietary", "pbs.org", "9", None)])
+    for mode in MODES:
+        [r] = audit_rows([row(4, E1, *pbs)], fake, quarantine=mode,
+                         multi_form_domains=exempt)
+        assert r.findings == () and r.research == ()
+        assert r.lines == [f"{E1}\tProprietary\t1\tpbs.org",
+                           f"{E1}\tProprietary\t2\tpbs.org"]
+    # The same shape on a single-form Proprietary Kind is withheld.
+    other = [a._replace(domain="a.com") for a in pbs]
+    [r] = audit_rows([row(4, E1, *other)], Fake(), multi_form_domains=exempt)
+    assert r.additions == () and len(r.research) == 2
+
+
+def test_the_rulings_do_not_depend_on_the_batch_or_the_single_row_form():
+    fake = Fake([(E1, "IMDB", "", "tt9", None)])
+    rows = [row(4, E1, imdb("tt1"), imdb("tt2"), B),
+            row(5, E1, imdb("tt3"), imdb("tt3", "Deprecated")),
+            row(6, E2, imdb("tt1"), imdb("tt1"))]
+    for mode in MODES:
+        one = [r._replace(row=None) for r in audit_rows(rows, fake, quarantine=mode)]
+        per = [r._replace(row=None)
+               for r in audit_rows(rows, fake, quarantine=mode, batch_alt_ids=1)]
+        single = [audit(w.asserted_id, w.alt_ids, client=fake,
+                        quarantine=mode)._replace(row=None) for w in rows]
+        assert one == per == single

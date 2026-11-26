@@ -38,6 +38,44 @@ The procedure, per row (BMRtoAltID's operator specification, 2026-08-26):
    IDs agree on: an Alt ID match alone does not confirm a record. It is
    reported as ``UNASSERTED_RESOLVED`` (INFO); BMR-Review is where it goes.
 
+Relation-aware vetting (operator rulings of 2026-11-24, carried here from
+eidr-wikidata's local implementation; vetting POLICY, so it is written here
+and not in ``specs/altidtool-format.md``, which is the file format). The
+operator: "The same Kind+Value should never appear on the same record more
+than once, even if they have different relations; otherwise, if a
+Kind+Value has a relation that is not IsSameAs, don't count it as
+duplicating/conflicting." Identity is ``is_identity_relation``; Kind is
+``(Type, Domain)`` as in R8. Case by case:
+
+* Kind+value already on the target under any relation: withheld (step 5,
+  unchanged).
+* The source offers ONE value for the record under TWO relations (blank and
+  ``IsSameAs`` are one relation): it cannot be both, so every copy is
+  withheld as ``ALT_ID_RELATION_CONFLICT`` (rule 7's class: the same
+  principle, the second relation coming from the source rather than the
+  record) and counted in ``relation_conflicts``. Until this change both
+  copies were written. An exact repeat (same Kind, value and relation) is
+  written once.
+* An identity value another record holds as identity: withheld (steps 3-4,
+  unchanged). Within one run, C5 sees no other row's proposals; see
+  ``audit_rows``.
+* A value another record holds only under a non-identity relation, and a
+  non-identity proposal whatever other records hold: not a duplicate, so
+  written. This was already so (step 2 and the lookup's relation filter);
+  it is now pinned by tests as policy.
+* Two DIFFERENT identity values of one single-form Kind for one record (on
+  the row, or one offered against another the record already claims):
+  every value withheld (``SAME_KIND_CONFLICT``, rule 6, unchanged), and
+  each is now also returned in ``RowAudit.research``, the Help Desk's
+  research list (operator: "Keep the duplicate IDs out of the registry.
+  Create a research report for the Help Desk to resolve each and decide how
+  to handle."). The list is data; writing a report from it is the caller's.
+  The Kinds in ``altidtool_io.multi_form_domains()`` stay exempt.
+
+No ledger is needed for "never proposed again": while a source still offers
+rival values the ladder withholds them on every run, and once the Help Desk
+puts a value on the record, step 5 stops it being proposed again.
+
 Quarantine (ruled 2026-10-15, item 6). ``"row"``, BMRtoAltID's ruling: any
 identity finding withholds every Alt ID of the row, and the ones not
 themselves in conflict come back as ``collateral`` so the caller can list
@@ -85,6 +123,7 @@ __all__ = [
     "Finding",
     "MirrorClient",
     "MirrorError",
+    "Research",
     "RowAudit",
     "audit",
     "audit_rows",
@@ -217,6 +256,30 @@ class Finding(NamedTuple):
     conflicting: tuple[str, ...] = ()
 
 
+class Research(NamedTuple):
+    """One value withheld because the record would hold two different
+    identity values of one single-form Kind: an entry for the Help Desk.
+
+    Operator, 2026-11-24: "Keep the duplicate IDs out of the registry.
+    Create a research report for the Help Desk to resolve each and decide
+    how to handle." The ladder returns the list and writes nothing: the
+    report's shape (workbook, links, decision columns) differs per caller.
+
+    ``offered`` is every distinct identity value of the Kind the source
+    offered for the record, sorted, this one included; more than one means
+    the source itself is contradictory (the case eidr-wikidata's own research
+    workbook lists). ``on_record`` is the identity values of the Kind the
+    record already claims, sorted; a value there not in ``offered`` means
+    the source contradicts the record. ``reason`` is the finding's text.
+    """
+
+    eidr_id: str
+    alt_id: AltId
+    offered: tuple[str, ...]
+    on_record: tuple[str, ...]
+    reason: str
+
+
 class RowAudit(NamedTuple):
     """The audit of one row.
 
@@ -225,6 +288,8 @@ class RowAudit(NamedTuple):
     because another on the row is in conflict. ``clean`` means no identity
     finding. ``error`` is an unexpected exception contained to this row; when
     set, everything else is empty and the row's tallies are zero.
+    ``research`` lists the rival values withheld for the Help Desk (see
+    ``Research``); it is last so positional construction keeps working.
     """
 
     row: AuditRow
@@ -240,6 +305,7 @@ class RowAudit(NamedTuple):
     relation_conflicts: int = 0
     already_contributed: int = 0
     alias_followed: bool = False
+    research: tuple[Research, ...] = ()
 
     @property
     def lines(self) -> list[str]:
@@ -279,11 +345,16 @@ def same_relation(existing: set[str], relation: str) -> bool:
     Blank and ``IsSameAs`` are one relation on both sides; otherwise the
     names compare case-insensitively.
     """
-    def norm(rel: str) -> str:
-        rel = rel.strip()
-        return IS_SAME_AS.casefold() if not rel else rel.casefold()
-    want = norm(relation)
-    return any(norm(r) == want for r in existing)
+    want = _norm_relation(relation)
+    return any(_norm_relation(r) == want for r in existing)
+
+
+def _norm_relation(rel: str) -> str:
+    # One spelling per relation, so rule 7 on the record and the two-relation
+    # check on the row (2026-11-24) cannot disagree about what "the same
+    # relation" is.
+    rel = (rel or "").strip()
+    return IS_SAME_AS.casefold() if not rel else rel.casefold()
 
 
 class MirrorClient:
@@ -473,6 +544,13 @@ def audit_rows(rows: Iterable[AuditRow], client, *,
     gate (C5 item 14): an Alt ID it answers True for was contributed before,
     is not on the record now, and is not offered again; it is counted, not
     reported.
+
+    Each row is adjudicated against the mirror alone, never against the
+    other rows' proposals: a batch boundary must not change an answer, and
+    rows stream out before the run ends. So an identity value offered for
+    two different records in one run, both new to the registry, is not
+    caught here; a caller that needs that guard runs it over the finished
+    output (eidr-wikidata's ``SAME_BATCH``).
     """
     if quarantine not in ("row", "alt_id"):
         raise ValueError(f"quarantine must be 'row' or 'alt_id', not {quarantine!r}")
@@ -547,6 +625,71 @@ def _find(cls: str, alt: AltId | None, detail: str, effective: str = "",
                    tuple(sorted(conflicting)))
 
 
+def _identity_values(held: dict) -> dict[tuple[str, str], set[str]]:
+    """``{Kind: {value, ...}}`` the record claims as identity. A value it
+    holds only under another relation (Deprecated, a containment) is no
+    claim, so it never makes a rival (operator, 2026-11-24)."""
+    identity: dict[tuple[str, str], set[str]] = {}
+    for (t, d, v), rels in held.items():
+        if any(is_identity_relation(r) for r in rels):
+            identity.setdefault((t, d), set()).add(v)
+    return identity
+
+
+def _unique(alt_ids: Sequence[AltId]
+            ) -> tuple[list[AltId], set[tuple[str, str, str]]]:
+    """The row's Alt IDs with exact repeats dropped, and the Kind+values it
+    offers under more than one relation.
+
+    Operator, 2026-11-24: one Kind+value never sits on a record twice,
+    whatever the relation. A repeat under the same relation (blank =
+    IsSameAs) is the same line, kept once, first occurrence winning. Under
+    two relations the source contradicts itself and nothing here can say
+    which is meant, so every copy is withheld by the caller of this.
+    """
+    seen: set[tuple[tuple[str, str, str], str]] = set()
+    relations: dict[tuple[str, str, str], set[str]] = {}
+    out: list[AltId] = []
+    for alt in alt_ids:
+        key, rel = kind_key(alt), _norm_relation(alt.relation)
+        relations.setdefault(key, set()).add(rel)
+        if (key, rel) in seen:
+            continue
+        seen.add((key, rel))
+        out.append(alt)
+    # A blank value is no Alt ID to contradict; the emission check owns it.
+    split = {k for k, rels in relations.items() if len(rels) > 1 and k[2]}
+    return out, split
+
+
+def _research(findings: list[Finding], audited: list[AltId], effective: str,
+              held: dict, multi_form_domains: frozenset[str] | None
+              ) -> tuple[Research, ...]:
+    """The Help Desk's entries: one per value rule 6 withheld (2026-11-24).
+
+    Built from the ``SAME_KIND_CONFLICT`` findings, so the list and the
+    findings cannot disagree about what was withheld. A value with both a
+    row-side and a record-side finding is listed once, with both reasons.
+    """
+    offered: dict[tuple[str, str], set[str]] = {}
+    for alt in audited:
+        if is_single_form(alt, multi_form_domains):
+            offered.setdefault(alt.kind, set()).add(alt.value)
+    on_record = _identity_values(held)
+    reasons: dict[tuple[str, str, str], tuple[AltId, list[str]]] = {}
+    for f in findings:
+        if f.error_class != "SAME_KIND_CONFLICT" or f.alt_id is None:
+            continue
+        entry = reasons.setdefault(kind_key(f.alt_id), (f.alt_id, []))
+        entry[1].append(f.detail)
+    return tuple(
+        Research(effective, alt,
+                 tuple(sorted(offered.get(alt.kind, ()))),
+                 tuple(sorted(on_record.get(alt.kind, ()))),
+                 " ".join(details))
+        for alt, details in reasons.values())
+
+
 def _same_kind_conflicts(audited: list[AltId], effective: str, held: dict,
                          multi_form_domains: frozenset[str] | None) -> list[Finding]:
     """Rule 6: a second identity value of a single-form Kind, on the row
@@ -576,10 +719,7 @@ def _same_kind_conflicts(audited: list[AltId], effective: str, held: dict,
     # as identity. The same value is presence (rule 7), not a conflict.
     if not effective or not held:
         return out
-    identity: dict[tuple[str, str], set[str]] = {}
-    for (t, d, v), rels in held.items():
-        if any(is_identity_relation(r) for r in rels):
-            identity.setdefault((t, d), set()).add(v)
+    identity = _identity_values(held)
     for alt in single:
         have = identity.get(alt.kind)
         if have and alt.value not in have:
@@ -638,8 +778,11 @@ def _adjudicate(work: AuditRow, aliases: dict, matches: dict, existing: dict,
         findings.append(_find("REVIEWER_RELATION_MISMATCH", None,
                               work.reviewer_relation_mismatch, effective))
 
-    audited = [a for a in work.alt_ids if is_audited(a)]
-    skipped = len(work.alt_ids) - len(audited)
+    # Exact repeats go first, so one value never yields two findings or two
+    # lines; ``split`` is what the source offers under two relations.
+    alts, split = _unique(work.alt_ids)
+    audited = [a for a in alts if is_audited(a)]
+    skipped = len(alts) - len(audited)
 
     # Every record any of the row's audited Alt IDs points at.
     per_alt: dict[tuple[str, str, str], set[str]] = {}
@@ -677,12 +820,36 @@ def _adjudicate(work: AuditRow, aliases: dict, matches: dict, existing: dict,
 
     # A finding without an Alt ID of its own leaves no record to write to.
     row_held = any(f.alt_id is None for f in findings)
+    # The two 2026-11-24 outputs are about what the record would hold, so
+    # they exist only when there is a record not itself in question: with
+    # none, or with a row-level finding, nothing is written to anything and
+    # the Alt IDs are collateral like the rest.
+    split_findings: list[Finding] = []
+    research: tuple[Research, ...] = ()
+    if effective and not row_held:
+        offered_as: dict[tuple[str, str, str], set[str]] = {}
+        for alt in alts:
+            if kind_key(alt) in split:
+                offered_as.setdefault(kind_key(alt), set()).add(
+                    alt.relation.strip() or IS_SAME_AS)
+        split_findings = [_find(
+            "ALT_ID_RELATION_CONFLICT", alt,
+            f"Column {alt.source!r}: the source offers this value for "
+            f"{effective} under more than one relation "
+            f"({', '.join(sorted(offered_as[kind_key(alt)]))}). Not "
+            f"written (one Alt ID must not sit on a record under two "
+            f"relations); every copy withheld, reconcile by hand.",
+            effective, {effective}) for alt in alts if kind_key(alt) in split]
+        research = _research(findings, audited, effective,
+                             existing.get(effective, {}), multi_form_domains)
     if findings and (quarantine == "row" or row_held):
-        named = {kind_key(f.alt_id) for f in findings if f.alt_id is not None and f.alt_id.value}
-        collateral = tuple(a for a in work.alt_ids if kind_key(a) not in named)
-        return RowAudit(row=work, effective_id=effective, findings=tuple(findings),
+        withheld = findings + split_findings
+        named = {kind_key(f.alt_id) for f in withheld if f.alt_id is not None and f.alt_id.value}
+        collateral = tuple(a for a in alts if kind_key(a) not in named)
+        return RowAudit(row=work, effective_id=effective, findings=tuple(withheld),
                         collateral=collateral, audited=len(audited), skipped=skipped,
-                        alias_followed=alias_followed)
+                        relation_conflicts=len(split_findings),
+                        alias_followed=alias_followed, research=research)
     clean = not findings
     # Under quarantine "alt_id", the Alt IDs a finding names are withheld and
     # the row's others go on to the presence and emission checks.
@@ -710,7 +877,7 @@ def _adjudicate(work: AuditRow, aliases: dict, matches: dict, existing: dict,
         findings.append(_find(
             "REVIEWER_RELATION_APPLIED", None,
             f"BMR-Review's reviewer recorded RELATION: {effective} "
-            f"{work.reviewer_relation}; all {len(work.alt_ids)} Alt "
+            f"{work.reviewer_relation}; all {len(alts)} Alt "
             f"ID(s) on this row are written under it (CONTRACT "
             f"section 4: the relation applies to every Alt ID the "
             f"row carries).{replaced}", effective,
@@ -718,9 +885,13 @@ def _adjudicate(work: AuditRow, aliases: dict, matches: dict, existing: dict,
 
     already = existing.get(effective, {})
     additions: list[AltIdRow] = []
-    present_n = conflicts_n = contributed_n = 0
-    for alt in work.alt_ids:
-        if kind_key(alt) in held:
+    present_n = contributed_n = 0
+    # The source's two-relation copies are reported once each, ahead of the
+    # per-Alt-ID checks, and never reach rule 7: neither copy is written.
+    findings.extend(split_findings)
+    conflicts_n = len(split_findings)
+    for alt in alts:
+        if kind_key(alt) in held or kind_key(alt) in split:
             continue
         present = already.get(kind_key(alt))
         if present is not None:
@@ -752,4 +923,5 @@ def _adjudicate(work: AuditRow, aliases: dict, matches: dict, existing: dict,
                     findings=tuple(findings), clean=clean,
                     already_present=present_n, relation_conflicts=conflicts_n,
                     already_contributed=contributed_n, audited=len(audited),
-                    skipped=skipped, alias_followed=alias_followed)
+                    skipped=skipped, alias_followed=alias_followed,
+                    research=research)

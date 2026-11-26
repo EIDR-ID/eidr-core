@@ -65,7 +65,7 @@ under "(none)" is stdlib-only.
 
 | Extra | Pulls | Needed for |
 |---|---|---|
-| *(none)* | — | `codes`, `db_schemas`, `altidtool_io`, `ordering`, `normalize`, `external` (including the retry/failover chassis), `verify`, `inheritance`, `altid_audit`, `lookup`, `swap` (the mirror connection is the caller's), `bmr_rows`, and `registry.operation_status` |
+| *(none)* | — | `codes`, `db_schemas`, `altidtool_io`, `ordering`, `normalize`, `external` (including the retry/failover chassis), `verify`, `inheritance`, `altid_audit`, `lookup`, `swap` (the mirror connection is the caller's), `bmr_rows`, `uri_mapping`, and `registry.operation_status` |
 | `compare` | rapidfuzz | `eidr_core.compare` (imported at module load) |
 | `bmr` | openpyxl | `eidr_core.bmr_io.read_sheet` / `open_sheet` / `write_sheet` / `subset_rows` (lazy). `read_headers` / `family_layout` / `families_for` / `template_for_creation_type` need no extra — they take an already-open worksheet or plain names |
 | `aws` | boto3 | `eidr_core.secrets_loader` AWS path (lazy) |
@@ -120,12 +120,14 @@ after a later `git pull`. `eidr_core.__version__` reads the checkout's own
 | `eidr_core.secrets_loader` | One secrets loader (AWS Secrets Manager + local `.secrets.json`, one section layout) |
 | `eidr_core.verify` | External-fact verification primitives — categorical, precision-aware comparison (release-date precision is the asymmetry that makes this a separate engine from `compare`) |
 | `eidr_core.db_schemas` | Schema-contract assertions (`assert_tables`) against packaged manifests for the portfolio databases Four databases since 0.32.0: `imdb_snapshot_db` added (eidr-imdb) |
-| `eidr_core.external` | The shared external-source chassis: `FactCache` protocol + `Null`/`Dict`/`JsonFactCache` (0.35.0) implementations and the fact-dict contract; retry/backoff + endpoint failover (`external/failover.py`), which honours `Retry-After` on 429/503 (0.42.0: 5 s floor without the header; a caller-owned `cooldowns` memo, like the outage memo, keeps later calls in an operation off a cooling endpoint) **+** `RequestPacer(shared_scope=)` (0.61.0): one pace for every process on the machine **+** `external.wikimedia` (0.63.0, C8 part 1): Wikimedia's Action API rules once (`user_agent`, `action_api_pacer`, `action_api_json`) and SPARQL (0.65.0-0.66.0: `sparql_select` over WDQS with QLever as a per-request fallback, under the machine-wide `sparql_pacer`) **+** `external.wikidata` (0.64.0-0.66.0, C8 part 2-3): an entity read into BMR template fields (`bmr_facts`), `external_ids` with the OD-43 retired-ID rule, `imdb_qids` |
+| `eidr_core.external` | The shared external-source chassis: `FactCache` protocol + `Null`/`Dict`/`JsonFactCache` (0.35.0) implementations and the fact-dict contract; retry/backoff + endpoint failover (`external/failover.py`), which honours `Retry-After` on 429/503 (0.42.0: 5 s floor without the header; a caller-owned `cooldowns` memo, like the outage memo, keeps later calls in an operation off a cooling endpoint) **+** `RequestPacer(shared_scope=)` (0.61.0): one pace for every process on the machine **+** `external.wikimedia` (0.63.0, C8 part 1): Wikimedia's Action API rules once (`user_agent`, `action_api_pacer`, `action_api_json`) and SPARQL (0.65.0-0.66.0: `sparql_select` over WDQS with QLever as a per-request fallback, under the machine-wide `sparql_pacer`) **+** `external.wikidata` (0.64.0-0.66.0, C8 part 2-3): an entity read into BMR template fields (`bmr_facts`), `external_ids` with the OD-43 retired-ID rule, `imdb_qids` **+** `external.tmdb` (C8, TMDb): `TmdbClient` (`find_imdb`, `facts`, `credits`, `bmr_facts`) on the chassis, the caller's User-Agent, `credentials_from_secrets`, the machine-wide `tmdb_pacer` |
+| `eidr_core.uri_mapping` | Alt ID resolvability over `uri_mapping.json` (extracted from eidr-wikidata): `UriMapping.resolvable(alt_type, domain, value) -> Resolvability(url, reason, kind, detail)`; `load(path, fetch_fallback=fetch_published)` for the `ui.eidr.org` published copy. Carries no copy of the data (R8) |
 
 Per-source external clients are **not** here until a genuine second
 consumer appears; each source has exactly one implementation home until
-then. Wikidata reached that point (C8, 0.64.0: `external.wikidata`); TMDb
-and IMDb have not.
+then. Wikidata reached that point (C8, 0.64.0: `external.wikidata`), and
+TMDb did when eidr-imdb joined eidr-dq and BMR-Review (`external.tmdb`);
+IMDb has not.
 
 ## Repository layout
 

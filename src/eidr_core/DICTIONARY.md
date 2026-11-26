@@ -864,6 +864,8 @@ These recent changes may still be reaching consumers:
 | Route a creation type to its Template-22 template | `bmr_io.template_for_creation_type` | |
 | Write or read an AltIDTool line | `altidtool_io.format_line`, `altidtool_io.write_lines`, `altidtool_io.parse_line`, `altidtool_io.parse_edit_line` | `specs/altidtool-format.md` |
 | Know which Alt ID Kinds are exempt from rule 6 | `altidtool_io.multi_form_domains` | never keep your own copy of the list |
+| Get a clickable URL for an Alt ID, or say why it has none | `uri_mapping.load`, then `UriMapping.resolvable` | for people only: never compare URLs to find duplicates (R8) |
+| Call TMDb: find by IMDb id, facts, full credits, BMR fields | `external.tmdb.TmdbClient` with `external.tmdb.credentials_from_secrets` | your own User-Agent; cut credits with `bmr_rows.cap_credits` for a sheet |
 | Check that a database has the tables and columns you read | `db_schemas.assert_tables` | |
 | Carry eidr-core code into a package that cannot depend on it | `python -m eidr_core.vendor` (`sync`, `check`) | `specs/vendoring.md` |
 
@@ -1055,6 +1057,19 @@ edition's Changes entry.
 | [`eidr_core.external.failover.WIKIMEDIA_MIN_INTERVAL`](#wikimedia_min_interval-constant) | constant | Seconds between request starts under Wikimedia's 200-requests-a-minute limit; `RequestPacer`'s default `min_interval`. |
 | [`eidr_core.external.failover.WIKIMEDIA_SLOW_PAUSE`](#wikimedia_slow_pause-constant) | constant | Seconds to wait after a request that took longer than `WIKIMEDIA_SLOW_REQUEST` (Wikimedia: "please wait 5 seconds"); `RequestPacer`'s default `slow_pause`. |
 | [`eidr_core.external.failover.WIKIMEDIA_SLOW_REQUEST`](#wikimedia_slow_request-constant) | constant | A request slower than this many seconds counts as slow and triggers the pause; `RequestPacer`'s default `slow_threshold`. |
+| [`eidr_core.external.tmdb.credentials_from_secrets`](#credentials_from_secrets) | function | Reads TMDb credentials in eidr-dq's order: either environment variable wins; otherwise `bearer_token` and `api_key` from the `tmdb` section (the portfolio skeleton's block, `"tmdb": {"bearer_token": "..."}`). |
+| [`eidr_core.external.tmdb.tmdb_pacer`](#tmdb_pacer) | function | Builds a `RequestPacer` on the machine-wide TMDb scope: one request in flight across every EIDR program, `min_interval` apart, no slow-request pause (a Wikimedia rule, not TMDb's). |
+| [`eidr_core.external.tmdb.TmdbAuthError`](#tmdbautherror-class) | class | Raised by every `TmdbClient` method on HTTP 401 (credentials missing, wrong or revoked), so a caller can switch TMDb off for the run with a clear message instead of reading every id as not found. |
+| [`eidr_core.external.tmdb.TmdbClient`](#tmdbclient-class) | class | A read-only TMDb client; `kind` is one of `KINDS`. |
+| [`eidr_core.external.tmdb.TmdbCredentials`](#tmdbcredentials-class) | class | Holds TMDb credentials. |
+| [`eidr_core.external.tmdb.ALT_ID_DOMAINS`](#alt_id_domains-constant) | constant | the registry Alt ID Kind (Proprietary domain) for a TMDb movie or series id; `find_imdb` uses it. |
+| [`eidr_core.external.tmdb.ENV_API_KEY`](#env_api_key-constant) | constant | the environment variable that overrides the secrets for a v3 key (eidr-dq's name). |
+| [`eidr_core.external.tmdb.ENV_BEARER_TOKEN`](#env_bearer_token-constant) | constant | the environment variable that overrides the secrets for a v4 token (eidr-dq's name). |
+| [`eidr_core.external.tmdb.KINDS`](#kinds-constant) | constant | the `kind` values the client takes. |
+| [`eidr_core.external.tmdb.SECRETS_SECTION`](#secrets_section-constant) | constant | the secrets section `credentials_from_secrets` reads, with keys `bearer_token` and `api_key`. |
+| [`eidr_core.external.tmdb.TMDB_API`](#tmdb_api-constant) | constant | the v3 API base; `TmdbClient(base_url=)` overrides it. |
+| [`eidr_core.external.tmdb.TMDB_MIN_INTERVAL`](#tmdb_min_interval-constant) | constant | seconds between TMDb request starts across the machine: eidr-dq's 300 ms, about two orders of magnitude under TMDb's posted limit. |
+| [`eidr_core.external.tmdb.TMDB_SCOPE`](#tmdb_scope-constant) | constant | the machine-wide `RequestPacer` scope every EIDR TMDb client shares, because TMDb counts requests per IP address. |
 | [`eidr_core.external.wikidata.alternate_titles`](#alternate_titles) | function | Aliases then labels, de-duplicated with case and punctuation folded, the primary title excluded; never P2441 (a literal translation is not a title the work is known by). |
 | [`eidr_core.external.wikidata.bmr_facts`](#bmr_facts) | function | Reads the entity into BMR fields. |
 | [`eidr_core.external.wikidata.claims`](#claims) | function | Reads a property's statements under the package's rank rule; every other reader goes through it. |
@@ -1199,6 +1214,21 @@ edition's Changes entry.
 | [`eidr_core.swap.plan_swaps`](#plan_swaps) | function | Decides each claim: KEEP for an Abstraction, an unknown type or a verified claim; SWAP with the ancestor otherwise, when there is one; HELPDESK when there is none. |
 | [`eidr_core.swap.swap_note`](#swap_note) | function | Formats `SWAP_NOTE`. |
 | [`eidr_core.swap.SWAP_NOTE`](#swap_note-constant) | constant | the fixed note form BMR-Review's "Swapped original" control parses. |
+| [`eidr_core.uri_mapping.fetch_published`](#fetch_published) | function | Fetches the published copy in one request (gzip asked for and decoded), no retries: it is a fallback, so wrap it in `call_with_failover` if you want them. |
+| [`eidr_core.uri_mapping.load`](#load) | function | eidr-imdb's stated order, "uri_mapping.json, falling back to ui.eidr.org": reads `path`; on OSError or ValueError logs a warning and calls `fetch_fallback`. |
+| [`eidr_core.uri_mapping.load_entries`](#load_entries) | function | Reads and parses a mapping file (a UTF-8 byte-order mark is tolerated). |
+| [`eidr_core.uri_mapping.Resolvability`](#resolvability-class) | class | The answer `UriMapping.resolvable` returns for one Alt ID. |
+| [`eidr_core.uri_mapping.UriMapping`](#urimapping-class) | class | Indexes the entries by Alt ID type name (named-type entries: `IMDB`, `ISAN`, `DOI` ...) and by domain (Proprietary entries), case-insensitively as eidr-wikidata does. |
+| [`eidr_core.uri_mapping.AUTHORITY_FILENAME`](#authority_filename-constant) | constant | the authority's file name (underscore), in eidr-wikidata's `data/`. |
+| [`eidr_core.uri_mapping.LANDING_PAGE`](#landing_page-constant) | constant | reason: the Kind's template has no `{0}`, so every value links to one landing page; `url` is None. |
+| [`eidr_core.uri_mapping.NO_TEMPLATE`](#no_template-constant) | constant | reason: the entry has no `uriTemplate` and is not marked `ui: false`, a shape eidr-wikidata does not approve (malformed or legacy). |
+| [`eidr_core.uri_mapping.NO_URL`](#no_url-constant) | constant | reason: an "Allow without URL" Kind (`ui: false`, no template): approved by the operator, with no public page. |
+| [`eidr_core.uri_mapping.NO_VALUE`](#no_value-constant) | constant | reason: the Kind is known but the value is empty. |
+| [`eidr_core.uri_mapping.PUBLISHED_URL`](#published_url-constant) | constant | the copy the Web UI publishes; `fetch_published` reads it. |
+| [`eidr_core.uri_mapping.REASONS`](#reasons-constant) | constant | every reason code `resolvable` can return. |
+| [`eidr_core.uri_mapping.RESOLVES`](#resolves-constant) | constant | reason: the value has its own page, and `url` is it. |
+| [`eidr_core.uri_mapping.UNKNOWN_KIND`](#unknown_kind-constant) | constant | reason: no entry for the Kind (or no type and no domain). |
+| [`eidr_core.uri_mapping.VALUE_PATTERN`](#value_pattern-constant) | constant | reason: the value fails the Kind's `valuePattern`, so it is not a valid value of that Kind (iTunes values without `id`). |
 | [`eidr_core.vendor.check`](#check) | function | Returns the drift problems between a vendored copy and its manifest; an empty list means clean. |
 | [`eidr_core.vendor.load_manifest`](#load_manifest) | function | Reads and validates a consumer's `vendor.toml` into a Manifest. |
 | [`eidr_core.vendor.sync`](#sync) | function | Replaces the consumer's target directory with the listed modules copied from the pinned commit, imports rewritten. |
@@ -3489,7 +3519,7 @@ Source `src/eidr_core/external/__init__.py`. Public names: 3 functions, 5 classe
 * You store or pass fetched facts: use the fact-dict shape `{"status": "found" | "not_found" | "error", "facts": {...}, "error": str}` so `eidr_core.verify` can read it (see `Entry`).
 
 **Do not use it when.**
-* You want a ready Wikidata, TMDb or IMDb client. Per-source clients are not here: Wikidata's home is eidr-wikidata, TMDb's is eidr-dq, IMDb's is eidr-imdb. Only the chassis is shared.
+* You want a ready per-source client. Those are submodules, not this package: `eidr_core.external.wikimedia` and `eidr_core.external.wikidata` for Wikidata, `eidr_core.external.tmdb` for TMDb. IMDb's client is eidr-imdb's.
 * Several processes or threads write one cache: `JsonFactCache` is single-writer. Implement `FactCache` over a database instead (eidr-dq's `DbFactCache` is the model).
 * Do not write your own retry/backoff loop or Retry-After parser; call `call_with_failover` (a one-element endpoint list is fine for a single host) and `retry_after_seconds`.
 * Do not invent another fact-dict shape. The cache and `eidr_core.verify` are two halves of one contract: change it here and in `verify` together, or not at all.
@@ -7843,6 +7873,386 @@ Defined in `src/eidr_core/mddf_json/__init__.py`.
 <!-- /dict -->
 
 **Does.** A `MddfJsonError` subclass, so a caller can treat it apart from other failures.
+
+## `eidr_core.external.tmdb`
+
+<!-- dict-module:eidr_core.external.tmdb -->
+Source `src/eidr_core/external/tmdb.py`. Public names: 2 functions, 3 classes, 8 constants (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** The shared TMDb v3 client (reconciliation C8, TMDb): find TMDb's ids for an IMDb id, a record's facts for `eidr_core.verify`, its complete directors and cast for matching, and its allow-listed fields keyed by Template-22 header. Extracted from eidr-dq `src/dq/external/tmdb.py` (transport, statuses, fact dicts, `/find`), with BMR-Review `verify.py` `TmdbVerifier._meta_from`'s credit reading, when eidr-imdb became the third consumer. TMDb is PERMISSION-GRANTED through membership (eidr-metadata-sources OD-59; integration complete, OD-72); the Alt ID on each record is the link back, and no other attribution is owed. Runs on `call_with_failover` and a machine-wide `RequestPacer`; stdlib only.
+
+**Use it when.**
+* You call TMDb at all: build one `TmdbClient` per program with `credentials_from_secrets(load_secrets(...))` and your own `user_agent` (build it with `external.wikimedia.user_agent(program, version, contact)`).
+* You have an IMDb id and want the TMDb movie or series id, and the Alt ID Kind it goes in: `find_imdb`.
+* You verify a record against TMDb: `facts` gives the fact dict `eidr_core.verify` reads; `credits` gives every director and actor for a matcher.
+* You fill a BMR row from TMDb: `bmr_facts`, then `bmr_rows.cap_credits` for the sheet.
+
+**Do not use it when.**
+* Never put a contact address of yours into another program's User-Agent, and never build a second pacer for TMDb: TMDb limits by IP address, so `tmdb_pacer`'s scope is shared by every EIDR program on the machine.
+* Do not read secrets files inside a client: load them once with `eidr_core.secrets_loader` and pass the mapping to `credentials_from_secrets`.
+* You want writers, producers or other crew, synopses, ratings or images: the client returns only allow-listed fields (OD-14b). Fetch anything else yourself, transiently, and never retain it.
+* You want search by title: this client resolves ids only (an id resolves or it does not, as in eidr-dq).
+
+**Used by.**
+<!-- dict-usedby:eidr_core.external.tmdb -->
+No consumer imports it directly (scan of 2026-11-24).
+<!-- /dict-usedby -->
+
+### `credentials_from_secrets`
+
+<!-- dict:eidr_core.external.tmdb.credentials_from_secrets -->
+```python
+def credentials_from_secrets(secrets: Mapping[str, Any] | None, *, environ: Mapping[str, str] | None = None) -> TmdbCredentials
+```
+
+Defined in `src/eidr_core/external/tmdb.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `secrets` | `Mapping[str, Any] \| None` | required | A loaded secrets mapping (`eidr_core.secrets_loader.load_secrets` or your wrapper); its `tmdb` section is read. None or a mapping without the section gives empty credentials. |
+| `environ` | `Mapping[str, str] \| None` | `None` (keyword-only) | The environment to read `TMDB_BEARER_TOKEN` / `TMDB_API_KEY` from; None means `os.environ`. Tests pass a dict. |
+
+**Returns** `TmdbCredentials` -- False when neither a token nor a key was found.
+<!-- /dict -->
+
+**Does.** Reads TMDb credentials in eidr-dq's order: either environment variable wins; otherwise `bearer_token` and `api_key` from the `tmdb` section (the portfolio skeleton's block, `"tmdb": {"bearer_token": "..."}`). Values are stripped; blanks count as absent. Opens no file.
+
+### `tmdb_pacer`
+
+<!-- dict:eidr_core.external.tmdb.tmdb_pacer -->
+```python
+def tmdb_pacer(min_interval: float = TMDB_MIN_INTERVAL, *, scope_dir: str | None = None) -> RequestPacer
+```
+
+Defined in `src/eidr_core/external/tmdb.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `min_interval` | `float` | `TMDB_MIN_INTERVAL` | Seconds between request starts, 0.3 by default (eidr-dq's 300 ms). |
+| `scope_dir` | `str \| None` | `None` (keyword-only) | Where the shared state lives; the system temp directory by default. |
+
+**Returns** `RequestPacer` -- a pacer on `TMDB_SCOPE`.
+<!-- /dict -->
+
+**Does.** Builds a `RequestPacer` on the machine-wide TMDb scope: one request in flight across every EIDR program, `min_interval` apart, no slow-request pause (a Wikimedia rule, not TMDb's). `TmdbClient` builds one when you pass none; building several is harmless, they share one state.
+
+### `TmdbAuthError` (class)
+
+<!-- dict:eidr_core.external.tmdb.TmdbAuthError -->
+```python
+class TmdbAuthError(RuntimeError)
+```
+
+Defined in `src/eidr_core/external/tmdb.py`.
+<!-- /dict -->
+
+**Does.** Raised by every `TmdbClient` method on HTTP 401 (credentials missing, wrong or revoked), so a caller can switch TMDb off for the run with a clear message instead of reading every id as not found. A `RuntimeError`.
+
+### `TmdbClient` (class)
+
+<!-- dict:eidr_core.external.tmdb.TmdbClient -->
+```python
+class TmdbClient
+```
+
+Defined in `src/eidr_core/external/tmdb.py`.
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `__init__` | `def __init__(credentials: TmdbCredentials, *, user_agent: str, pacer: RequestPacer \| None = None, base_url: str = TMDB_API, timeout: float = 20.0, attempts: int = 2, backoff: float = 1.0, opener: Callable[..., Any] \| None = None) -> None` | `credentials` from `credentials_from_secrets` (ValueError when empty); `user_agent` required, the CALLING program and its contact (ValueError when blank); `pacer` defaults to `tmdb_pacer()`; `timeout` per request; `attempts` (2) and `backoff` (1.0) are eidr-dq's budget, two tries about 2 s apart; `opener` defaults to `urllib.request.urlopen` looked up at call time. |
+| `find_imdb` | `def find_imdb(imdb_id: str) -> dict` | `/find/{tt}?external_source=imdb_id`: `{"status", "resolved": [(kind, id)], "alt_ids": [(domain, value)]}` (+ `"error"`). `resolved` is eidr-dq's shape (`tmdb_movie`, `tmdb_tv`, `tmdb_episode` with id `"show:season:episode"`); `alt_ids` puts a movie or series id in its registry Kind (`ALT_ID_DOMAINS`). A malformed tt id is an error with no request. |
+| `facts` | `def facts(kind: str, tmdb_id: str) -> dict` | The fact dict (`{"status", "facts"}`) `eidr_core.verify` reads: `label`, `runtime_minutes` (movie, episode) or `episode_runtime_minutes` (series), `release_date` at day precision, a series' `last_air_date`, `external_ids` (`imdb`, `wikidata`). eidr-dq `fetch_one`. |
+| `credits` | `def credits(kind: str, tmdb_id: str) -> dict` | `{"status", "directors", "actors"}`, complete, billing order, repeats dropped. A series reads `aggregate_credits` (every season; directors by episodes directed, most first); an episode adds its guest stars after its cast. No other crew. |
+| `bmr_facts` | `def bmr_facts(kind: str, tmdb_id: str) -> dict` | `{"status", "facts"}`, the facts keyed by Template-22 header with `external.wikidata.bmr_facts`'s keys and shapes plus `End Date`; one request (credits appended, `language=en-US`). See Does. |
+<!-- /dict -->
+
+**Does.** A read-only TMDb client; `kind` is one of `KINDS`. Every method returns a status envelope (`found`, `not_found` on 404 or no result, `error` with `"error"`), never raises for one bad id, and raises `TmdbAuthError` on 401. 429 and 5xx, and transport failures, are retried through `call_with_failover`; a 429's Retry-After also makes the next request wait (`pacer.back_off`); a transient status that outlasts the retries is the answer (`error`, `HTTP 429`). The api key, when no bearer token is set, is added to the URL inside each attempt so it never reaches the chassis' log lines; a bearer token goes in the Authorization header. `bmr_facts`: Title is the original-language title with `original_language` (TMDb's `xx` becomes `zxx`), the English title an Alternate Title when it differs; an episode's name is its Title with no language. Release Date from `release_date` / `first_air_date` / `air_date`; End Date only for a series TMDb marks Ended or Canceled; Approx Length a movie's or episode's runtime, none for a series; Country of Origin `origin_country`, else the production countries, through `normalize_country_code` (SU becomes SUHH); Associated Org the production companies.
+
+**Notes.** The lists are complete for matching and voting (OD-62); cut them with `bmr_rows.cap_credits` before writing a sheet. A request cap per run stays the caller's (eidr-dq keeps `max_requests_per_run`).
+
+### `TmdbCredentials` (class)
+
+<!-- dict:eidr_core.external.tmdb.TmdbCredentials -->
+```python
+@dataclass(frozen=True, repr=False)
+class TmdbCredentials
+```
+
+Defined in `src/eidr_core/external/tmdb.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `bearer_token` | `str \| None` | `None` | A v4 read-access token, sent as `Authorization: Bearer`. Preferred when both are set. |
+| `api_key` | `str \| None` | `None` | A v3 API key, sent as the `api_key` query parameter when there is no token. |
+<!-- /dict -->
+
+**Does.** Holds TMDb credentials. Falsy when both are empty. Its repr names which values are present and never shows them, so it is safe in a log line or a traceback. Frozen.
+
+### `ALT_ID_DOMAINS` (constant)
+
+<!-- dict:eidr_core.external.tmdb.ALT_ID_DOMAINS -->
+Defined in `src/eidr_core/external/tmdb.py`.
+
+**Value** `ALT_ID_DOMAINS = {"movie": "themoviedb.org/movie", "tv": "themoviedb.org/tv"}` -- the registry Alt ID Kind (Proprietary domain) for a TMDb movie or series id; `find_imdb` uses it. No episode entry: the composite episode id is not what the `themoviedb.org/tv/episode` template takes.
+<!-- /dict -->
+
+### `ENV_API_KEY` (constant)
+
+<!-- dict:eidr_core.external.tmdb.ENV_API_KEY -->
+Defined in `src/eidr_core/external/tmdb.py`.
+
+**Value** `ENV_API_KEY = "TMDB_API_KEY"` -- the environment variable that overrides the secrets for a v3 key (eidr-dq's name).
+<!-- /dict -->
+
+### `ENV_BEARER_TOKEN` (constant)
+
+<!-- dict:eidr_core.external.tmdb.ENV_BEARER_TOKEN -->
+Defined in `src/eidr_core/external/tmdb.py`.
+
+**Value** `ENV_BEARER_TOKEN = "TMDB_BEARER_TOKEN"` -- the environment variable that overrides the secrets for a v4 token (eidr-dq's name).
+<!-- /dict -->
+
+### `KINDS` (constant)
+
+<!-- dict:eidr_core.external.tmdb.KINDS -->
+Defined in `src/eidr_core/external/tmdb.py`.
+
+**Value** `KINDS = ("movie", "tv", "episode")` -- the `kind` values the client takes. A movie or series id is numeric text; an episode id is `"show:season:episode"`, as `find_imdb` returns it.
+<!-- /dict -->
+
+### `SECRETS_SECTION` (constant)
+
+<!-- dict:eidr_core.external.tmdb.SECRETS_SECTION -->
+Defined in `src/eidr_core/external/tmdb.py`.
+
+**Value** `SECRETS_SECTION = "tmdb"` -- the secrets section `credentials_from_secrets` reads, with keys `bearer_token` and `api_key`.
+<!-- /dict -->
+
+### `TMDB_API` (constant)
+
+<!-- dict:eidr_core.external.tmdb.TMDB_API -->
+Defined in `src/eidr_core/external/tmdb.py`.
+
+**Value** `TMDB_API = "https://api.themoviedb.org/3"` -- the v3 API base; `TmdbClient(base_url=)` overrides it.
+<!-- /dict -->
+
+### `TMDB_MIN_INTERVAL` (constant)
+
+<!-- dict:eidr_core.external.tmdb.TMDB_MIN_INTERVAL -->
+Defined in `src/eidr_core/external/tmdb.py`.
+
+**Value** `TMDB_MIN_INTERVAL = 0.3` -- seconds between TMDb request starts across the machine: eidr-dq's 300 ms, about two orders of magnitude under TMDb's posted limit.
+<!-- /dict -->
+
+### `TMDB_SCOPE` (constant)
+
+<!-- dict:eidr_core.external.tmdb.TMDB_SCOPE -->
+Defined in `src/eidr_core/external/tmdb.py`.
+
+**Value** `TMDB_SCOPE = "tmdb-api"` -- the machine-wide `RequestPacer` scope every EIDR TMDb client shares, because TMDb counts requests per IP address.
+<!-- /dict -->
+
+## `eidr_core.uri_mapping`
+
+<!-- dict-module:eidr_core.uri_mapping -->
+Source `src/eidr_core/uri_mapping/__init__.py`. Public names: 3 functions, 2 classes, 10 constants (declared by `__all__`).
+<!-- /dict-module -->
+
+**Purpose.** Whether an Alt ID has a page of its own, and its URL, read from `uri_mapping.json`: `UriMapping.resolvable(alt_type, domain, value) -> Resolvability(url, reason, kind, detail)`. For a person, such as a help-desk ticket listing a record's other Alt IDs (eidr-imdb's companion sweep). Extracted from eidr-wikidata `bmr/altid_types.py` (`AltIDTypeResolver._load_uri_mapping`, `resolution_url`, `value_strip_prefix`, `value_pattern`) and its emit order in `bmr/altidtool.py`. eidr-core carries NO copy of the data (register R8: one maintainer, eidr-wikidata's `data/uri_mapping.json`); the caller passes the file, or fetches the copy the Web UI publishes at `https://ui.eidr.org/assets/uri-mapping.json`, explicitly. Stdlib only.
+
+**Use it when.**
+* You want a clickable link for an Alt ID, or to say why there is none: `load(path_to_uri_mapping_json)` once, then `resolvable` per Alt ID.
+* The authority file may be missing on the machine: `load(path, fetch_fallback=fetch_published)` (or a `functools.partial` of it with your User-Agent) reads the file and fetches the published copy only when the file cannot be read.
+
+**Do not use it when.**
+* Never compare resolution URLs to decide whether two Alt IDs are duplicates (R8, operator 2026-08-10): identity is Kind `(Type, Domain)` + value. Two Kinds may deliberately resolve to one page (the `IMDB` type and the `imdb.com` domain).
+* Do not keep your own copy of `uri_mapping.json` or a domain-to-type table (R8). Read the authority, or the published copy.
+* You need eidr-wikidata's emit decisions (which Kind a Wikidata property becomes, rule 5 approval for emission): those stay in eidr-wikidata's `AltIDTypeResolver`.
+
+**Used by.**
+<!-- dict-usedby:eidr_core.uri_mapping -->
+No consumer imports it directly (scan of 2026-11-24).
+<!-- /dict-usedby -->
+
+### `fetch_published`
+
+<!-- dict:eidr_core.uri_mapping.fetch_published -->
+```python
+def fetch_published(*, url: str = PUBLISHED_URL, user_agent: str | None = None, timeout: float = 30.0, opener: Callable[..., Any] | None = None) -> UriMapping
+```
+
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `url` | `str` | `PUBLISHED_URL` (keyword-only) | Where the published copy is served. |
+| `user_agent` | `str \| None` | `None` (keyword-only) | Your program's User-Agent; None sends urllib's default. |
+| `timeout` | `float` | `30.0` (keyword-only) | Seconds for the one request. |
+| `opener` | `Callable[..., Any] \| None` | `None` (keyword-only) | Injectable for tests; None means `urllib.request.urlopen`, looked up at call time. |
+
+**Returns** `UriMapping` -- built with `complete=False`.
+<!-- /dict -->
+
+**Does.** Fetches the published copy in one request (gzip asked for and decoded), no retries: it is a fallback, so wrap it in `call_with_failover` if you want them. Raises what the transport raises, or ValueError when the body is not a JSON list or object.
+
+**Notes.** The published copy leaves out every entry with no `uriTemplate` (eidr-wikidata, 2026-11-25: the registry's LinkedAlternateID view crashed on them), so it cannot tell an Allow-without-URL Kind from an unknown one; `resolvable` says so in `detail`. The URL has been unreadable from some machines (R8, 2026-08-27).
+
+### `load`
+
+<!-- dict:eidr_core.uri_mapping.load -->
+```python
+def load(path: str | os.PathLike[str] | None, *, fetch_fallback: Callable[[], UriMapping] | None = None) -> UriMapping
+```
+
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `path` | `str \| os.PathLike[str] \| None` | required | The authority file (eidr-wikidata's `data/uri_mapping.json`) or a copy of it; None when you have none. |
+| `fetch_fallback` | `Callable[[], UriMapping] \| None` | `None` (keyword-only) | Called with no arguments when `path` is None, missing or unreadable; pass `fetch_published` or a `functools.partial` of it. None: nothing is fetched. |
+
+**Returns** `UriMapping` -- from the file (`complete=True`), else whatever `fetch_fallback` returned.
+<!-- /dict -->
+
+**Does.** eidr-imdb's stated order, "uri_mapping.json, falling back to ui.eidr.org": reads `path`; on OSError or ValueError logs a warning and calls `fetch_fallback`. Without a fallback the file's error is raised, or FileNotFoundError when `path` is None, so nothing is fetched behind the caller's back.
+
+### `load_entries`
+
+<!-- dict:eidr_core.uri_mapping.load_entries -->
+```python
+def load_entries(path: str | os.PathLike[str]) -> list[dict] | dict
+```
+
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `path` | `str \| os.PathLike[str]` | required | A mapping file. |
+
+**Returns** `list[dict] | dict` -- the parsed JSON: the entry list, or the older `{domain: entry}` object form.
+<!-- /dict -->
+
+**Does.** Reads and parses a mapping file (a UTF-8 byte-order mark is tolerated). Raises OSError on an unreadable file and ValueError on bad JSON or a body that is neither a list nor an object.
+
+### `Resolvability` (class)
+
+<!-- dict:eidr_core.uri_mapping.Resolvability -->
+```python
+class Resolvability(NamedTuple)
+```
+
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `url` | `str \| None` | required | The value's own page; set only when `reason` is `RESOLVES`. |
+| `reason` | `str` | required | One of `REASONS`: the decision to branch on. |
+| `kind` | `str` | required | The mapping key that answered, as the entry spells it (`IMDB`, `themoviedb.org/movie`); `""` when no entry did. |
+| `detail` | `str` | required | A sentence for a person or a help-desk ticket; it names no local path. |
+<!-- /dict -->
+
+**Does.** The answer `UriMapping.resolvable` returns for one Alt ID. A NamedTuple, so it unpacks as `url, reason, kind, detail`.
+
+### `UriMapping` (class)
+
+<!-- dict:eidr_core.uri_mapping.UriMapping -->
+```python
+class UriMapping
+```
+
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+| Method | Signature | Purpose |
+|---|---|---|
+| `__init__` | `def __init__(entries: Iterable[Mapping[str, Any]] \| Mapping[str, Any], *, complete: bool = True, source: str = "") -> None` | `entries`: the parsed file, a list of entries or the `{domain: entry}` object form; `complete`: False for the published copy; `source`: where the entries came from, for logs. |
+| `from_file` | `def from_file(path: str \| os.PathLike[str]) -> UriMapping` | Classmethod: `load_entries(path)` indexed, `complete=True`. |
+| `resolvable` | `def resolvable(alt_type: str \| None, domain: str \| None, value: str \| None) -> Resolvability` | Whether this Alt ID has a page, and its URL. `alt_type` is the registry's type (`IMDB`, `Proprietary`); `domain` is read for a Proprietary one or when `alt_type` is empty. Never raises. See Does. |
+<!-- /dict -->
+
+**Does.** Indexes the entries by Alt ID type name (named-type entries: `IMDB`, `ISAN`, `DOI` ...) and by domain (Proprietary entries), case-insensitively as eidr-wikidata does. `resolvable` answers, in order: no type and no domain, or no entry, `UNKNOWN_KIND` (for an incomplete mapping, `detail` says the Kind may be Allow-without-URL); no value, `NO_VALUE`; no template and `ui: false` (the 38 Allow-without-URL entries on 2026-11-26), `NO_URL`; no template otherwise, `NO_TEMPLATE`; the entry's `valueStripPrefix` is removed, then a value failing its `valuePattern` is `VALUE_PATTERN`; a template with no `{0}` (Luminate, kukla.tv) is `LANDING_PAGE` with the page in `detail`; otherwise `RESOLVES` with `{0}` replaced by the value (only spaces, controls and non-ASCII are percent-encoded; slashes stay). Of several entries for one key (alternate formats of one Kind), the `ui: true` `text/html` one answers. An invalid `valuePattern` is logged and ignored.
+
+**Notes.** Two differences from eidr-wikidata's `resolution_url`, both fixes: it found no template for a named type (`IMDB` entries carry no `altIdDomain`), and of several entries it took the first (for `dfi.dk/movie`, a JSON API).
+
+### `AUTHORITY_FILENAME` (constant)
+
+<!-- dict:eidr_core.uri_mapping.AUTHORITY_FILENAME -->
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+**Value** `AUTHORITY_FILENAME = "uri_mapping.json"` -- the authority's file name (underscore), in eidr-wikidata's `data/`. The published asset is spelled with a hyphen.
+<!-- /dict -->
+
+### `LANDING_PAGE` (constant)
+
+<!-- dict:eidr_core.uri_mapping.LANDING_PAGE -->
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+**Value** `LANDING_PAGE = "landing-page-only"` -- reason: the Kind's template has no `{0}`, so every value links to one landing page; `url` is None.
+<!-- /dict -->
+
+### `NO_TEMPLATE` (constant)
+
+<!-- dict:eidr_core.uri_mapping.NO_TEMPLATE -->
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+**Value** `NO_TEMPLATE = "no-template"` -- reason: the entry has no `uriTemplate` and is not marked `ui: false`, a shape eidr-wikidata does not approve (malformed or legacy).
+<!-- /dict -->
+
+### `NO_URL` (constant)
+
+<!-- dict:eidr_core.uri_mapping.NO_URL -->
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+**Value** `NO_URL = "allowed-without-url"` -- reason: an "Allow without URL" Kind (`ui: false`, no template): approved by the operator, with no public page.
+<!-- /dict -->
+
+### `NO_VALUE` (constant)
+
+<!-- dict:eidr_core.uri_mapping.NO_VALUE -->
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+**Value** `NO_VALUE = "no-value"` -- reason: the Kind is known but the value is empty.
+<!-- /dict -->
+
+### `PUBLISHED_URL` (constant)
+
+<!-- dict:eidr_core.uri_mapping.PUBLISHED_URL -->
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+**Value** `PUBLISHED_URL = "https://ui.eidr.org/assets/uri-mapping.json"` -- the copy the Web UI publishes; `fetch_published` reads it. It omits the Allow-without-URL entries.
+<!-- /dict -->
+
+### `REASONS` (constant)
+
+<!-- dict:eidr_core.uri_mapping.REASONS -->
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+**Value** `REASONS = frozenset({RESOLVES, NO_URL, LANDING_PAGE, VALUE_PATTERN, NO_TEMPLATE, UNKNOWN_KIND, NO...` -- every reason code `resolvable` can return.
+<!-- /dict -->
+
+### `RESOLVES` (constant)
+
+<!-- dict:eidr_core.uri_mapping.RESOLVES -->
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+**Value** `RESOLVES = "resolves"` -- reason: the value has its own page, and `url` is it.
+<!-- /dict -->
+
+### `UNKNOWN_KIND` (constant)
+
+<!-- dict:eidr_core.uri_mapping.UNKNOWN_KIND -->
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+**Value** `UNKNOWN_KIND = "unknown-kind"` -- reason: no entry for the Kind (or no type and no domain).
+<!-- /dict -->
+
+### `VALUE_PATTERN` (constant)
+
+<!-- dict:eidr_core.uri_mapping.VALUE_PATTERN -->
+Defined in `src/eidr_core/uri_mapping/__init__.py`.
+
+**Value** `VALUE_PATTERN = "value-pattern-mismatch"` -- reason: the value fails the Kind's `valuePattern`, so it is not a valid value of that Kind (iTunes values without `id`).
+<!-- /dict -->
 
 ## Specs and data files
 

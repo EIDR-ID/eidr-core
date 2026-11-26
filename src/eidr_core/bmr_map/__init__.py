@@ -35,9 +35,16 @@ one consumer):
 * ``DisplayName``: a display convention of the caller's output format, not a
   registry field; ``record_from_row`` leaves it out.
 
-Stdlib only, plus ``bmr_io`` (for ``family_layout``) and ``inheritance``
-(for ``is_absent``), so a vendoring consumer lists
-``["bmr_map", "bmr_io", "inheritance"]``, which is closed under imports.
+It also writes a standard record back to registry XML (``record_to_xml``,
+the inverse of ``record_from_xml``), extracted from XML_to_JSON's
+``standard_render`` for python-tools' ``-bmrin`` (2026-11-26).
+
+Stdlib only, plus ``bmr_io`` (for ``family_layout``), ``inheritance`` (for
+``is_absent``), ``ordering`` (for ``is_shortdoi``) and ``mddf_json`` (the
+schema-ordered XML writer ``record_to_xml`` builds on). bmr_io imports
+``ids``, so a vendoring consumer lists
+``["bmr_map", "bmr_io", "inheritance", "ids", "ordering", "mddf_json"]``,
+which is closed under imports (tests/test_vendor.py syncs exactly that).
 """
 from __future__ import annotations
 
@@ -45,16 +52,19 @@ import re
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable, Mapping
 from datetime import datetime, time
-from typing import Any
+from functools import lru_cache
+from typing import Any, cast
 
 from eidr_core.bmr_io import family_layout
 from eidr_core.inheritance import is_absent
+from eidr_core.mddf_json import eidr_schema, json_to_xml, xml_to_json
 from eidr_core.ordering import is_shortdoi
 
 __all__ = ["SUPPORTED_TEMPLATES", "PRODUCED_BASES", "NEVER_PRODUCED", "header_base",
            "select_blocks", "administrators_of",
            "row_from_blocks", "row_from_record",
-           "creation_type_from_row", "record_from_row", "record_from_xml"]
+           "creation_type_from_row", "record_from_row", "record_from_xml",
+           "record_to_xml", "RecordXmlError"]
 
 # Template keys are bmr_io.TEMPLATES keys. Compilation has a Template-22
 # sheet, but this mapper cannot populate its Header/Entry structure, so it is
@@ -207,7 +217,7 @@ def _bool_text(v: Any) -> str | None:
     return str(v)
 
 
-def _as_list(v: Any, scalar: tuple[type, ...]) -> list:
+def _as_list(v: Any, scalar: tuple[type, ...]) -> list[Any]:
     """The reference's tolerance: a scalar (of the given types) is one entry."""
     if not v:
         return []
@@ -236,7 +246,7 @@ def _names_a_parent(md: Any) -> bool:
 
 
 def select_blocks(record: Mapping[str, Any], source: str = "self",
-                  ) -> tuple[dict, dict]:
+                  ) -> tuple[dict[str, Any], dict[str, Any]]:
     """The ``(BaseObjectData, ExtraObjectMetadata)`` pair a sheet is built from.
 
     ``SelfDefinedMetadata`` only, so a value the record does not define itself
@@ -278,7 +288,7 @@ def select_blocks(record: Mapping[str, Any], source: str = "self",
     return base, extra
 
 
-def administrators_of(record: Mapping[str, Any], base: Mapping[str, Any]) -> dict:
+def administrators_of(record: Mapping[str, Any], base: Mapping[str, Any]) -> dict[str, Any]:
     """Registrant and Metadata Authority, from where this record carries them.
 
     A mirror-exported record has ``ProvenanceMetadata.Administrators`` (the
@@ -551,7 +561,7 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
     return row
 
 
-def _episodic_tail(row: dict, extra: Mapping[str, Any]) -> None:
+def _episodic_tail(row: dict[str, str | None], extra: Mapping[str, Any]) -> None:
     parent = None
     for key in ("SeriesInfo", "SeasonInfo", "EpisodeInfo"):  # last non-empty wins
         info = extra.get(key)
@@ -585,7 +595,7 @@ def _episodic_tail(row: dict, extra: Mapping[str, Any]) -> None:
             row[f"Alt. No. Domain {i}"] = _text(a.get("Domain"))
 
 
-def _details(row: dict, info: Mapping[str, Any], family: str) -> None:
+def _details(row: dict[str, str | None], info: Mapping[str, Any], family: str) -> None:
     details = info.get("Details") or []
     if isinstance(details, dict):
         details = [details]
@@ -595,12 +605,12 @@ def _details(row: dict, info: Mapping[str, Any], family: str) -> None:
             row[f"{family} Domain {i}"] = _text(d.get("Domain")) or _text(d.get("_domain"))
 
 
-def _numbered(row: dict, family: str, values: Any) -> None:
+def _numbered(row: dict[str, str | None], family: str, values: Any) -> None:
     for i, v in enumerate(_as_list(values, (str, int, float)), start=1):
         row[f"{family} {i}"] = _text(v)
 
 
-def _edit_tail(row: dict, ei: Any) -> None:
+def _edit_tail(row: dict[str, str | None], ei: Any) -> None:
     if not isinstance(ei, dict):
         return
     row["Parent EIDR/Row ID"] = _text(ei.get("Parent"))
@@ -614,7 +624,7 @@ def _edit_tail(row: dict, ei: Any) -> None:
     _details(row, ei, "Edit Details")
 
 
-def _manifestation_tail(row: dict, mi: Any) -> None:
+def _manifestation_tail(row: dict[str, str | None], mi: Any) -> None:
     if not isinstance(mi, dict):
         return
     row["Parent EIDR/Row ID"] = _text(mi.get("Parent"))
@@ -718,7 +728,7 @@ def creation_type_from_row(template: str, row: Mapping[str, Any]) -> str:
     raise ValueError(f"unknown Template-22 key {template!r}")
 
 
-def _sequence_info(row: Mapping[str, Any]) -> dict | None:
+def _sequence_info(row: Mapping[str, Any]) -> dict[str, Any] | None:
     dist_no, dist_dom = _text(row.get("Distribution No.")), _text(row.get("Dist. No. Domain"))
     house_no, house_dom = _text(row.get("House No.")), _text(row.get("House No. Domain"))
     alt = [{"Number": g.get("Alternate No."), "Domain": g.get("Alt. No. Domain")}
@@ -733,7 +743,7 @@ def _sequence_info(row: Mapping[str, Any]) -> dict | None:
     return obj or None
 
 
-def _details_from_row(row: Mapping[str, Any], family: str) -> list[dict] | None:
+def _details_from_row(row: Mapping[str, Any], family: str) -> list[dict[str, Any]] | None:
     # A domain without details text would be an empty element, which EIDR
     # does not allow (operator, 2026-11-15), so such a group is not read.
     out = [{"Details": g.get(family), "_domain": g.get(f"{family} Domain")}
@@ -742,7 +752,8 @@ def _details_from_row(row: Mapping[str, Any], family: str) -> list[dict] | None:
     return out or None
 
 
-def _extra_from_row(row: Mapping[str, Any], template: str, creation_type: str) -> dict | None:
+def _extra_from_row(row: Mapping[str, Any], template: str,
+                    creation_type: str) -> dict[str, Any] | None:
     parent = _text(row.get("Parent EIDR/Row ID"))
     if template == "episodic":
         flags = {
@@ -815,7 +826,7 @@ def _languages(row: Mapping[str, Any], family: str, template: str) -> list[Any]:
             for lang, mode in sorted(pairs, key=lambda p: (p[0].casefold(), p[1] or ""))]
 
 
-def record_from_row(row: Mapping[str, Any], template: str) -> dict:
+def record_from_row(row: Mapping[str, Any], template: str) -> dict[str, Any]:
     """The SELF-defined standard record one Template-22 row describes.
 
     Returns ``{"CreationType": ..., "SelfDefinedMetadata": {...}}`` with
@@ -898,7 +909,9 @@ def record_from_row(row: Mapping[str, Any], template: str) -> dict:
         "Description": ({"Description": description, "_lang": description_lang}
                         if description else None),
     })
-    return _prune({
+    # _prune is typed Any (it recurses over any JSON value); a dict in is a
+    # dict out, which the cast states for the checker without a runtime test.
+    return cast(dict[str, Any], _prune({
         "CreationType": creation_type,
         "SelfDefinedMetadata": {
             "_xmlns": "http://www.eidr.org/schema",
@@ -907,7 +920,7 @@ def record_from_row(row: Mapping[str, Any], template: str) -> dict:
             "BaseObjectData": base,
             "ExtraObjectMetadata": _extra_from_row(row, template, creation_type),
         },
-    })
+    }))
 
 
 # --------------------------------------------------------------------------
@@ -977,7 +990,7 @@ _LIGHTWEIGHT = {"AlternateContentInfo", "PackagingInfo", "PromotionInfo",
                 "SupplementalContentInfo"}
 
 
-def _number(el: ET.Element) -> dict:
+def _number(el: ET.Element) -> dict[str, Any]:
     return {"Number": el.text, "Domain": _attr(el, "domain")}
 
 
@@ -1004,7 +1017,7 @@ def _generic(el: ET.Element) -> Any:
     return out
 
 
-def _info(el: ET.Element) -> dict:
+def _info(el: ET.Element) -> dict[str, Any]:
     """One ExtraObjectMetadata *Info block in the standard shape."""
     out: dict[str, Any] = {}
     for c in el:
@@ -1048,9 +1061,9 @@ def _info(el: ET.Element) -> dict:
     return out
 
 
-def _base_from_xml(bod: ET.Element) -> dict:
-    titles: list[dict] = []
-    alternates: list[dict] = []
+def _base_from_xml(bod: ET.Element) -> dict[str, Any]:
+    titles: list[dict[str, Any]] = []
+    alternates: list[dict[str, Any]] = []
     for t in _kids(bod, "ResourceName"):
         if not (t.text or "").strip():
             continue     # an empty element is no title (operator, 2026-11-15)
@@ -1088,7 +1101,7 @@ def _base_from_xml(bod: ET.Element) -> dict:
     for a_el in _kids(bod, "Administrators")[:1]:
         admins = {"Registrant": _kid_text(a_el, "Registrant"),
                   "MetadataAuthority": [m.text for m in _kids(a_el, "MetadataAuthority")]}
-    credits: dict[str, list] = {}
+    credits: dict[str, list[dict[str, Any]]] = {}
     for c_el in _kids(bod, "Credits"):
         for role in ("Director", "Actor"):
             for person in _kids(c_el, role):
@@ -1128,7 +1141,7 @@ _XMLNS = {"_xmlns": "http://www.eidr.org/schema",
           "_xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"}
 
 
-def record_from_xml(xml: str | bytes | ET.Element) -> dict:
+def record_from_xml(xml: str | bytes | ET.Element) -> dict[str, Any]:
     """The standard record a piece of registry XML describes.
 
     ``xml`` is a ``SelfDefinedMetadata`` or ``FullMetadata`` element (a
@@ -1168,4 +1181,627 @@ def record_from_xml(xml: str | bytes | ET.Element) -> dict:
                     extra[key] = _info(info)
         out[name] = {**_XMLNS, "BaseObjectData": _base_from_xml(bod[0]) if bod else None,
                      "ExtraObjectMetadata": extra or None}
-    return _prune(out)
+    return cast(dict[str, Any], _prune(out))  # a dict in is a dict out (see record_from_row)
+
+
+# --------------------------------------------------------------------------
+# Standard record -> registry XML (python-tools' -bmrin, handoff 2026-11-25)
+# --------------------------------------------------------------------------
+#
+# EXTRACTED from XML_to_JSON ``standard_render.py`` (render_view_xml and the
+# _base/_extra/_metadata/_provenance/_alias builders under it, read
+# 2026-11-26 at XML_to_JSON a5b0949). eidr-core's 2026-11-13 plan kept that
+# writer in XML_to_JSON until a second consumer needed it; python-tools'
+# ``-bmrin`` (sheet row -> record_from_row -> registry submission) is that
+# consumer. The extraction keeps the original's mapping and output, with the
+# differences listed in record_to_xml's docstring, so XML_to_JSON can
+# delegate to it.
+#
+# How: each view is first built as a practice-shaped dict (the names only:
+# which record key is which element or attribute), then written by
+# mddf_json.json_to_xml, which places every child in the EIDR 2.7.0 schema's
+# content-model order. Element order is therefore the schema's by
+# construction, never a list transcribed here.
+
+class RecordXmlError(ValueError):
+    """The record holds something ``record_to_xml`` has no element for.
+
+    Raised rather than dropped: a key the mapping does not know would vanish
+    from the XML without a trace, and a registration built from that XML
+    would silently lose the value (python-tools' acceptance item 4, the same
+    obligation ``WriteReport.dropped`` meets on the way out to a sheet). The
+    message names the key and where it was found.
+    """
+
+
+# The concrete xsi:types of eidr:alternateIDType are the alternateIDTypeType
+# enumeration of the bundled schema, less Proprietary (the only one that
+# takes a domain). Read from the schema, never typed here: XML_to_JSON's
+# hand-typed list once left out Ad-ID (review, 2026-11-13). Read lazily, so
+# importing bmr_map does not parse an XSD.
+@lru_cache(maxsize=1)
+def _alt_id_types() -> frozenset[str]:
+    hit = eidr_schema().types.get(f"{{{_XMLNS['_xmlns']}}}alternateIDTypeType")
+    if hit is None:
+        raise RuntimeError("alternateIDTypeType is not in the bundled EIDR schema")
+    xs = "{http://www.w3.org/2001/XMLSchema}"
+    names = {e.get("value") for e in hit[0].iter(f"{xs}enumeration")}
+    return frozenset(n for n in names if n and n != "Proprietary")
+
+
+# The four lightweight relationships: one element per relationship, its class
+# element named after the info element.
+_LIGHTWEIGHT_CLASS = {
+    "AlternateContentInfo": "AlternateContentClass",
+    "PackagingInfo": "PackagingClass",
+    "PromotionInfo": "PromotionClass",
+    "SupplementalContentInfo": "SupplementalContentClass",
+}
+
+
+def _xml_text(v: Any) -> str | None:
+    """A value as XML text, or None when the record does not provide one.
+
+    Absent is ``inheritance.is_absent`` (None, blank, empty containers), the
+    rule record_from_row and record_from_xml prune with. Typed values (an
+    int SequenceNumber from the mirror) are ``str``-ed; booleans are the
+    schema's ``true``/``false``. Not stripped: the value is written as the
+    record holds it, as in the original.
+    """
+    if is_absent(v):
+        return None
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    return str(v)
+
+
+def _xml_list(v: Any) -> list[Any]:
+    if v is None:
+        return []
+    return v if isinstance(v, list) else [v]
+
+
+def _check_keys(where: str, obj: Mapping[str, Any], known: set[str] | frozenset[str]) -> None:
+    extra = [k for k in obj if k not in known and not str(k).startswith("_xmlns")]
+    if extra:
+        raise RecordXmlError(f"{where}: no element for record key(s) {sorted(extra)}")
+
+
+def _one_of(where: str, entry: Mapping[str, Any], *keys: str) -> Any:
+    """The value under whichever spelling ``entry`` uses for one field.
+
+    The record shapes spell some fields two ways (``Title`` or ``value``;
+    ``_domain`` from record_from_row, ``Domain`` from record_from_xml). The
+    original took the first and ignored the second; two spellings with
+    DIFFERENT values would lose one silently, so that raises.
+    """
+    present = [k for k in keys if k in entry and not is_absent(entry[k])]
+    values = {_xml_text(entry[k]) for k in present}
+    if len(values) > 1:
+        raise RecordXmlError(f"{where}: {present} disagree ({sorted(map(str, values))})")
+    return entry[present[0]] if present else None
+
+
+def _put(out: dict[str, Any], key: str, value: Any) -> None:
+    # Absent values are not written (operator, 2026-11-13).
+    if value is None or value == [] or value == {}:
+        return
+    out[key] = value
+
+
+def _xml_texts(v: Any) -> list[str]:
+    return [t for t in (_xml_text(x) for x in _xml_list(v)) if t is not None]
+
+
+def _with_attrs(value: str | None, attrs: Mapping[str, str | None]) -> Any:
+    """An element with text and attributes, attributes in the registry's order.
+
+    The registry writes attributes alphabetically (``lang``,
+    ``systemGenerated``, ``titleClass``), measured by XML_to_JSON on its
+    2026-11-13 resolve corpus; the callers pass them in that order.
+
+    An element with no text is not written, whatever its attributes: EIDR
+    does not allow empty elements (operator, 2026-11-15), and both readers
+    (record_from_row, record_from_xml) already treat ``<Description
+    lang="en"/>`` or a domain without details as no value, so this is the
+    shared policy, not a loss.
+    """
+    if value is None:
+        return None
+    present = {f"_{k}": a for k, a in attrs.items() if a is not None}
+    return {"value": value, **present} if present else value
+
+
+_TITLE_KEYS = frozenset({"Title", "value", "TitleClass", "_titleClass", "_lang",
+                         "SystemGenerated", "_systemGenerated"})
+
+
+def _xml_title(entry: Any, main: bool) -> Any:
+    if not isinstance(entry, Mapping):
+        return _xml_text(entry)
+    where = "ResourceName entry" if main else "AlternateResourceName entry"
+    _check_keys(where, entry, _TITLE_KEYS)
+    flag = (_xml_text(_one_of(where, entry, "SystemGenerated", "_systemGenerated")) or "")
+    flag = flag.strip().lower()
+    if flag not in ("", "true", "1", "false", "0"):
+        raise RecordXmlError(f"{where}: SystemGenerated {flag!r} is not a boolean")
+    generated = flag in ("true", "1")
+    if generated and not main:
+        # The registry marks only the main title (the mirror holds 0 of
+        # 1,402,189 alternates so marked); the original dropped the flag
+        # here, which is a silent loss of a stated value.
+        raise RecordXmlError(f"{where}: SystemGenerated true on an alternate title has no "
+                             "place in EIDR XML")
+    # Only "true" is a statement (operator, 2026-11-13: no "false"
+    # placeholders).
+    return _with_attrs(_xml_text(_one_of(where, entry, "Title", "value")), {
+        "lang": _xml_text(entry.get("_lang")),
+        "systemGenerated": "true" if generated else None,
+        "titleClass": _xml_text(_one_of(where, entry, "TitleClass", "_titleClass")),
+    })
+
+
+def _xml_language(entry: Any) -> Any:
+    if not isinstance(entry, Mapping):
+        return _xml_text(entry)
+    _check_keys("language entry", entry, {"value", "_mode", "_type"})
+    return _with_attrs(_xml_text(entry.get("value")),
+                       {"mode": _xml_text(entry.get("_mode")),
+                        "type": _xml_text(entry.get("_type"))})
+
+
+def _xml_org(entry: Any) -> dict[str, Any] | None:
+    if not isinstance(entry, Mapping):
+        raise RecordXmlError(f"AssociatedOrg entry is not an object: {entry!r}")
+    _check_keys("AssociatedOrg entry", entry,
+                {"_idType", "_organizationID", "_role", "DisplayName", "SortName",
+                 "AlternateName"})
+    out: dict[str, Any] = {}
+    for a in ("_idType", "_organizationID", "_role"):
+        _put(out, a, _xml_text(entry.get(a)))
+    _put(out, "DisplayName", _xml_text(entry.get("DisplayName")))
+    _put(out, "SortName", _xml_text(entry.get("SortName")))
+    _put(out, "AlternateName", _xml_texts(entry.get("AlternateName")))
+    return out or None
+
+
+def _xml_alt_id(entry: Any) -> Any:
+    if not isinstance(entry, Mapping):
+        raise RecordXmlError(f"AlternateID entry is not an object: {entry!r}")
+    _check_keys("AlternateID entry", entry, {"AltID", "Type", "Domain", "Relation"})
+    value = _xml_text(entry.get("AltID"))
+    typ, domain = _xml_text(entry.get("Type")), _xml_text(entry.get("Domain"))
+    if typ is None:
+        # The sheet shape (record_from_row) has no Type: row_from_blocks
+        # writes `dom if dom else typ`, so a Domain naming one of the schema's
+        # types IS the type, and any other Domain is a Proprietary domain.
+        if domain in _alt_id_types():
+            typ, domain = domain, None
+        else:
+            typ = "Proprietary"
+    if typ != "Proprietary" and domain is not None:
+        # Only Proprietary has a domain attribute in the schema. The original
+        # dropped it here without a word.
+        raise RecordXmlError(f"AlternateID {value!r}: Domain {domain!r} has no place on a "
+                             f"{typ} ID (only Proprietary takes a domain)")
+    return _with_attrs(value, {"domain": domain, "relation": _xml_text(entry.get("Relation")),
+                               "xsi:type": typ})
+
+
+def _xml_person(entry: Any) -> dict[str, Any] | None:
+    if not isinstance(entry, Mapping):
+        raise RecordXmlError(f"credit entry is not an object: {entry!r}")
+    _check_keys("credit entry", entry, {"DisplayName", "SortName"})
+    out: dict[str, Any] = {}
+    _put(out, "DisplayName", _xml_text(entry.get("DisplayName")))
+    _put(out, "SortName", _xml_text(entry.get("SortName")))
+    if out and "DisplayName" not in out:
+        # A credit without md:DisplayName is not a valid element, and the
+        # original dropped its SortName silently.
+        raise RecordXmlError(f"credit entry has a SortName but no DisplayName: {dict(entry)!r}")
+    return out or None
+
+
+_BASE_KEYS = frozenset({
+    "ID", "StructuralType", "Mode", "ReferentType", "ResourceName", "AlternateResourceName",
+    "OriginalLanguage", "VersionLanguage", "AssociatedOrg", "ReleaseDate", "CountryOfOrigin",
+    "Status", "ApproximateLength", "AlternateID", "Administrators", "Credits",
+    "RegistrantExtra", "Description"})
+
+
+def _xml_administrators(adm: Mapping[str, Any]) -> dict[str, Any]:
+    _check_keys("Administrators", adm, {"Registrant", "MetadataAuthority"})
+    a: dict[str, Any] = {}
+    _put(a, "Registrant", _xml_text(adm.get("Registrant")))
+    _put(a, "MetadataAuthority", _xml_texts(adm.get("MetadataAuthority")))
+    return a
+
+
+def _xml_base(b: Mapping[str, Any]) -> dict[str, Any]:
+    _check_keys("BaseObjectData", b, _BASE_KEYS)
+    out: dict[str, Any] = {}
+    for k in ("ID", "StructuralType", "Mode", "ReferentType"):
+        _put(out, k, _xml_text(b.get(k)))
+    # ResourceName is the main title, AlternateResourceName the alternates
+    # (0.75.0); the older one-list shape (alternates as ResourceName entries
+    # 1..n) is still read. Entry 0 is taken BEFORE any filtering, so an
+    # alternate is never promoted (operator, 2026-11-15).
+    titles = _xml_list(b.get("ResourceName"))
+    alts = [_xml_title(t, main=False) for t in titles[1:] if t is not None] + [
+        _xml_title(t, main=False) for t in _xml_list(b.get("AlternateResourceName"))]
+    if titles and titles[0] is not None:
+        _put(out, "ResourceName", _xml_title(titles[0], main=True))
+    _put(out, "AlternateResourceName", [a for a in alts if a is not None])
+    for k in ("OriginalLanguage", "VersionLanguage"):
+        _put(out, k, [x for x in (_xml_language(e) for e in _xml_list(b.get(k)))
+                      if x is not None])
+    _put(out, "AssociatedOrg", [x for x in (_xml_org(e) for e in _xml_list(b.get("AssociatedOrg")))
+                                if x is not None])
+    _put(out, "ReleaseDate", _xml_text(b.get("ReleaseDate")))
+    _put(out, "CountryOfOrigin", _xml_texts(b.get("CountryOfOrigin")))
+    _put(out, "Status", _xml_text(b.get("Status")))
+    _put(out, "ApproximateLength", _xml_text(b.get("ApproximateLength")))
+    _put(out, "AlternateID", [x for x in (_xml_alt_id(e) for e in _xml_list(b.get("AlternateID")))
+                              if x is not None])
+    adm = b.get("Administrators")
+    if isinstance(adm, Mapping):
+        _put(out, "Administrators", _xml_administrators(adm))
+    elif not is_absent(adm):
+        raise RecordXmlError(f"Administrators is not an object: {adm!r}")
+    cr = b.get("Credits")
+    if isinstance(cr, Mapping):
+        _check_keys("Credits", cr, {"Director", "Actor"})
+        c: dict[str, Any] = {}
+        for role in ("Director", "Actor"):
+            _put(c, role, [x for x in (_xml_person(e) for e in _xml_list(cr.get(role)))
+                           if x is not None])
+        _put(out, "Credits", c)
+    elif not is_absent(cr):
+        raise RecordXmlError(f"Credits is not an object: {cr!r}")
+    _put(out, "RegistrantExtra", _xml_text(b.get("RegistrantExtra")))
+    d = b.get("Description")
+    if isinstance(d, Mapping):
+        _check_keys("Description", d, {"Description", "_lang", "value"})
+        _put(out, "Description", _with_attrs(
+            _xml_text(_one_of("Description", d, "Description", "value")),
+            {"lang": _xml_text(d.get("_lang"))}))
+    elif not is_absent(d):
+        # Both record builders give {Description, _lang}; a bare string has
+        # no lang, which the schema requires.
+        raise RecordXmlError(f"Description is not an object: {d!r}")
+    return out
+
+
+def _xml_scalars(where: str, src: Mapping[str, Any], names: tuple[str, ...],
+                 lists: tuple[str, ...] = ()) -> dict[str, Any]:
+    _check_keys(where, src, set(names) | set(lists))
+    out: dict[str, Any] = {}
+    for k in names:
+        _put(out, k, _xml_text(src.get(k)))
+    for k in lists:
+        _put(out, k, _xml_texts(src.get(k)))
+    return out
+
+
+def _xml_numbered(entry: Any) -> Any:
+    if not isinstance(entry, Mapping):
+        return _xml_text(entry)
+    _check_keys("sequence number", entry, {"Number", "Domain"})
+    return _with_attrs(_xml_text(entry.get("Number")), {"domain": _xml_text(entry.get("Domain"))})
+
+
+def _xml_details(v: Any) -> list[Any]:
+    out = []
+    for e in _xml_list(v):
+        if isinstance(e, Mapping):
+            # record_from_row spells the domain "_domain", record_from_xml
+            # "Domain"; both are read (the original knew only "_domain").
+            _check_keys("Details entry", e, {"Details", "_domain", "Domain"})
+            x = _with_attrs(_xml_text(e.get("Details")),
+                            {"domain": _xml_text(_one_of("Details entry", e, "_domain", "Domain"))})
+        else:
+            x = _xml_text(e)
+        if x is not None:
+            out.append(x)
+    return out
+
+
+def _xml_digital(xml_block: Any) -> Any:
+    """The stored Digital block (XML text) as practice JSON for json_to_xml.
+
+    Parsed inside a FullMetadata wrapper so the schema knows every element
+    (Digital is not a global element), with the block's own namespace
+    declarations dropped: the view's root declares them, as the registry's
+    document does.
+    """
+    text = _xml_text(xml_block)
+    if text is None:
+        return None
+    body = text.strip()
+    if body.startswith("<?xml"):
+        body = body.split("?>", 1)[1]
+    wrapped = (f'<FullMetadata xmlns="{_XMLNS["_xmlns"]}" xmlns:md="{_XMLNS["_xmlns:md"]}" '
+               f'xmlns:xsi="{_XMLNS["_xmlns:xsi"]}"><ExtraObjectMetadata><ManifestationInfo>'
+               f"{body}</ManifestationInfo></ExtraObjectMetadata></FullMetadata>")
+    tree = xml_to_json(wrapped, strict=True)
+    dig = tree["FullMetadata"]["ExtraObjectMetadata"]["ManifestationInfo"]["Digital"]
+    if isinstance(dig, dict):
+        dig = {k: v for k, v in dig.items() if not k.startswith("_xmlns")}
+    return dig
+
+
+_EXTRA_KEYS = frozenset({"SeriesInfo", "SeasonInfo", "EpisodeInfo", "EditInfo", "ClipInfo",
+                         "ManifestationInfo", "CompilationInfo", "CompositeInfo",
+                         *_LIGHTWEIGHT_CLASS})
+
+
+def _xml_info(e: Mapping[str, Any], key: str) -> Mapping[str, Any] | None:
+    v = e.get(key)
+    if isinstance(v, Mapping):
+        return v
+    if not is_absent(v):
+        raise RecordXmlError(f"{key} is not an object: {v!r}")
+    return None
+
+
+def _xml_extra(e: Mapping[str, Any]) -> dict[str, Any]:
+    _check_keys("ExtraObjectMetadata", e, _EXTRA_KEYS)
+    out: dict[str, Any] = {}
+    if (se := _xml_info(e, "SeriesInfo")) is not None:
+        _put(out, "SeriesInfo", _xml_scalars(
+            "SeriesInfo", se,
+            ("EndDate", "SeriesClass", "NumberRequired", "DateRequired",
+             "OriginalTitleRequired")))
+    if (sa := _xml_info(e, "SeasonInfo")) is not None:
+        _put(out, "SeasonInfo", _xml_scalars(
+            "SeasonInfo", sa,
+            ("Parent", "EndDate", "NumberRequired", "DateRequired", "OriginalTitleRequired",
+             "SequenceNumber"), ("SeasonClass",)))
+    if (ep := _xml_info(e, "EpisodeInfo")) is not None:
+        _check_keys("EpisodeInfo", ep, {"Parent", "SequenceInfo", "EpisodeClass", "TimeSlot"})
+        o: dict[str, Any] = {}
+        _put(o, "Parent", _xml_text(ep.get("Parent")))
+        seq = ep.get("SequenceInfo")
+        if isinstance(seq, Mapping):
+            _check_keys("SequenceInfo", seq,
+                        {"DistributionNumber", "HouseSequence", "AlternateNumber"})
+            s: dict[str, Any] = {}
+            _put(s, "DistributionNumber", _xml_numbered(seq.get("DistributionNumber")))
+            _put(s, "HouseSequence", _xml_numbered(seq.get("HouseSequence")))
+            _put(s, "AlternateNumber",
+                 [x for x in (_xml_numbered(n) for n in _xml_list(seq.get("AlternateNumber")))
+                  if x is not None])
+            _put(o, "SequenceInfo", s)
+        elif not is_absent(seq):
+            raise RecordXmlError(f"SequenceInfo is not an object: {seq!r}")
+        _put(o, "EpisodeClass", _xml_texts(ep.get("EpisodeClass")))
+        _put(o, "TimeSlot", _xml_text(ep.get("TimeSlot")))
+        _put(out, "EpisodeInfo", o)
+    if (ed := _xml_info(e, "EditInfo")) is not None:
+        _check_keys("EditInfo", ed, {"Parent", "EditUse", "EditClass", "MadeForRegion",
+                                     "Details", "ColorType", "ThreeD"})
+        o = {}
+        _put(o, "Parent", _xml_text(ed.get("Parent")))
+        _put(o, "EditUse", _xml_text(ed.get("EditUse")))
+        _put(o, "EditClass", _xml_texts(ed.get("EditClass")))
+        _put(o, "MadeForRegion", _xml_texts(ed.get("MadeForRegion")))
+        # The record's "Details" is EditDetails in the schema (and
+        # ManifestationDetails below); the record name is shared with star.
+        _put(o, "EditDetails", _xml_details(ed.get("Details")))
+        _put(o, "ColorType", _xml_text(ed.get("ColorType")))
+        _put(o, "ThreeD", _xml_text(ed.get("ThreeD")))
+        _put(out, "EditInfo", o)
+    if (cl := _xml_info(e, "ClipInfo")) is not None:
+        _check_keys("ClipInfo", cl, {"Parent", "ComponentsMode", "Start", "Duration"})
+        o = {}
+        for k in ("Parent", "ComponentsMode", "Start"):
+            _put(o, k, _xml_text(cl.get(k)))
+        _put(o, "Duration", _xml_texts(cl.get("Duration")))
+        _put(out, "ClipInfo", o)
+    if (mf := _xml_info(e, "ManifestationInfo")) is not None:
+        _check_keys("ManifestationInfo", mf,
+                    {"Parent", "ManifestationClass", "MadeForRegion", "Details", "Digital"})
+        o = {}
+        _put(o, "Parent", _xml_text(mf.get("Parent")))
+        _put(o, "ManifestationClass", _xml_texts(mf.get("ManifestationClass")))
+        _put(o, "MadeForRegion", _xml_texts(mf.get("MadeForRegion")))
+        _put(o, "ManifestationDetails", _xml_details(mf.get("Details")))
+        _put(o, "Digital", _xml_digital(mf.get("Digital")))
+        _put(out, "ManifestationInfo", o)
+    if (co := _xml_info(e, "CompilationInfo")) is not None:
+        # XML_to_JSON's mirror shape. A Template-22 Compilation row cannot be
+        # built (SUPPORTED_TEMPLATES), and record_from_xml reads this block
+        # generically, so such a record raises on its keys rather than
+        # writing a partial Compilation.
+        _check_keys("CompilationInfo", co, {"Entry", "CompilationClass"})
+        o = {}
+        entries = []
+        for en in _xml_list(co.get("Entry")):
+            if not isinstance(en, Mapping):
+                raise RecordXmlError(f"CompilationInfo Entry is not an object: {en!r}")
+            _check_keys("CompilationInfo Entry", en, {"Name", "Number", "Class", "ID"})
+            x: dict[str, Any] = {}
+            _put(x, "DisplayName", _xml_text(en.get("Name")))
+            _put(x, "EntryNumber", _xml_text(en.get("Number")))
+            _put(x, "EntryClass", _xml_text(en.get("Class")))
+            _put(x, "ContentID", _xml_text(en.get("ID")))
+            if x:
+                entries.append(x)
+        _put(o, "Entry", entries)
+        cc = co.get("CompilationClass")
+        if isinstance(cc, Mapping):
+            _check_keys("CompilationClass", cc, {"value", "_hasOtherInclusions"})
+            _put(o, "CompilationClass", _with_attrs(
+                _xml_text(cc.get("value")),
+                {"hasOtherInclusions": _xml_text(cc.get("_hasOtherInclusions"))}))
+        else:
+            _put(o, "CompilationClass", _xml_text(cc))
+        _put(out, "CompilationInfo", o)
+    comps = []
+    for cp in _xml_list(e.get("CompositeInfo")):
+        if not isinstance(cp, Mapping):
+            raise RecordXmlError(f"CompositeInfo is not an object: {cp!r}")
+        _check_keys("CompositeInfo", cp, {"CompositeClass", "Element"})
+        o = {}
+        _put(o, "CompositeClass", _xml_text(cp.get("CompositeClass")))
+        elems = []
+        for el in _xml_list(cp.get("Element")):
+            if not isinstance(el, Mapping):
+                raise RecordXmlError(f"CompositeInfo Element is not an object: {el!r}")
+            # DestinationStart / DestinationDuration are XML_to_JSON's mirror
+            # names (q_composite_info); the schema's are DestStart / DestDuration.
+            _check_keys("CompositeInfo Element", el,
+                        {"ID", "ComponentsMode", "SourceStart", "SourceDuration",
+                         "DestinationStart", "DestinationDuration"})
+            x = {}
+            for src, dst in (("ID", "ID"), ("SourceStart", "SourceStart"),
+                             ("SourceDuration", "SourceDuration"),
+                             ("ComponentsMode", "ComponentsMode"),
+                             ("DestinationStart", "DestStart"),
+                             ("DestinationDuration", "DestDuration")):
+                _put(x, dst, _xml_text(el.get(src)))
+            if x:
+                elems.append(x)
+        _put(o, "Element", elems)
+        if o:
+            comps.append(o)
+    _put(out, "CompositeInfo", comps)
+    for info, cls in _LIGHTWEIGHT_CLASS.items():
+        rels = []
+        for r in _xml_list(e.get(info)):
+            if not isinstance(r, Mapping):
+                raise RecordXmlError(f"{info} entry is not an object: {r!r}")
+            # "Class" is XML_to_JSON's mirror name; record_from_xml keys the
+            # class by its element name. Both are read.
+            _check_keys(f"{info} entry", r, {"ID", "Class", cls})
+            x = {}
+            _put(x, "ID", _xml_text(r.get("ID")))
+            _put(x, cls, _xml_text(_one_of(f"{info} entry", r, "Class", cls)))
+            if x:
+                rels.append(x)
+        _put(out, info, rels)
+    return out
+
+
+def _xml_metadata(block: Mapping[str, Any]) -> dict[str, Any]:
+    _check_keys("metadata block", block, {"BaseObjectData", "ExtraObjectMetadata"})
+    out: dict[str, Any] = {}
+    for key, build in (("BaseObjectData", _xml_base), ("ExtraObjectMetadata", _xml_extra)):
+        v = block.get(key)
+        if isinstance(v, Mapping):
+            _put(out, key, build(v))
+        elif not is_absent(v):
+            raise RecordXmlError(f"{key} is not an object: {v!r}")
+    return out
+
+
+def _xml_provenance(block: Mapping[str, Any]) -> dict[str, Any]:
+    # CreatedBy / LastModifiedBy are not carried (XML_to_JSON never reads
+    # them from the mirror, for privacy), so a record holding them raises.
+    _check_keys("ProvenanceMetadata", block,
+                {"ID", "IssueNumber", "Status", "Administrators", "CreationDate",
+                 "LastModificationDate", "PublicationDate"})
+    out: dict[str, Any] = {}
+    for k in ("ID", "IssueNumber", "Status"):
+        _put(out, k, _xml_text(block.get(k)))
+    adm = block.get("Administrators")
+    if isinstance(adm, Mapping):
+        _put(out, "Administrators", _xml_administrators(adm))
+    elif not is_absent(adm):
+        raise RecordXmlError(f"Administrators is not an object: {adm!r}")
+    for k in ("CreationDate", "LastModificationDate", "PublicationDate"):
+        _put(out, k, _xml_text(block.get(k)))
+    return out
+
+
+def _xml_alias(block: Mapping[str, Any]) -> dict[str, Any]:
+    return _xml_scalars("AliasContinuation", block, ("LastAliased", "TargetOfLastAliased"))
+
+
+_VIEW_BUILDERS = {
+    "SelfDefinedMetadata": _xml_metadata,
+    "FullMetadata": _xml_metadata,
+    "ProvenanceMetadata": _xml_provenance,
+    "AliasContinuation": _xml_alias,
+}
+
+
+def record_to_xml(record: Mapping[str, Any], *, view: str = "SelfDefinedMetadata") -> str:
+    """One view of a standard record as EIDR 2.7.0 XML text: the inverse of
+    ``record_from_xml``.
+
+    ``record`` is a standard record (``record_from_row``, ``record_from_xml``
+    or XML_to_JSON's export); ``record[view]`` is written, other keys
+    (``CreationType``, ``DisplayName``, other views) are ignored. ``view`` is
+    ``"SelfDefinedMetadata"`` (the default), ``"FullMetadata"``,
+    ``"ProvenanceMetadata"`` or ``"AliasContinuation"``. Returns the view
+    element as a document (with an XML declaration). Children are in the
+    EIDR 2.7.0 schema's content-model order (``mddf_json.json_to_xml``), the
+    root declares the EIDR default namespace plus ``md`` and ``xsi`` only
+    when used, and attributes are in the registry's (alphabetical) order.
+
+    Round trip: ``record_from_xml(record_to_xml(r)) == r`` for a record
+    ``record_from_xml`` built, for every creation type a Template-22 sheet
+    produces. A ``record_from_row`` record is not in that normal form (its
+    Alt IDs carry the sheet's Domain and no Type, its Details domain is
+    ``_domain``), so it round-trips at the row level:
+    ``row_from_record(record_from_xml(record_to_xml(r)), t)`` equals
+    ``row_from_record(r, t)``.
+
+    **For a registration** (python-tools' ``-bmrin``): the creation element
+    has the same children as this view's (the schema's
+    ``creationSelfDefinedInfo`` / ``creationFullInfo`` share the order of
+    ``selfDefinedFieldsGroup``), so the caller renames the root to the
+    creation type (``Episode``, ``Basic``...). A creation carries no ``ID``:
+    a ``record_from_row`` record has none; drop it from a
+    ``record_from_xml`` one. Nothing is filtered: a ShortDOI Alt ID, which
+    the registry issues, is written if the record holds one.
+
+    Absent values (``inheritance.is_absent``) are not written, so no empty
+    element; an element with attributes but no text (``<Description
+    lang="en"/>``) is not written either, as both readers already treat it
+    as no value (operator, 2026-11-15).
+
+    Raises ``RecordXmlError`` (a ``ValueError``) naming the key when the
+    record holds a field this writer cannot place: an unknown key, a
+    non-object where an object belongs, a Domain on a non-Proprietary Alt
+    ID, ``SystemGenerated`` true on an alternate title, a credit with a
+    SortName and no DisplayName, two spellings of one field that disagree,
+    or a ``ManifestationInfo`` ``Film``/``Tape`` block. Also raises when
+    ``record`` has no ``view`` block or the block writes nothing. Never
+    drops a value silently.
+
+    Extracted from XML_to_JSON ``standard_render.render_view_xml`` (a5b0949).
+    Differences from it: takes the whole record (it took the block), returns
+    ``str`` and raises for an empty view (it returned ``None``); the error is
+    ``RecordXmlError`` (its ``RenderError``); Details accept ``Domain`` as
+    well as ``_domain`` and the lightweight relationships their element-named
+    class key as well as ``Class`` (record_from_xml's spellings); the five
+    silent drops listed above raise instead; the Alt ID type list is read lazily from
+    ``mddf_json.eidr_schema()`` instead of re-parsing ``common.xsd`` at import.
+    """
+    build = _VIEW_BUILDERS.get(view)
+    if build is None:
+        raise ValueError(f"view must be one of {sorted(_VIEW_BUILDERS)}, not {view!r}")
+    block = record.get(view)
+    if not isinstance(block, Mapping):
+        raise RecordXmlError(f"the record has no {view} block")
+    practice = build(block)
+    if not practice:
+        raise RecordXmlError(f"the record's {view} block holds nothing to write")
+    root: dict[str, Any] = dict(_XMLNS)
+    root.update(practice)
+    xml = json_to_xml({view: root})
+    used = {""}
+    for el in ET.fromstring(xml).iter():
+        for q in (el.tag, *el.attrib):
+            if q.startswith("{"):
+                used.add(q[1:].split("}", 1)[0])
+    for key in ("_xmlns:md", "_xmlns:xsi"):
+        uri = _XMLNS[key]
+        if uri not in used:
+            # json_to_xml writes the root's declarations exactly so, once, in
+            # its start tag; the first occurrence is that one. A resolve
+            # document declares md/xsi only when it uses them.
+            xml = xml.replace(f' xmlns:{key[7:]}="{uri}"', "", 1)
+    return xml

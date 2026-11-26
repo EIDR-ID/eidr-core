@@ -336,7 +336,9 @@ def test_real_altidtool_io_vendors_and_works_without_eidr_core(tmp_path, source)
 # python-tools adopts bmr_map by vendoring (its blocker B3: the tools run with
 # only the SDK installed). bmr_map imports bmr_io (family_layout) and
 # inheritance (is_absent), and bmr_io imports ids relatively, so the closure is
-# four modules. Until 2026-10-13 bmr_io and inheritance named their own
+# four modules; ordering joined it at 0.58.0 (is_shortdoi) and mddf_json with
+# record_to_xml (its schema-ordered writer, and the bundled XSDs it reads as
+# package data). Until 2026-10-13 bmr_io and inheritance named their own
 # package in comments, which sync refuses; this test runs the REAL closure
 # through sync and uses the copy with eidr_core blocked, so such text returning
 # fails HERE rather than when python-tools next moves its pin.
@@ -347,17 +349,19 @@ _SRC = Path(__file__).resolve().parent.parent / "src" / "eidr_core"
 def test_real_bmr_map_closure_vendors_and_works_without_eidr_core(tmp_path, source):
     import shutil
     pkg = source / "src" / "eidr_core"
-    for mod in ("bmr_map", "bmr_io", "inheritance", "ordering"):
+    for mod in ("bmr_map", "bmr_io", "inheritance", "ordering", "mddf_json"):
         shutil.copytree(_SRC / mod, pkg / mod, ignore=shutil.ignore_patterns("__pycache__"))
     _git("-c", "user.email=t@t", "-c", "user.name=t", "add", "-A", cwd=source)
     _git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "bmr_map", cwd=source)
-    m = _manifest(tmp_path, source, ["bmr_map", "bmr_io", "inheritance", "ids", "ordering"])
+    m = _manifest(tmp_path, source,
+                  ["bmr_map", "bmr_io", "inheritance", "ids", "ordering", "mddf_json"])
     sync(m, source_path=source)
     code = (
         "import sys\n"
         "sys.modules['eidr_core'] = None\n"
         f"sys.path.insert(0, {str(tmp_path / 'consumer' / 'src')!r})\n"
         "from eidr._core.bmr_map import row_from_blocks, record_from_row, record_from_xml\n"
+        "from eidr._core.bmr_map import record_to_xml\n"
         "xml = '<FullMetadata xmlns=\"http://www.eidr.org/schema\"><BaseObjectData>'\n"
         "xml += '<ID>x</ID></BaseObjectData></FullMetadata>'\n"
         "assert record_from_xml(xml)['FullMetadata']['BaseObjectData'] == {'ID': 'x'}\n"
@@ -369,6 +373,11 @@ def test_real_bmr_map_closure_vendors_and_works_without_eidr_core(tmp_path, sour
         "rec = record_from_row(cells, 'non_episodic')\n"
         "assert rec['SelfDefinedMetadata']['BaseObjectData']['AlternateID'] == "
         "[{'AltID': 'x', 'Domain': 'example.org'}]\n"
+        # record_to_xml reads the copy's bundled XSDs (Alt ID types, order).
+        "out = record_to_xml(rec)\n"
+        "assert 'xsi:type=\"Proprietary\"' in out, out\n"
+        "assert record_from_xml(out)['SelfDefinedMetadata']['BaseObjectData']['AlternateID'] "
+        "== [{'AltID': 'x', 'Type': 'Proprietary', 'Domain': 'example.org'}]\n"
         "print('ok')\n")
     r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr

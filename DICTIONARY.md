@@ -950,9 +950,11 @@ edition's Changes entry.
 | [`eidr_core.bmr_map.header_base`](#header_base) | function | Strips the group number from a family column header, so template columns compare with `PRODUCED_BASES`. |
 | [`eidr_core.bmr_map.record_from_row`](#record_from_row) | function | Builds the self-defined record a row describes. |
 | [`eidr_core.bmr_map.record_from_xml`](#record_from_xml) | function | Builds the standard record (the shape XML_to_JSON builds from the mirror, which `row_from_record` takes) from registry XML, on the standard library's ElementTree, so `bmr_map` stays vendorable. |
+| [`eidr_core.bmr_map.record_to_xml`](#record_to_xml) | function | Writes a standard record back to registry XML, through `mddf_json.json_to_xml`, so element order is the schema's by construction. |
 | [`eidr_core.bmr_map.row_from_blocks`](#row_from_blocks) | function | Maps one record's blocks to one row under the documented defaults: the sheet Domain is an Alt ID's Domain, else its Type; `IMDB` to `IMDb`, `ISAN` to `ISAN` (to `V-ISAN` on Clip), the rest to `Alt ID N` uncapped; `ResourceName` entry 0 is the main title and an alternate is never promoted into `Title` (0.75.0; alternates from `AlternateResourceName`, or ResourceName entries 1..n in the older one-list shape); Metadata Authority to the Party ID column only; credits from DisplayName, then Name, then value; episodic parent from EpisodeInfo over SeasonInfo over SeriesInfo; Manifestation `Digital` XML to `Operator's Notes` as one line; `Language Mode N` only from the template's own language family (Original Language on Abstraction templates, Version Language on Edit and Manifestation, none on Clip; 0.51.0). |
 | [`eidr_core.bmr_map.row_from_record`](#row_from_record) | function | Maps a whole record with the documented defaults: exactly what XML_to_JSON's `--sheet-out` did per record, minus the `Unique Row ID` column and the echo of an unconvertible row, which stay with the caller. |
 | [`eidr_core.bmr_map.select_blocks`](#select_blocks) | function | Picks the blocks a sheet is built from: `SelfDefinedMetadata`, so values the record does not define itself stay empty on the sheet. |
+| [`eidr_core.bmr_map.RecordXmlError`](#recordxmlerror-class) | class | The error `record_to_xml` raises when the record holds a field it has no element for, or no block to write. |
 | [`eidr_core.bmr_map.NEVER_PRODUCED`](#never_produced-constant) | constant | the template columns this module never writes, each for a stated reason: `Unique Row ID` (the caller's), `Assigned EIDR ID` and `Registration Errors & Notes` (the registry's and the reviewer's), `Metadata Authority` (the display name; only the Party ID column is written), `Operator's Notes` (written on Manifestation only). |
 | [`eidr_core.bmr_map.PRODUCED_BASES`](#produced_bases-constant) | constant | per supported template, every header base the mapper can write (derived from a record that takes every branch and pinned by a test, together with the rule that every stock template column is here or in `NEVER_PRODUCED`). |
 | [`eidr_core.bmr_map.SUPPORTED_TEMPLATES`](#supported_templates-constant) | constant | the template keys `row_from_blocks` writes; Compilation has a sheet but is refused. |
@@ -1539,14 +1541,14 @@ Defined in `src/eidr_core/bmr_io/__init__.py`.
 
 <!-- dict:eidr_core.bmr_io.expand_family -->
 ```python
-def expand_family(ws, primary: str, anchor_members: list[str], insert_members: list[str], want: int, headers: dict[int, str], *, header_row: int = HEADER_ROW) -> None
+def expand_family(ws: Any, primary: str, anchor_members: list[str], insert_members: list[str], want: int, headers: dict[int, str], *, header_row: int = HEADER_ROW) -> None
 ```
 
 Defined in `src/eidr_core/bmr_io/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `ws` | - | required | Open openpyxl worksheet (not read-only); modified in place. |
+| `ws` | `Any` | required | Open openpyxl worksheet (not read-only); modified in place. |
 | `primary` | `str` | required | Family primary column; `count_family` on it gives the current group count. |
 | `anchor_members` | `list[str]` | required | Every column group 1 carries, without numbers. New groups go after the rightmost column matching any of them. |
 | `insert_members` | `list[str]` | required | Columns each new group adds, in order; each is written as `"{member} {n}"`. |
@@ -1647,14 +1649,14 @@ Defined in `src/eidr_core/bmr_io/__init__.py`.
 
 <!-- dict:eidr_core.bmr_io.header_map -->
 ```python
-def header_map(values: Iterable) -> dict[int, str]
+def header_map(values: Iterable[Any]) -> dict[int, str]
 ```
 
 Defined in `src/eidr_core/bmr_io/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `values` | `Iterable` | required | The cell values of one row, left to right, e.g. a tuple from `iter_rows(values_only=True)`. Non-string values are converted with `str()`. |
+| `values` | `Iterable[Any]` | required | The cell values of one row, left to right, e.g. a tuple from `iter_rows(values_only=True)`. Non-string values are converted with `str()`. |
 
 **Returns** `dict[int, str]` -- `{1-based integer column: trimmed header text}`; `None`, empty and whitespace-only cells are left out.
 <!-- /dict -->
@@ -1733,19 +1735,19 @@ Defined in `src/eidr_core/bmr_io/__init__.py`.
 
 <!-- dict:eidr_core.bmr_io.pad_groups -->
 ```python
-def pad_groups(items: Sequence, count: int, width: int, fill: str = "") -> list
+def pad_groups(items: Sequence[Any], count: int, width: int, fill: str = "") -> list[Any]
 ```
 
 Defined in `src/eidr_core/bmr_io/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `items` | `Sequence` | required | One record's groups for one family: each a tuple or list of `width` cells, or a single value when `width` is 1. |
+| `items` | `Sequence[Any]` | required | One record's groups for one family: each a tuple or list of `width` cells, or a single value when `width` is 1. |
 | `count` | `int` | required | Number of groups to emit, usually `RepeatPlan.get(family)`. |
 | `width` | `int` | required | Cells per group. |
 | `fill` | `str` | `""` | Value put in every cell of a missing group. |
 
-**Returns** `list` -- a flat list of exactly `count * width` cells.
+**Returns** `list[Any]` -- a flat list of exactly `count * width` cells.
 <!-- /dict -->
 
 **Does.** Flattens one family's values to exactly `count` groups of `width` cells, padding missing groups with `fill`. Raises `ValueError` when a tuple or list item has the wrong number of cells, or when a single value is given with `width` other than 1. Items beyond `count` are dropped without warning, so size `count` with `RepeatPlan` over the same records first.
@@ -1779,14 +1781,14 @@ Defined in `src/eidr_core/bmr_io/__init__.py`.
 
 <!-- dict:eidr_core.bmr_io.read_headers -->
 ```python
-def read_headers(ws, header_row: int = HEADER_ROW) -> dict[int, str]
+def read_headers(ws: Any, header_row: int = HEADER_ROW) -> dict[int, str]
 ```
 
 Defined in `src/eidr_core/bmr_io/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `ws` | - | required | Open openpyxl worksheet, normal or read-only. A read-only one believes the sheet's declared `<dimension>`: call `ws.reset_dimensions()` first to read past a stale one. |
+| `ws` | `Any` | required | Open openpyxl worksheet, normal or read-only. A read-only one believes the sheet's declared `<dimension>`: call `ws.reset_dimensions()` first to read past a stale one. |
 | `header_row` | `int` | `HEADER_ROW` | 1-based row holding the headers; pass the discovered row for a round-tripped sheet. |
 
 **Returns** `dict[int, str]` -- `{1-based integer column: trimmed header}`, blank cells skipped (the `header_map` policy).
@@ -4205,20 +4207,20 @@ Scan of 2026-11-24; regenerated at each release from the consumer trees.
 
 <!-- dict:eidr_core.inheritance.build_full_base -->
 ```python
-def build_full_base(self_base: dict, parent_base: dict | None, creation_type: str, extra: dict | None = None, *, series_title: str | None = None) -> tuple[dict, dict[str, str]]
+def build_full_base(self_base: dict[str, Any], parent_base: dict[str, Any] | None, creation_type: str, extra: dict[str, Any] | None = None, *, series_title: str | None = None) -> tuple[dict[str, Any], dict[str, str]]
 ```
 
 Defined in `src/eidr_core/inheritance/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `self_base` | `dict` | required | The child's SELF-defined `BaseObjectData` (registry JSON, canonical field names as keys). Deep-copied, never modified. `None` is treated as `{}`. |
-| `parent_base` | `dict \| None` | required | The parent's FULL `BaseObjectData`, not its self-defined one. `None` or `{}` means no parent, and Self is returned as Full. |
+| `self_base` | `dict[str, Any]` | required | The child's SELF-defined `BaseObjectData` (registry JSON, canonical field names as keys). Deep-copied, never modified. `None` is treated as `{}`. |
+| `parent_base` | `dict[str, Any] \| None` | required | The parent's FULL `BaseObjectData`, not its self-defined one. `None` or `{}` means no parent, and Self is returned as Full. |
 | `creation_type` | `str` | required | The child's creation type, exact spelling (`'Season'`, `'Episode'`, ...). A type outside `CHILD_TYPES` returns Self as Full and ignores the parent. |
-| `extra` | `dict \| None` | `None` | Title inputs only: `SequenceNumber` (Season), `DistributionNumber` (Episode), `ReleaseDate` (fallback for both; when non-empty it outranks the child's own `ReleaseDate`), `TimeSlot` (Episode, dated form; 0.74.0), `EndDate` (the Season's `SeasonInfo/EndDate`, dated form; 0.76.0). The numbers are read ONLY from here, never from `self_base`, so a missing `SequenceNumber` or `DistributionNumber` means the numbered pattern cannot fire. A missing or empty `ReleaseDate` falls back to the child's own `self_base["ReleaseDate"]`. |
+| `extra` | `dict[str, Any] \| None` | `None` | Title inputs only: `SequenceNumber` (Season), `DistributionNumber` (Episode), `ReleaseDate` (fallback for both; when non-empty it outranks the child's own `ReleaseDate`), `TimeSlot` (Episode, dated form; 0.74.0), `EndDate` (the Season's `SeasonInfo/EndDate`, dated form; 0.76.0). The numbers are read ONLY from here, never from `self_base`, so a missing `SequenceNumber` or `DistributionNumber` means the numbered pattern cannot fire. A missing or empty `ReleaseDate` falls back to the child's own `self_base["ReleaseDate"]`. |
 | `series_title` | `str \| None` | `None` (keyword-only) | The Series' main title, when the parent is a Season (0.78.0). Used only when that Season's main title is user-supplied: the Episode is then `<Series>: <Season>: Episode <N>` or `<Series> [<date>]`, as the registry titles it. Pass it whenever the parent is a Season; without it such an Episode gets the pre-0.78.0 `<Season>: Episode <N>`, which does not match the registry. |
 
-**Returns** `tuple[dict, dict[str, str]]` -- `(full_base, provenance)`: a new dict, and a map from each field populated in the result to `'self'`, `'inherited'` or `'system'`. A system-generated ResourceName that was carried over rather than built here has no entry.
+**Returns** `tuple[dict[str, Any], dict[str, str]]` -- `(full_base, provenance)`: a new dict, and a map from each field populated in the result to `'self'`, `'inherited'` or `'system'`. A system-generated ResourceName that was carried over rather than built here has no entry.
 <!-- /dict -->
 
 **Does.** Builds a child's full registry-JSON `BaseObjectData` from its self-defined one plus its parent's full one. For a Season or Episode without a user-supplied ResourceName it first generates the title from the number or date in `extra` (or the child's own `ReleaseDate`), then copies from the parent every `INHERITABLE_FIELDS` value the child lacks (per `is_absent`). Edit, Clip and Manifestation inherit the parent's ResourceName unless they carry a user-supplied one; Season and Episode never inherit it. Titles (0.75.0): the result keeps the main title in `ResourceName` and the child's own alternates in `AlternateResourceName` (a one-list input comes back split); only the parent's MAIN title (ResourceName entry 0) is used, for generation or inheritance, and a parent's alternates are never copied. Raises `TitleConstructionError`, after inheritance has run and with `partial` and `provenance` attached, when a Season or Episode title cannot be built (parent untitled, or the child has no number and no date of its own).
@@ -4340,7 +4342,7 @@ Defined in `src/eidr_core/inheritance/__init__.py`.
 | Field | Type | Default | Purpose |
 |---|---|---|---|
 | `partial` | `Any` | `None` | Set on the raised instance: the full base dict or record object with every inheritable field applied and no title: since 0.69.0 a stale system-generated title the child already carried is dropped too, and `provenance` has no `ResourceName` entry (operator ruling 2026-10-19). `None` on the class itself. |
-| `provenance` | `dict \| None` | `None` | Set on the raised instance: a copy of the provenance map for `partial`. `None` on the class itself. |
+| `provenance` | `dict[str, str] \| None` | `None` | Set on the raised instance: a copy of the provenance map for `partial`. `None` on the class itself. |
 <!-- /dict -->
 
 **Does.** Signals that a Season or Episode needed a generated title and the data could not build one. The operator's rule says this cannot happen, so it marks a data defect, not a normal branch; it subclasses `ValueError` and its message names the parent title, the numbers and the date it tried. Batch callers should catch it per record and either skip the row with the message as the reason or proceed with `exc.partial`, never re-derive inheritance another way.
@@ -4774,18 +4776,18 @@ Scan of 2026-11-24; regenerated at each release from the consumer trees.
 
 <!-- dict:eidr_core.ordering.altid_canonical_key -->
 ```python
-def altid_canonical_key(id_type, domain, value) -> tuple
+def altid_canonical_key(id_type: object, domain: object, value: object) -> tuple[str, str, str]
 ```
 
 Defined in `src/eidr_core/ordering/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `id_type` | - | required | Alt ID Type (`IMDB`, `ISAN`, `Proprietary`, ...). None or `""` allowed; other values go through `str()`. |
-| `domain` | - | required | Alt ID Domain. None or `""` for named types. |
-| `value` | - | required | The identifier value. |
+| `id_type` | `object` | required | Alt ID Type (`IMDB`, `ISAN`, `Proprietary`, ...). None or `""` allowed; other values go through `str()`. |
+| `domain` | `object` | required | Alt ID Domain. None or `""` for named types. |
+| `value` | `object` | required | The identifier value. |
 
-**Returns** `tuple` -- `(casefold(type), casefold(domain), casefold(value))`: a 3-tuple of str, with the kind spread over the first two items.
+**Returns** `tuple[str, str, str]` -- `(casefold(type), casefold(domain), casefold(value))`: a 3-tuple of str, with the kind spread over the first two items.
 <!-- /dict -->
 
 **Does.** Returns the canonical sort key for one Alt ID: kind (Type, Domain), then value, all casefolded. IDs of the same kind sort next to each other, and ShortDOI is kept. Use it for export, hashing and comparison. Pure.
@@ -4794,17 +4796,17 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 
 <!-- dict:eidr_core.ordering.altid_collapsed_canonical_key -->
 ```python
-def altid_collapsed_canonical_key(kind, value) -> tuple
+def altid_collapsed_canonical_key(kind: object, value: object) -> tuple[str, str]
 ```
 
 Defined in `src/eidr_core/ordering/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `kind` | - | required | The source's single Kind column, with Type and Domain already merged (as in XML_to_JSON star mode). None allowed. |
-| `value` | - | required | The identifier value. |
+| `kind` | `object` | required | The source's single Kind column, with Type and Domain already merged (as in XML_to_JSON star mode). None allowed. |
+| `value` | `object` | required | The identifier value. |
 
-**Returns** `tuple` -- `(casefold(kind), casefold(value))`.
+**Returns** `tuple[str, str]` -- `(casefold(kind), casefold(value))`.
 <!-- /dict -->
 
 **Does.** Returns the canonical sort key for an Alt ID whose Type and Domain arrive as one Kind string. Pure. Its keys are 2-tuples and `altid_canonical_key`'s are 3-tuples, so never mix the two in one sort.
@@ -4815,18 +4817,18 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 
 <!-- dict:eidr_core.ordering.altid_display_key -->
 ```python
-def altid_display_key(id_type, domain, value) -> tuple
+def altid_display_key(id_type: object, domain: object, value: object) -> tuple[int, str, str, str]
 ```
 
 Defined in `src/eidr_core/ordering/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `id_type` | - | required | Alt ID Type. Only the Type decides IMDb-first (casefold equals `imdb`), so a `Proprietary` row with domain `imdb.com` is not moved up. |
-| `domain` | - | required | Alt ID Domain. None or `""` for named types. |
-| `value` | - | required | The identifier value. |
+| `id_type` | `object` | required | Alt ID Type. Only the Type decides IMDb-first (casefold equals `imdb`), so a `Proprietary` row with domain `imdb.com` is not moved up. |
+| `domain` | `object` | required | Alt ID Domain. None or `""` for named types. |
+| `value` | `object` | required | The identifier value. |
 
-**Returns** `tuple` -- `(0 if the Type is IMDB else 1, casefold(type), casefold(domain), casefold(value))`.
+**Returns** `tuple[int, str, str, str]` -- `(0 if the Type is IMDB else 1, casefold(type), casefold(domain), casefold(value))`.
 <!-- /dict -->
 
 **Does.** Returns the display sort key for one Alt ID: IMDb-typed entries first, then canonical kind and value. It does not drop ShortDOI. Filter with `is_shortdoi` first, then stable-sort with this key; display only, never for export or comparison.
@@ -4835,17 +4837,17 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 
 <!-- dict:eidr_core.ordering.altid_kind -->
 ```python
-def altid_kind(id_type, domain) -> tuple
+def altid_kind(id_type: object, domain: object) -> tuple[str, str]
 ```
 
 Defined in `src/eidr_core/ordering/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `id_type` | - | required | Alt ID Type. None counts as `""`. |
-| `domain` | - | required | Alt ID Domain. None counts as `""`. |
+| `id_type` | `object` | required | Alt ID Type. None counts as `""`. |
+| `domain` | `object` | required | Alt ID Domain. None counts as `""`. |
 
-**Returns** `tuple` -- `(casefold(type), casefold(domain))`.
+**Returns** `tuple[str, str]` -- `(casefold(type), casefold(domain))`.
 <!-- /dict -->
 
 **Does.** Returns the Alt ID kind composite (casefolded Type, casefolded Domain) used for grouping and sorting. A missing half becomes `""`, so domain-only entries group under `("", domain)` and sort before named Types, as the spec intends. It is an ordering key, not a rule-6 identity Kind.
@@ -4854,14 +4856,14 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 
 <!-- dict:eidr_core.ordering.ck -->
 ```python
-def ck(s) -> str
+def ck(s: object) -> str
 ```
 
 Defined in `src/eidr_core/ordering/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `s` | - | required | Any value. None becomes `""`; anything else goes through `str()`. |
+| `s` | `object` | required | Any value. None becomes `""`; anything else goes through `str()`. |
 
 **Returns** `str` -- `str(s).casefold()`, or `""` for None.
 <!-- /dict -->
@@ -4872,14 +4874,14 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 
 <!-- dict:eidr_core.ordering.is_internal_class -->
 ```python
-def is_internal_class(title_class) -> bool
+def is_internal_class(title_class: object) -> bool
 ```
 
 Defined in `src/eidr_core/ordering/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `title_class` | - | required | The title's Title Class. None allowed (gives False). |
+| `title_class` | `object` | required | The title's Title Class. None allowed (gives False). |
 
 **Returns** `bool` -- True only when the class casefolds to exactly `internal`.
 <!-- /dict -->
@@ -4890,15 +4892,15 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 
 <!-- dict:eidr_core.ordering.is_shortdoi -->
 ```python
-def is_shortdoi(id_type, domain) -> bool
+def is_shortdoi(id_type: object, domain: object) -> bool
 ```
 
 Defined in `src/eidr_core/ordering/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `id_type` | - | required | Alt ID Type. None allowed. |
-| `domain` | - | required | Alt ID Domain. None allowed. |
+| `id_type` | `object` | required | Alt ID Type. None allowed. |
+| `domain` | `object` | required | Alt ID Domain. None allowed. |
 
 **Returns** `bool` -- True when the Type or the Domain, stripped and casefolded, is exactly `shortdoi`.
 <!-- /dict -->
@@ -4909,14 +4911,14 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 
 <!-- dict:eidr_core.ordering.title_bucket -->
 ```python
-def title_bucket(title_class, is_resource: bool = False) -> int
+def title_bucket(title_class: object, is_resource: bool = False) -> int
 ```
 
 Defined in `src/eidr_core/ordering/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `title_class` | - | required | The title's Title Class. None allowed. |
+| `title_class` | `object` | required | The title's Title Class. None allowed. |
 | `is_resource` | `bool` | `False` | True when the title is structurally the ResourceName (`md:ResourceName`). It outranks every class, `Internal` included. |
 
 **Returns** `int` -- 0 for the ResourceName, 1 for a non-Internal alternate, 2 for an Internal alternate.
@@ -4928,18 +4930,18 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 
 <!-- dict:eidr_core.ordering.title_sort_key -->
 ```python
-def title_sort_key(text, title_class=None, is_resource: bool = False) -> tuple
+def title_sort_key(text: object, title_class: object = None, is_resource: bool = False) -> tuple[int, str]
 ```
 
 Defined in `src/eidr_core/ordering/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `text` | - | required | The title text. None counts as `""`. |
-| `title_class` | - | `None` | The title's Title Class, or None for no class. |
+| `text` | `object` | required | The title text. None counts as `""`. |
+| `title_class` | `object` | `None` | The title's Title Class, or None for no class. |
 | `is_resource` | `bool` | `False` | True when the title is structurally the ResourceName. Puts it first whatever its class. |
 
-**Returns** `tuple` -- `(bucket, casefold(text))`, where bucket is `title_bucket(title_class, is_resource)`.
+**Returns** `tuple[int, str]` -- `(bucket, casefold(text))`, where bucket is `title_bucket(title_class, is_resource)`.
 <!-- /dict -->
 
 **Does.** Returns the full title sort key: the three-bucket rank, then the casefolded text. Use it with a stable sort (`sorted`, `list.sort`) so that equal keys keep their input order. The same key serves display and canonical serialization of titles.
@@ -4948,18 +4950,18 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 
 <!-- dict:eidr_core.ordering.altid_star_key -->
 ```python
-def altid_star_key(id_type, kind, value) -> tuple
+def altid_star_key(id_type: object, kind: object, value: object) -> tuple[int, str, str]
 ```
 
 Defined in `src/eidr_core/ordering/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `id_type` | - | required | The entry's Type as it was before Type and Domain were collapsed into Kind. Decides IMDb only. |
-| `kind` | - | required | The collapsed Kind string (the star shape's Domain, else Type). |
-| `value` | - | required | The Alt ID value. |
+| `id_type` | `object` | required | The entry's Type as it was before Type and Domain were collapsed into Kind. Decides IMDb only. |
+| `kind` | `object` | required | The collapsed Kind string (the star shape's Domain, else Type). |
+| `value` | `object` | required | The Alt ID value. |
 
-**Returns** `tuple` -- `(0 or 1, casefold(kind), casefold(value))`; 0 for IMDb.
+**Returns** `tuple[int, str, str]` -- `(0 or 1, casefold(kind), casefold(value))`; 0 for IMDb.
 <!-- /dict -->
 
 **Does.** Returns the star export order for Alt IDs (operator ruling 2026-11-12; `normalized-record.md` §4.2 v1.2): IMDb entries first, then by Kind, then by value. It filters nothing. The star export leaves ShortDOI out (operator ruling 2026-11-17; §4.2 v1.3), so drop those entries first with `is_shortdoi` on the Type and Domain, before they collapse into Kind, then sort the rest by this key. The IMDb test is `is_imdb` on the Type, which the collapse loses, so pass the Type separately: a Proprietary entry with Domain `imdb.com` does not lead. Use it with a stable sort. Pure. New in 0.72.0.
@@ -4968,14 +4970,14 @@ Defined in `src/eidr_core/ordering/__init__.py`.
 
 <!-- dict:eidr_core.ordering.is_imdb -->
 ```python
-def is_imdb(id_type) -> bool
+def is_imdb(id_type: object) -> bool
 ```
 
 Defined in `src/eidr_core/ordering/__init__.py`.
 
 | Parameter | Type | Default | Purpose |
 |---|---|---|---|
-| `id_type` | - | required | The Alt ID's Type. The Domain is not consulted. |
+| `id_type` | `object` | required | The Alt ID's Type. The Domain is not consulted. |
 
 **Returns** `bool` -- True when the casefolded Type equals `imdb`.
 <!-- /dict -->
@@ -5576,15 +5578,16 @@ Defined in `src/eidr_core/verify/__init__.py`.
 ## `eidr_core.bmr_map`
 
 <!-- dict-module:eidr_core.bmr_map -->
-Source `src/eidr_core/bmr_map/__init__.py`. Public names: 8 functions, 3 constants (declared by `__all__`).
+Source `src/eidr_core/bmr_map/__init__.py`. Public names: 9 functions, 1 class, 3 constants (declared by `__all__`).
 <!-- /dict-module -->
 
-**Purpose.** The one implementation of mapping a standard record (the registry-shaped JSON XML_to_JSON emits) to a Template-22 BMR row, and a row back to the self-defined record it describes. Extracted 2026-10-13 (register B5) from XML_to_JSON's `_bmr_rows_from_standard_records` and `build_standard_record_from_bmr_row`, on the six conditions XML_to_JSON set and eidr-core accepted on 2026-09-24. Second consumer: python-tools (`FlattenTool -f bmr`, `-bmrin`). It is cell <-> field mechanism for one record and one row; routing, family expansion, row IDs, parent resolution and Full-record construction stay where they already live.
+**Purpose.** The one implementation of mapping a standard record (the registry-shaped JSON XML_to_JSON emits) to a Template-22 BMR row, and a row back to the self-defined record it describes. Extracted 2026-10-13 (register B5) from XML_to_JSON's `_bmr_rows_from_standard_records` and `build_standard_record_from_bmr_row`, on the six conditions XML_to_JSON set and eidr-core accepted on 2026-09-24. Second consumer: python-tools (`FlattenTool -f bmr`, `-bmrin`). It is cell <-> field mechanism for one record and one row; routing, family expansion, row IDs, parent resolution and Full-record construction stay where they already live. It also reads registry XML into a standard record (`record_from_xml`) and writes one back (`record_to_xml`, extracted 2026-11-26 from XML_to_JSON's `standard_render` for python-tools' `-bmrin`).
 
 **Use it when.** 
 * You turn a standard record into a BMR row: `row_from_record` (selects the self-defined block, takes Administrators from where the record carries them), or `row_from_blocks` if you hold the self-defined blocks. Never pass Full blocks: no BMR sheet carries inherited data (operator, 2026-11-13). Route first with `bmr_io.template_for_creation_type`, write with `bmr_io.write_sheet`.
 * You read a BMR row back into a record (for a Modify, or a `--sheet` pass): `record_from_row`, then resolve the parent with `bmr_io.resolve_parent` and build Full with `inheritance.build_full_base` if you need them.
 * You hold registry XML (a resolve result, an API Shim message): `record_from_xml` first, then `row_from_record`.
+* You submit a sheet row to the registry: `record_from_row`, then `record_to_xml`, and rename the root to the creation type. A `RecordXmlError` names a value the XML cannot carry; report it rather than submit without it.
 * Your guardrail checks that every column of a template is accounted for: compare the template's header bases (`header_base`) with `PRODUCED_BASES[template] | NEVER_PRODUCED`.
 
 **Do not use it when.** 
@@ -5593,7 +5596,8 @@ Source `src/eidr_core/bmr_map/__init__.py`. Public names: 8 functions, 3 constan
 * You want a per-family cap or a report of values with no column: `bmr_io.write_sheet` does both (`SCHEMA_MAX`, `WriteReport.dropped`); there is deliberately no second cap here.
 * You want `DisplayName` on a built record: it is a display convention of your output, not a registry field, and `record_from_row` leaves it out.
 * You want ShortDOI rows dropped from a registration: that is your policy; `record_from_row` keeps every Alt ID the row carries.
-* Vendoring: list `["bmr_map", "bmr_io", "inheritance", "ids", "ordering"]`; that closure is tested by a real sync.
+* You need Compilation or Service XML from `record_to_xml`: there is no Template-22 record shape for either (a Compilation raises on its keys).
+* Vendoring: list `["bmr_map", "bmr_io", "inheritance", "ids", "ordering", "mddf_json"]` (`mddf_json` since `record_to_xml`); that closure is tested by a real sync.
 
 **Used by.**
 <!-- dict-usedby:eidr_core.bmr_map -->
@@ -5606,7 +5610,7 @@ Scan of 2026-11-24; regenerated at each release from the consumer trees.
 
 <!-- dict:eidr_core.bmr_map.administrators_of -->
 ```python
-def administrators_of(record: Mapping[str, Any], base: Mapping[str, Any]) -> dict
+def administrators_of(record: Mapping[str, Any], base: Mapping[str, Any]) -> dict[str, Any]
 ```
 
 Defined in `src/eidr_core/bmr_map/__init__.py`.
@@ -5616,7 +5620,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 | `record` | `Mapping[str, Any]` | required | A standard record. |
 | `base` | `Mapping[str, Any]` | required | The block selected for the row (from `select_blocks`); its `Administrators` is the fallback. |
 
-**Returns** `dict` -- a copy of `ProvenanceMetadata.Administrators` when the record has it, else of `base["Administrators"]`, else `{}`.
+**Returns** `dict[str, Any]` -- a copy of `ProvenanceMetadata.Administrators` when the record has it, else of `base["Administrators"]`, else `{}`.
 <!-- /dict -->
 
 **Does.** Finds Registrant and Metadata Authority where this record carries them. A mirror-exported record has ProvenanceMetadata (the full Metadata Authority list whatever block is selected); a record built from a BMR row has them only in its block. Until 2026-10-02 the reference read Provenance only, so every sheet-built row lost both (24 of 24 real rows).
@@ -5662,7 +5666,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 
 <!-- dict:eidr_core.bmr_map.record_from_row -->
 ```python
-def record_from_row(row: Mapping[str, Any], template: str) -> dict
+def record_from_row(row: Mapping[str, Any], template: str) -> dict[str, Any]
 ```
 
 Defined in `src/eidr_core/bmr_map/__init__.py`.
@@ -5672,7 +5676,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 | `row` | `Mapping[str, Any]` | required | One row as `{column header: cell value}`; blank cells may be `None` or absent. |
 | `template` | `str` | required | The row's Template-22 key; any key `creation_type_from_row` accepts. |
 
-**Returns** `dict` -- `{"CreationType": ..., "SelfDefinedMetadata": {...}}` with absent values pruned (`inheritance.is_absent`).
+**Returns** `dict[str, Any]` -- `{"CreationType": ..., "SelfDefinedMetadata": {...}}` with absent values pruned (`inheritance.is_absent`).
 <!-- /dict -->
 
 **Does.** Builds the self-defined record a row describes. Every family is read on `bmr_io.family_layout` (a bare header is group 1; companion columns pair by the sheet's own group index). Metadata Authority comes from the Party ID column only. `IMDb`, `ISAN` and `V-ISAN` come back as Alt IDs with Domain `IMDB` / `ISAN`. Languages and countries are de-duplicated and sorted case-insensitively (the BMR-input canonical order); since 0.51.0 the template's own language family comes back with its `Language Mode` as `{"value": lang, "_mode": mode}` (plain string when there is no mode). Every Details group with text is read, where the reference read group 1 only. Parent references are left as written. Since 0.75.0 the Title cell is the only main title: Alternate Titles come back under `AlternateResourceName`, so a row with a blank Title has no `ResourceName` and its alternate is never promoted; a Description with no text, a Details group with no text and a repeated class or region value are not read; a date cell reads as an xs:date.
@@ -5725,7 +5729,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 
 <!-- dict:eidr_core.bmr_map.select_blocks -->
 ```python
-def select_blocks(record: Mapping[str, Any], source: str = "self") -> tuple[dict, dict]
+def select_blocks(record: Mapping[str, Any], source: str = "self") -> tuple[dict[str, Any], dict[str, Any]]
 ```
 
 Defined in `src/eidr_core/bmr_map/__init__.py`.
@@ -5735,7 +5739,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 | `record` | `Mapping[str, Any]` | required | A standard record. |
 | `source` | `str` | `"self"` | Only `"self"`. `"full"` (withdrawn at 0.73.0) and anything else raise `ValueError`. |
 
-**Returns** `tuple[dict, dict]` -- `(BaseObjectData, ExtraObjectMetadata)`, each `{}` when absent.
+**Returns** `tuple[dict[str, Any], dict[str, Any]]` -- `(BaseObjectData, ExtraObjectMetadata)`, each `{}` when absent.
 <!-- /dict -->
 
 **Does.** Picks the blocks a sheet is built from: `SelfDefinedMetadata`, so values the record does not define itself stay empty on the sheet. The operator ruled that inherited data never appears in BMR spreadsheet output, for every BMR writer (2026-11-12, 2026-11-13). A record with no Self block uses its Full block when that names no Parent (a parentless record inherits nothing), and raises `ValueError` when it names one (inherited values cannot be told apart). A record with neither block gives `({}, {})`. Until 0.73.0, `"full"` selected FullMetadata.
@@ -5768,7 +5772,7 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 
 <!-- dict:eidr_core.bmr_map.record_from_xml -->
 ```python
-def record_from_xml(xml: str | bytes | ET.Element) -> dict
+def record_from_xml(xml: str | bytes | ET.Element) -> dict[str, Any]
 ```
 
 Defined in `src/eidr_core/bmr_map/__init__.py`.
@@ -5777,10 +5781,41 @@ Defined in `src/eidr_core/bmr_map/__init__.py`.
 |---|---|---|---|
 | `xml` | `str \| bytes \| ET.Element` | required | Registry XML: a `SelfDefinedMetadata` or `FullMetadata` element (a resolve result), or any element holding them (an API Shim `Message`), as text, bytes or a parsed element. |
 
-**Returns** `dict` -- `{"SelfDefinedMetadata": {...}, "FullMetadata": {...}}` with whichever blocks the XML carries, in the standard-record shape, absent values pruned.
+**Returns** `dict[str, Any]` -- `{"SelfDefinedMetadata": {...}, "FullMetadata": {...}}` with whichever blocks the XML carries, in the standard-record shape, absent values pruned.
 <!-- /dict -->
 
 **Does.** Builds the standard record (the shape XML_to_JSON builds from the mirror, which `row_from_record` takes) from registry XML, on the standard library's ElementTree, so `bmr_map` stays vendorable. Values are as the XML states them, not normalised (`PT2H0M` stays `PT2H0M`); ShortDOI Alt IDs are kept (the caller decides); there is no `CreationType`, `DisplayName` or `ProvenanceMetadata`, which the blocks do not carry. Checked before release against XML_to_JSON's mirror export of the same 363 records: 722 of 722 rows equal, apart from the export's own rendering (duration normalisation, dropped ShortDOI, a Self `Status` the SelfDefined XML does not state). Not a substitute: the SDK codec (`eidr.codecs.xml.to_codec_dict`), whose MovieLabs JSON encoding differs in about 40 paths. Since 0.75.0: `AlternateResourceName` elements come back under their own key (a SelfDefined block with only an alternate has no `ResourceName`); an element without text (`<Description lang="en"/>`, a Details element with only a domain) is not read, since EIDR XML allows no empty element; a repeated class value is read once; languages are one entry per (code, mode), the `type` attribute unread.
+
+### `record_to_xml`
+
+<!-- dict:eidr_core.bmr_map.record_to_xml -->
+```python
+def record_to_xml(record: Mapping[str, Any], *, view: str = "SelfDefinedMetadata") -> str
+```
+
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+
+| Parameter | Type | Default | Purpose |
+|---|---|---|---|
+| `record` | `Mapping[str, Any]` | required | A standard record (`record_from_row`, `record_from_xml`, or XML_to_JSON's export). Only `record[view]` is read; `CreationType` and other keys are ignored. Never modified. |
+| `view` | `str` | `"SelfDefinedMetadata"` (keyword-only) | Which block to write: `"SelfDefinedMetadata"`, `"FullMetadata"`, `"ProvenanceMetadata"` or `"AliasContinuation"`. Anything else raises `ValueError`. |
+
+**Returns** `str` -- the view element as an XML document (with an XML declaration): the EIDR default namespace on the root, `md` and `xsi` declared only when used, children in the EIDR 2.7.0 schema's content-model order, attributes in the registry's alphabetical order.
+<!-- /dict -->
+
+**Does.** Writes a standard record back to registry XML, through `mddf_json.json_to_xml`, so element order is the schema's by construction. `record_from_xml(record_to_xml(r)) == r` for a record `record_from_xml` built, for Basic, Series, Season, Episode, Edit, Clip and Manifestation; a `record_from_row` record round-trips at the row level (its Alt IDs carry the sheet's Domain and no Type until they pass through XML). Measured on XML_to_JSON's 36 golden registry documents: all round-trip, and the text equals the registry's own except the deprecated language `type` attribute (which `record_from_xml` does not read) and a `Digital` block whose `Container` preceded its `Track` (an unbounded choice; tracks are written first). For a registration, rename the root to the creation type (`Episode`, `Basic`, ...): `create<Type>DataType` has the same children in the same order (tested). A creation carries no `ID`: a `record_from_row` record has none; drop it from a `record_from_xml` one. Nothing is filtered, so a ShortDOI Alt ID is written if the record holds one. Absent values are not written; an element with attributes but no text is not written, as both readers already treat it as no value. Raises `RecordXmlError` naming the key for anything it cannot place: an unknown key (including `ManifestationInfo` `Film`/`Tape` and an XML-built Compilation's entries), a non-object where an object belongs, a Domain on a non-Proprietary Alt ID, `SystemGenerated` true on an alternate title, a credit with a SortName and no DisplayName, two spellings of one field that disagree; and for a missing or empty view. Extracted from XML_to_JSON `standard_render.render_view_xml` (2026-11-26), which can delegate to it: it takes the whole record instead of the block, returns `str` and raises where that returned `None`, reads `Domain` beside `_domain` on Details and the element-named class key beside `Class` on the lightweight relationships, and raises where that dropped a value silently.
+
+### `RecordXmlError` (class)
+
+<!-- dict:eidr_core.bmr_map.RecordXmlError -->
+```python
+class RecordXmlError(ValueError)
+```
+
+Defined in `src/eidr_core/bmr_map/__init__.py`.
+<!-- /dict -->
+
+**Does.** The error `record_to_xml` raises when the record holds a field it has no element for, or no block to write. A `ValueError`, so an existing `except ValueError` catches it; the message names the key and where it was found. It exists so a registration can never lose a value without a trace, as `WriteReport.dropped` does for a sheet.
 
 ## `eidr_core.verdicts`
 

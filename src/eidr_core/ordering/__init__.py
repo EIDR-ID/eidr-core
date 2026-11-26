@@ -37,14 +37,14 @@ __all__ = [
 ]
 
 
-def ck(s) -> str:
+def ck(s: object) -> str:
     """Casefold sort key; None-safe. The §3.x rule: keys fold, values don't."""
     return str(s if s is not None else "").casefold()
 
 
 # ── titles (§4.1 / title-display-order.md) ─────────────────────────────────
 
-def is_internal_class(title_class) -> bool:
+def is_internal_class(title_class: object) -> bool:
     """Is this the Internal Title Class (casefolded)? EIDR's own machine
     translations carry it; it sends an ALTERNATE to the last bucket."""
     return ck(title_class) == "internal"
@@ -60,7 +60,7 @@ def is_internal_class(title_class) -> bool:
 # of a ResourceName-first list), not guess from the class.
 
 
-def title_bucket(title_class, is_resource: bool = False) -> int:
+def title_bucket(title_class: object, is_resource: bool = False) -> int:
     """The ratified three buckets: 0 = ResourceName (ALWAYS first — even when
     its class is Internal), 1 = non-Internal alternates, 2 = Internal
     alternates.
@@ -86,7 +86,8 @@ def title_bucket(title_class, is_resource: bool = False) -> int:
     return 1
 
 
-def title_sort_key(text, title_class=None, is_resource: bool = False) -> tuple:
+def title_sort_key(text: object, title_class: object = None,
+                   is_resource: bool = False) -> tuple[int, str]:
     """Full display/canonical sort key: (bucket, casefold(text)).
 
     ``is_resource`` must come from the record's structure (see
@@ -97,7 +98,7 @@ def title_sort_key(text, title_class=None, is_resource: bool = False) -> tuple:
 
 # ── alt IDs (§4.2 / altid-display-order.md) ────────────────────────────────
 
-def is_shortdoi(id_type, domain) -> bool:
+def is_shortdoi(id_type: object, domain: object) -> bool:
     """ShortDOI test, for the three places ShortDOI is left out: display,
     evaluation, and the star export (operator ruling 2026-11-17: "Exclude
     ShortDOI IDs from the star schema export"; normalized-record §4.2 v1.3).
@@ -111,7 +112,7 @@ def is_shortdoi(id_type, domain) -> bool:
     return ck(id_type).strip() == "shortdoi" or ck(domain).strip() == "shortdoi"
 
 
-def altid_kind(id_type, domain) -> tuple:
+def altid_kind(id_type: object, domain: object) -> tuple[str, str]:
     """The ratified kind composite: (casefold(Type), casefold(Domain)).
     Missing halves participate as "" — so domain-only (Proprietary) entries
     group under ("", domain) and sort before named Types; deterministic and
@@ -119,14 +120,14 @@ def altid_kind(id_type, domain) -> tuple:
     return (ck(id_type), ck(domain))
 
 
-def altid_canonical_key(id_type, domain, value) -> tuple:
+def altid_canonical_key(id_type: object, domain: object, value: object) -> tuple[str, str, str]:
     """Canonical order: (kind, casefold(value)) — same-kind IDs adjacent
     (e.g. two distinct IMDb IDs), ShortDOI retained. For export/comparison
     surfaces."""
     return (*altid_kind(id_type, domain), ck(value))
 
 
-def is_imdb(id_type) -> bool:
+def is_imdb(id_type: object) -> bool:
     """The one IMDb test the IMDb-first orders share: the Type alone,
     casefolded, equals ``imdb``. A Proprietary entry whose Domain is
     ``imdb.com`` is NOT IMDb here, as the display worked example has always
@@ -139,7 +140,8 @@ def is_imdb(id_type) -> bool:
     return ck(id_type) == "imdb"
 
 
-def altid_display_key(id_type, domain, value) -> tuple:
+def altid_display_key(id_type: object, domain: object,
+                      value: object) -> tuple[int, str, str, str]:
     """Display order: IMDb entries first, then canonical (kind, value).
     Callers implement the display rule as: drop entries where
     ``is_shortdoi(...)``, then stable-sort by this key. (The API Shim's
@@ -148,7 +150,7 @@ def altid_display_key(id_type, domain, value) -> tuple:
     return (imdb_first, *altid_kind(id_type, domain), ck(value))
 
 
-def altid_collapsed_canonical_key(kind, value) -> tuple:
+def altid_collapsed_canonical_key(kind: object, value: object) -> tuple[str, str]:
     """Canonical key for sources whose (Type, Domain) is already collapsed
     into a single Kind column (XML_to_JSON star mode): (casefold(Kind),
     casefold(value)). Ordering among same-shaped entries is identical to the
@@ -156,7 +158,7 @@ def altid_collapsed_canonical_key(kind, value) -> tuple:
     return (ck(kind), ck(value))
 
 
-def altid_star_key(id_type, kind, value) -> tuple:
+def altid_star_key(id_type: object, kind: object, value: object) -> tuple[int, str, str]:
     """Star export order (operator ruling 2026-11-12; normalized-record
     §4.2 v1.2): IMDb first, then the collapsed Kind, then the value, all
     casefolded.

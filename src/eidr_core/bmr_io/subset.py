@@ -102,6 +102,7 @@ import shutil
 import tempfile
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from eidr_core.bmr_io import DATA_START, fix_shared_strings, read_headers, transplant
 from eidr_core.bmr_io.writer import SHEET_TO_TEMPLATE, TEMPLATES
@@ -207,7 +208,7 @@ def _template_key(sheet_name: str) -> str:
     return key
 
 
-def _inspect(wb, key: str, src_xlsx: str, sheet_name: str) -> SheetCheck:
+def _inspect(wb: Any, key: str, src_xlsx: str, sheet_name: str) -> SheetCheck:
     """The conformance rules, in ONE place: ``check_sheet`` runs them before
     a consumer starts an expensive run, and ``subset_rows`` runs the same
     function before it writes, so a sheet that passes the pre-flight cannot

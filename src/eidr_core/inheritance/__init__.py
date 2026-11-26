@@ -165,7 +165,7 @@ class TitleConstructionError(ValueError):
     """
 
     partial: Any = None
-    provenance: dict | None = None
+    provenance: dict[str, str] | None = None
 
 
 __all__ = [
@@ -381,7 +381,7 @@ def _text(value: Any) -> str:
     return "" if value is None else str(value).strip()
 
 
-def _items(titles: Any) -> list:
+def _items(titles: Any) -> list[Any]:
     if is_absent(titles):
         return []
     return list(titles) if isinstance(titles, (list, tuple)) else [titles]
@@ -402,7 +402,7 @@ def _title_text(item: Any) -> str:
     return _text(item)
 
 
-def _split_titles(titles: Any) -> tuple[Any, list]:
+def _split_titles(titles: Any) -> tuple[Any, list[Any]]:
     """``(main title, alternates)`` from a title list, in either shape.
 
     The main title is entry 0 of a list of dicts, whatever its text: an
@@ -455,7 +455,7 @@ def has_user_supplied_title(titles: Any) -> bool:
     return not _is_generated(main)
 
 
-def _split_base_titles(base: dict) -> None:
+def _split_base_titles(base: dict[str, Any]) -> None:
     """Move ResourceName entries 1..n to ``AlternateResourceName``, in place.
 
     The JSON adapter's output keeps the two title fields apart, as the
@@ -534,13 +534,13 @@ def _series_prefix(parent_titles: Any, series_title: Any) -> str | None:
 
 
 def build_full_base(
-    self_base: dict,
-    parent_base: dict | None,
+    self_base: dict[str, Any],
+    parent_base: dict[str, Any] | None,
     creation_type: str,
-    extra: dict | None = None,
+    extra: dict[str, Any] | None = None,
     *,
     series_title: str | None = None,
-) -> tuple[dict, dict[str, str]]:
+) -> tuple[dict[str, Any], dict[str, str]]:
     """Build a child's FULL ``BaseObjectData`` from its self-defined one.
 
     ``parent_base`` is the parent's **FULL** ``BaseObjectData`` (not its
@@ -579,7 +579,7 @@ def build_full_base(
     creation-type-specific and never inherited, so it is not touched here.
     """
     extra = extra or {}
-    full: dict = copy.deepcopy(self_base or {})
+    full: dict[str, Any] = copy.deepcopy(self_base or {})
     # One representation in the output: ResourceName is the main title only,
     # AlternateResourceName the alternates (0.75.0). A one-list input has
     # its entries 1..n moved; entry 0 is the main title, and one with no
@@ -736,7 +736,7 @@ def build_full_base(
     return full, prov
 
 
-def _without_generated(titles: Any) -> list:
+def _without_generated(titles: Any) -> list[Any]:
     """``titles`` minus its system-generated entries, in either shape.
 
     Used only on the TitleConstructionError path, to keep a stale generated
@@ -758,7 +758,7 @@ def _without_generated(titles: Any) -> list:
     return kept
 
 
-def _main_title(base: dict | None) -> dict | None:
+def _main_title(base: dict[str, Any] | None) -> dict[str, Any] | None:
     """The main-title entry (ResourceName entry 0) of a BaseObjectData dict."""
     if not base:
         return None
@@ -766,7 +766,7 @@ def _main_title(base: dict | None) -> dict | None:
     return main if isinstance(main, dict) else None
 
 
-def _best_title(base: dict | None) -> str:
+def _best_title(base: dict[str, Any] | None) -> str:
     """The parent's MAIN title text (ResourceName entry 0), or "".
 
     Until 0.75.0 this was the first entry with text, so a parent whose main
@@ -981,7 +981,7 @@ def build_full_record(
 
 
 def _apply_title(
-    full: Any, parent_full: Any, ctype: str, prov: dict,
+    full: Any, parent_full: Any, ctype: str, prov: dict[str, str],
     series_title: str | None = None,
 ) -> TitleConstructionError | None:
     """Season/Episode get a constructed title; other child types inherit one.
@@ -1091,7 +1091,7 @@ def _clone_title(parent_full: Any, text: str, title_class: str) -> Any:
     return made
 
 
-def _attach(rec: Any, prov: dict) -> None:
+def _attach(rec: Any, prov: dict[str, str]) -> None:
     # Suppressed rather than raised: a slotted or frozen model cannot carry
     # the attribute, and losing the provenance map is a degradation, not a
     # reason to fail the build. provenance() then reports {} == "unknown".

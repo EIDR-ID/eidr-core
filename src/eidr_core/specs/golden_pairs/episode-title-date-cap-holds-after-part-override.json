@@ -1,0 +1,116 @@
+{
+  "id": "episode-title-date-cap-holds-after-part-override",
+  "added": "2026-11-25",
+  "why": "Where the 2.23.0 date cap sits (De-Dupe UI S-42). '13/08/2026 - Novela Rosa' / 'Novela Rosa Part 2' against 'Novela Rosa' / 'Novela Rosa Part 3': the part numbers differ (a part conflict) and two Alt ID sources agree with no conflict, so the part-conflict OVERRIDE fires; the date is on one side only. The date cap is an independent check AFTER the part chain, so it still caps the pair at Review. Mutation-tested: with the cap moved into the chain as its last elif the override branch is taken instead and the pair reaches Accept at 100 (fails verdict_not_in and score_max). SCOPE: the cap's placement relative to the part-conflict override, nothing else.",
+  "submitted": {
+    "creation_type": "Episode",
+    "titles": [
+      {
+        "text": "13/08/2026 - Novela Rosa",
+        "lang": "pt",
+        "is_resource": true
+      },
+      {
+        "text": "Novela Rosa Part 2",
+        "lang": "pt",
+        "is_resource": false
+      }
+    ],
+    "release_date": "2026-08-13",
+    "parent_id": "10.5240/1FB4-801D-C016-5F48-86E6-9",
+    "family_id": "10.5240/1FB4-801D-C016-5F48-86E6-9",
+    "countries": [
+      "BR"
+    ],
+    "length_minutes": 45,
+    "alt_ids": [
+      {
+        "id_type": "IMDB",
+        "value": "tt9310452",
+        "relation": "IsSameAs"
+      },
+      {
+        "id_type": "Proprietary",
+        "domain": "thetvdb.com",
+        "value": "8812345",
+        "relation": "IsSameAs"
+      }
+    ]
+  },
+  "candidate": {
+    "creation_type": "Episode",
+    "titles": [
+      {
+        "text": "Novela Rosa",
+        "lang": "pt",
+        "is_resource": true
+      },
+      {
+        "text": "Novela Rosa Part 3",
+        "lang": "pt",
+        "is_resource": false
+      }
+    ],
+    "release_date": "2026-08-13",
+    "parent_id": "10.5240/1FB4-801D-C016-5F48-86E6-9",
+    "family_id": "10.5240/1FB4-801D-C016-5F48-86E6-9",
+    "countries": [
+      "BR"
+    ],
+    "length_minutes": 45,
+    "alt_ids": [
+      {
+        "id_type": "IMDB",
+        "value": "tt9310452",
+        "relation": "IsSameAs"
+      },
+      {
+        "id_type": "Proprietary",
+        "domain": "thetvdb.com",
+        "value": "8812345",
+        "relation": "IsSameAs"
+      }
+    ],
+    "eidr_id": "10.5240/4A7C-21E0-9B3F-58D6-E1A2-K"
+  },
+  "invariants": {
+    "verdict_not_in": [
+      "Accept"
+    ],
+    "score_max": 79.9
+  },
+  "expected": {
+    "spec_version": "2.25.0",
+    "confidence": 79.0,
+    "verdict": "Review",
+    "field_qualities": {
+      "title": 1.038,
+      "release_date": 1.0,
+      "distribution_number": null,
+      "length": 1.0,
+      "house_sequence": null,
+      "time_slot": null,
+      "director": null,
+      "actor": null,
+      "assoc_org": null,
+      "original_language": null,
+      "version_language": null,
+      "alt_id": 1.75
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "identical",
+      "episode_distribution_number": "neutral",
+      "duration": "identical",
+      "episode_house_sequence": "neutral",
+      "episode_time_slot": "neutral",
+      "director": "neutral",
+      "actor": "neutral",
+      "associated_org": "neutral",
+      "original_language": "neutral",
+      "version_language": "neutral",
+      "alternate_id": "identical"
+    },
+    "alt_id_conflicts": 0
+  }
+}

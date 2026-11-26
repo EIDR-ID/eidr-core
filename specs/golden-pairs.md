@@ -2,7 +2,7 @@
 
 **Status:** all three modes LANDED — `pair` 2026-07-29; `case` ratified 2026-09-10 (S-26),
 evaluator 2026-09-11; `recovery_pool` ratified 2026-09-10 (S-9), first captured instance and
-evaluator 2026-09-11 (BMR-Review T17). Corpus: 39 `pair`, 16 `case`, 1 `recovery_pool` (56) at compare-spec 2.24.0.
+evaluator 2026-09-11 (BMR-Review T17). Corpus: 42 `pair`, 16 `case`, 1 `recovery_pool` (59) at compare-spec 2.25.0.
 **Owner of the format:** eidr-core. **Owner of the evaluator:** BMR-Review
 (`eidr_dedup_score/golden.py`). **Conforming implementation:** De-Dupe UI,
 in JavaScript, with no database.
@@ -135,6 +135,17 @@ confirms No Match, and the match stays in the registry.
   not system-titled as S-32 first described it: a pilot's system title
   (`<Series>: Season 1: Episode 1`) already contains the Series' title, so
   that shape passed with the block ignored and could pin nothing.
+* **Alt IDs, names and organizations have fixed keys** (2.25.0, 2026-11-26;
+  De-Dupe UI S-43 and S-41). An Alt ID is
+  `{"value", "id_type", "domain", "relation"}`. A person's name is a string or
+  `{"display", "sort_name"}`; an organization is a string or
+  `{"name", "party_id", "alt_names"}`. A loader must FAIL on any other key, by
+  the same rule as `ancestry`: the corpus once carried an Alt ID written
+  `{"type": ...}`, which a loader reading `id_type` loaded with no Kind and
+  never compared, though the fixture's `why` said the IDs agreed. The dict
+  forms exist because the S-41 item-state list is index-aligned with the
+  record view, which lists each sort name and each alternate name as its own
+  entry.
 * **A `pair` or `case` fixture may carry a top-level `aliases` block**
   (defined at 2.24.0, 2026-11-26; BMR-Review T48):
   `"aliases": { "<alias eidr_id>": "<live target eidr_id>", ... }`. The engine
@@ -179,6 +190,12 @@ deliberately NOT the payload's post-0.38.0 semantics, where the glyph bands on
 the quality whatever `applicable` says: `inherited-date-match-still-confirms` can
 only pin "a matching inherited field is counted" because a dropped field reads
 `null` here and fails its `field_quality_min`. Do not align the two blocks.
+`item_states {manifest key: [state, ...]}` (2.25.0, S-41) checks EXACT
+equality with the evaluator's per-item states for that key
+(`scoring.field_item_states`: one state per list item, candidate side,
+index-aligned with the record view). An evaluator adds `field_item_states` to
+its snapshot only for a fixture that declares this invariant, so no other
+fixture's `expected` changes.
 Prefer `verdict_not_in` over `verdict_in` and a
 `field_quality_max` over a pinned value: **a property survives a retune, a
 value must be re-approved at each one.**

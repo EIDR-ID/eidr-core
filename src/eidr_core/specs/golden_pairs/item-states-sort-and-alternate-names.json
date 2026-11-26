@@ -1,0 +1,120 @@
+{
+  "id": "item-states-sort-and-alternate-names",
+  "added": "2026-11-25",
+  "why": "Per-item states for the entries the record view adds beyond the display names (De-Dupe UI, 2026-11-25). The view lists a credit's sort name and an organization's alternate names as their own entries, sorted with the rest, so the states array must carry one state for each in the same place. Directors: Ann Lee (sort name 'Lee, Ann') matches, so both entries are identical; Bo Diddley (sort name 'Diddley, Bo') has no counterpart, so both are neutral; the view interleaves them by sort order. Organizations: Northwind Media Group (alternate name NW Media) has the submission's party id under a different name, so both of its entries are identical by the equal-party-id rule, not by name similarity; Zenith Studio has no counterpart (neutral). Fails if a loader drops sort_name or alt_names (the arrays shift), if a sort name or alternate name does not carry its person's or organization's state, or if organizations are matched by name alone. SCOPE: the sort-name and alternate-name entries and the party-id rule; nothing about scores.",
+  "submitted": {
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Stolen",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2019",
+    "length_minutes": 95,
+    "directors": [
+      "Ann Lee"
+    ],
+    "assoc_orgs": [
+      {
+        "name": "Acme Films",
+        "party_id": "10.5237/9F2A-41C0"
+      }
+    ]
+  },
+  "candidate": {
+    "eidr_id": "10.5240/4A7C-21E0-9B3F-58D6-E1A2-K",
+    "creation_type": "Basic",
+    "titles": [
+      {
+        "text": "Stolen",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2019",
+    "length_minutes": 95,
+    "directors": [
+      {
+        "display": "Ann Lee",
+        "sort_name": "Lee, Ann"
+      },
+      {
+        "display": "Bo Diddley",
+        "sort_name": "Diddley, Bo"
+      }
+    ],
+    "assoc_orgs": [
+      {
+        "name": "Northwind Media Group",
+        "party_id": "10.5237/9F2A-41C0",
+        "alt_names": [
+          "NW Media"
+        ]
+      },
+      {
+        "name": "Zenith Studio"
+      }
+    ]
+  },
+  "invariants": {
+    "item_states": {
+      "director": [
+        "identical",
+        "neutral",
+        "neutral",
+        "identical"
+      ],
+      "associated_org": [
+        "identical",
+        "identical",
+        "neutral"
+      ]
+    }
+  },
+  "expected": {
+    "spec_version": "2.25.0",
+    "confidence": 100.0,
+    "verdict": "Accept",
+    "field_qualities": {
+      "title": 1.0,
+      "release_date": 1.0,
+      "director": 1.0,
+      "actor": null,
+      "country": null,
+      "assoc_org": 1.0,
+      "length": 1.0,
+      "original_language": null,
+      "version_language": null,
+      "alt_id": null
+    },
+    "field_states": {
+      "titles": "identical",
+      "release_date": "identical",
+      "director": "identical",
+      "actor": "neutral",
+      "country_of_origin": "neutral",
+      "associated_org": "identical",
+      "duration": "identical",
+      "original_language": "neutral",
+      "version_language": "neutral",
+      "alternate_id": "neutral"
+    },
+    "alt_id_conflicts": 0,
+    "field_item_states": {
+      "titles": [
+        "identical"
+      ],
+      "director": [
+        "identical",
+        "neutral",
+        "neutral",
+        "identical"
+      ],
+      "associated_org": [
+        "identical",
+        "identical",
+        "neutral"
+      ]
+    }
+  }
+}

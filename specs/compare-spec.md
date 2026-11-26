@@ -220,6 +220,26 @@ BMR-Review.
    capped at Review (four pair fixtures, both directions; a classed Series, a
    different year and a non-exact title stay ineligible).
 
+8. **Per-item states and strict fixture keys (2.25.0, 2026-11-26).** No
+   value moved. (a) **S-41** (operator, 2026-11-24, option (a)): the payload's
+   additive `scoring.field_item_states` key gives one comparison state per
+   list item, `{manifest key: [state, ...]}`, candidate side only,
+   index-aligned with the candidate's record-view list, absent when empty,
+   with no effect on `q`, the score or the field state (`format_version` 2.0
+   stands: an additive key absent on old payloads). Three rules where the
+   reference differs from the first request: a non-identity Alt ID is
+   `neutral` even when its value is equal (the comparator never compares it);
+   an extra value under a Kind that already matched is `neutral`, not
+   `mismatch` (no conflict is counted there); a sort name and an
+   organization's alternate names carry the state of their person or
+   organization. Pinned by `item-states-list-fields` and
+   `item-states-sort-and-alternate-names`. (b) **S-42:** the `date_ambiguous`
+   Review cap (2.23.0) is an independent check AFTER the part-number chain,
+   pinned by `episode-title-date-cap-holds-after-part-override`. (c) **S-43:**
+   strict Alt ID / name / organization keys in fixtures (golden-pairs.md §2);
+   `episode-title-date-one-sided-caps-at-review` was replaced and now compares
+   its IMDb ID (`alt_id` null -> 1.0; still Review 79.0).
+
 **Shipped inert in eidr-core 0.77.0; both LANDED 2026-11-24 (2.22.0, 2.23.0).** Two title
 rules from BMR-Review's handoff of 2026-11-23, approved by the operator the
 same day. Each is read from an OPTIONAL parameter, as

@@ -1,7 +1,7 @@
 {
   "id": "episode-title-date-one-sided-caps-at-review",
   "added": "2026-11-24",
-  "why": "A date in ONE title only (compare-spec 2.23.0, TITLE_DATE_TOKENS; operator 2026-11-23): '13/08/2026 - Novela Rosa' against 'Novela Rosa', same parent, date, number, length and IMDb id. The rest of the titles is compared (1.0) and the pair is date_ambiguous; BMR-Review's scorer caps it at Review, as a one-sided part number is (eidr-core handoff 2026-11-24: 'cap a date_ambiguous pair at Review, as your scorer does for part_ambiguous'). Mutation-tested both ways: with TITLE_DATE_TOKENS removed the title splits on its slashes and scores 0.20 (fails field_quality_min); with the scorer's date_ambiguous cap removed the pair reaches Accept at 100 (fails verdict_not_in). SCOPE: Episode, one side dated d/m/y, an identity Alt ID agreeing.",
+  "why": "A date in ONE title only (compare-spec 2.23.0, TITLE_DATE_TOKENS; operator 2026-11-23): '13/08/2026 - Novela Rosa' against 'Novela Rosa', same parent, date, number, length and IMDb id. The rest of the titles is compared (1.0) and the pair is date_ambiguous; BMR-Review's scorer caps it at Review, as a one-sided part number is (eidr-core handoff 2026-11-24: 'cap a date_ambiguous pair at Review, as your scorer does for part_ambiguous'). Mutation-tested both ways: with TITLE_DATE_TOKENS removed the title splits on its slashes and scores 0.20 (fails field_quality_min); with the scorer's date_ambiguous cap removed the pair reaches Accept at 100 (fails verdict_not_in). SCOPE: Episode, one side dated d/m/y, an identity Alt ID agreeing. CORRECTED 2026-11-25 (De-Dupe UI S-43): the Alt IDs were written {\"type\": ...}, which build_record did not read, so the IMDb id loaded with no Kind and was never compared (alt_id null); now id_type, alt_id 1.0, and build_record fails on any other key. The lesson is unchanged and re-measured: 79.0 Review; cap removed 100 Accept; knob removed title 0.20.",
   "submitted": {
     "creation_type": "Episode",
     "titles": [
@@ -21,7 +21,7 @@
     "distribution_number": "2026081",
     "alt_ids": [
       {
-        "type": "IMDB",
+        "id_type": "IMDB",
         "value": "tt1234567"
       }
     ]
@@ -46,7 +46,7 @@
     "distribution_number": "2026081",
     "alt_ids": [
       {
-        "type": "IMDB",
+        "id_type": "IMDB",
         "value": "tt1234567"
       }
     ]
@@ -60,7 +60,7 @@
     }
   },
   "expected": {
-    "spec_version": "2.24.0",
+    "spec_version": "2.25.0",
     "confidence": 79.0,
     "verdict": "Review",
     "field_qualities": {
@@ -75,7 +75,7 @@
       "assoc_org": null,
       "original_language": null,
       "version_language": null,
-      "alt_id": null
+      "alt_id": 1.0
     },
     "field_states": {
       "titles": "identical",
@@ -89,7 +89,7 @@
       "associated_org": "neutral",
       "original_language": "neutral",
       "version_language": "neutral",
-      "alternate_id": "neutral"
+      "alternate_id": "identical"
     },
     "alt_id_conflicts": 0
   }

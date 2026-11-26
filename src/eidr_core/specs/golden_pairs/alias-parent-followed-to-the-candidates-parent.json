@@ -55,7 +55,7 @@
     ]
   },
   "expected": {
-    "spec_version": "2.24.0",
+    "spec_version": "2.25.0",
     "assessment": "Accept: sole match",
     "proposed_id": "10.5240/4A7C-21E0-9B3F-58D6-E1A2-K",
     "confidence": 100.0,

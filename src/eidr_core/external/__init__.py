@@ -53,7 +53,11 @@ consumer appears; only the chassis is shared. Current homes:
   dependencies on the DQ host"), which eidr-wikidata's SPARQLWrapper-based
   client cannot satisfy. See the register R13 note for the outage gap between
   them.
-* **TMDb** — eidr-dq (``external/tmdb.py``).
+* **TMDb** — here, ``eidr_core.external.tmdb``: extracted from eidr-dq
+  ``external/tmdb.py`` (with BMR-Review's credit reading) when eidr-imdb
+  became its third consumer (eidr-metadata-sources OD-72). Until they adopt
+  it, eidr-dq's module and BMR-Review's ``TmdbVerifier`` are copies to
+  retire.
 * **IMDb** — planned (rate-managed, pre-configured library).
 
 THE OTHER CHASSIS LEGS

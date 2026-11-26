@@ -113,7 +113,7 @@ class SchemaSet:
         root = None
         for event, item in ET.iterparse(str(path), events=("start-ns", "start")):
             if event == "start-ns":
-                p, uri = item  # type: ignore[misc]
+                p, uri = item
                 prefixes.setdefault(p, uri)
             elif root is None:
                 root = item

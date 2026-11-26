@@ -126,7 +126,7 @@ __all__ = ["HEADER_ROW", "DATA_START", "read_headers", "count_family",
            "header_map"]
 
 
-def _header_map(values: Iterable) -> dict[int, str]:
+def _header_map(values: Iterable[Any]) -> dict[int, str]:
     """THE header-row policy, in one place: ``{1-based column: header}``.
 
     **CONTRACT — the key is an INTEGER column index, never a column
@@ -161,7 +161,7 @@ def _header_map(values: Iterable) -> dict[int, str]:
     return out
 
 
-def header_map(values: Iterable) -> dict[int, str]:
+def header_map(values: Iterable[Any]) -> dict[int, str]:
     """Public name for the header-row policy (2026-09-11): BMR-Review finds
     the header row by content, because review round-trips move it off row 3,
     and then built its own ``{name: index}`` inline -- keeping whitespace-only
@@ -169,7 +169,7 @@ def header_map(values: Iterable) -> dict[int, str]:
     return _header_map(values)
 
 
-def read_headers(ws, header_row: int = HEADER_ROW) -> dict[int, str]:
+def read_headers(ws: Any, header_row: int = HEADER_ROW) -> dict[int, str]:
     """Header map ``{1-based INTEGER column: header text}`` from a live
     worksheet. The integer key is a CONTRACT consumers sort on to recover
     sheet order — see ``_header_map``.
@@ -219,7 +219,7 @@ def rightmost_in(headers: dict[int, str], members: list[str]) -> int | None:
                 right = max(right, col) if right is not None else col
     return right
 
-def expand_family(ws, primary: str,
+def expand_family(ws: Any, primary: str,
                    anchor_members: list[str], insert_members: list[str],
                    want: int, headers: dict[int, str], *,
                    header_row: int = HEADER_ROW) -> None:
@@ -365,7 +365,7 @@ def _xml_unescape(text: str) -> str:
     production registry). Anything that is not one of those references is
     left as written.
     """
-    def _one(m: re.Match) -> str:
+    def _one(m: re.Match[str]) -> str:
         ref = m.group(1)
         if ref.startswith("#x"):
             return chr(int(ref[2:], 16))
@@ -419,7 +419,7 @@ def fix_shared_strings(xlsx_path: str) -> None:
                 if b't="inlineStr"' not in xml:
                     continue
 
-                def _sub(m: re.Match) -> bytes:
+                def _sub(m: re.Match[bytes]) -> bytes:
                     nonlocal total
                     texts = []
                     for tm in t_re.finditer(m.group(2)):
@@ -678,15 +678,15 @@ class RepeatPlan:
         return max(v if v is not None else default, 1)
 
 
-def pad_groups(items: Sequence, count: int, width: int,
-               fill: str = "") -> list:
+def pad_groups(items: Sequence[Any], count: int, width: int,
+               fill: str = "") -> list[Any]:
     """Flatten one family's values to exactly ``count`` groups of
     ``width`` cells, padding missing groups with ``fill``.
 
     Each item is a tuple/list of ``width`` cells, or a scalar when
     ``width == 1`` (e.g. a plain country-code list).
     """
-    out: list = []
+    out: list[Any] = []
     for idx in range(count):
         if idx < len(items):
             item = items[idx]

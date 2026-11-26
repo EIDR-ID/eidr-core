@@ -45,7 +45,7 @@ import re
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable, Mapping
 from datetime import datetime, time
-from typing import Any
+from typing import Any, cast
 
 from eidr_core.bmr_io import family_layout
 from eidr_core.inheritance import is_absent
@@ -207,7 +207,7 @@ def _bool_text(v: Any) -> str | None:
     return str(v)
 
 
-def _as_list(v: Any, scalar: tuple[type, ...]) -> list:
+def _as_list(v: Any, scalar: tuple[type, ...]) -> list[Any]:
     """The reference's tolerance: a scalar (of the given types) is one entry."""
     if not v:
         return []
@@ -236,7 +236,7 @@ def _names_a_parent(md: Any) -> bool:
 
 
 def select_blocks(record: Mapping[str, Any], source: str = "self",
-                  ) -> tuple[dict, dict]:
+                  ) -> tuple[dict[str, Any], dict[str, Any]]:
     """The ``(BaseObjectData, ExtraObjectMetadata)`` pair a sheet is built from.
 
     ``SelfDefinedMetadata`` only, so a value the record does not define itself
@@ -278,7 +278,7 @@ def select_blocks(record: Mapping[str, Any], source: str = "self",
     return base, extra
 
 
-def administrators_of(record: Mapping[str, Any], base: Mapping[str, Any]) -> dict:
+def administrators_of(record: Mapping[str, Any], base: Mapping[str, Any]) -> dict[str, Any]:
     """Registrant and Metadata Authority, from where this record carries them.
 
     A mirror-exported record has ``ProvenanceMetadata.Administrators`` (the
@@ -551,7 +551,7 @@ def row_from_blocks(base: Mapping[str, Any], extra: Mapping[str, Any], template:
     return row
 
 
-def _episodic_tail(row: dict, extra: Mapping[str, Any]) -> None:
+def _episodic_tail(row: dict[str, str | None], extra: Mapping[str, Any]) -> None:
     parent = None
     for key in ("SeriesInfo", "SeasonInfo", "EpisodeInfo"):  # last non-empty wins
         info = extra.get(key)
@@ -585,7 +585,7 @@ def _episodic_tail(row: dict, extra: Mapping[str, Any]) -> None:
             row[f"Alt. No. Domain {i}"] = _text(a.get("Domain"))
 
 
-def _details(row: dict, info: Mapping[str, Any], family: str) -> None:
+def _details(row: dict[str, str | None], info: Mapping[str, Any], family: str) -> None:
     details = info.get("Details") or []
     if isinstance(details, dict):
         details = [details]
@@ -595,12 +595,12 @@ def _details(row: dict, info: Mapping[str, Any], family: str) -> None:
             row[f"{family} Domain {i}"] = _text(d.get("Domain")) or _text(d.get("_domain"))
 
 
-def _numbered(row: dict, family: str, values: Any) -> None:
+def _numbered(row: dict[str, str | None], family: str, values: Any) -> None:
     for i, v in enumerate(_as_list(values, (str, int, float)), start=1):
         row[f"{family} {i}"] = _text(v)
 
 
-def _edit_tail(row: dict, ei: Any) -> None:
+def _edit_tail(row: dict[str, str | None], ei: Any) -> None:
     if not isinstance(ei, dict):
         return
     row["Parent EIDR/Row ID"] = _text(ei.get("Parent"))
@@ -614,7 +614,7 @@ def _edit_tail(row: dict, ei: Any) -> None:
     _details(row, ei, "Edit Details")
 
 
-def _manifestation_tail(row: dict, mi: Any) -> None:
+def _manifestation_tail(row: dict[str, str | None], mi: Any) -> None:
     if not isinstance(mi, dict):
         return
     row["Parent EIDR/Row ID"] = _text(mi.get("Parent"))
@@ -718,7 +718,7 @@ def creation_type_from_row(template: str, row: Mapping[str, Any]) -> str:
     raise ValueError(f"unknown Template-22 key {template!r}")
 
 
-def _sequence_info(row: Mapping[str, Any]) -> dict | None:
+def _sequence_info(row: Mapping[str, Any]) -> dict[str, Any] | None:
     dist_no, dist_dom = _text(row.get("Distribution No.")), _text(row.get("Dist. No. Domain"))
     house_no, house_dom = _text(row.get("House No.")), _text(row.get("House No. Domain"))
     alt = [{"Number": g.get("Alternate No."), "Domain": g.get("Alt. No. Domain")}
@@ -733,7 +733,7 @@ def _sequence_info(row: Mapping[str, Any]) -> dict | None:
     return obj or None
 
 
-def _details_from_row(row: Mapping[str, Any], family: str) -> list[dict] | None:
+def _details_from_row(row: Mapping[str, Any], family: str) -> list[dict[str, Any]] | None:
     # A domain without details text would be an empty element, which EIDR
     # does not allow (operator, 2026-11-15), so such a group is not read.
     out = [{"Details": g.get(family), "_domain": g.get(f"{family} Domain")}
@@ -742,7 +742,8 @@ def _details_from_row(row: Mapping[str, Any], family: str) -> list[dict] | None:
     return out or None
 
 
-def _extra_from_row(row: Mapping[str, Any], template: str, creation_type: str) -> dict | None:
+def _extra_from_row(row: Mapping[str, Any], template: str,
+                    creation_type: str) -> dict[str, Any] | None:
     parent = _text(row.get("Parent EIDR/Row ID"))
     if template == "episodic":
         flags = {
@@ -815,7 +816,7 @@ def _languages(row: Mapping[str, Any], family: str, template: str) -> list[Any]:
             for lang, mode in sorted(pairs, key=lambda p: (p[0].casefold(), p[1] or ""))]
 
 
-def record_from_row(row: Mapping[str, Any], template: str) -> dict:
+def record_from_row(row: Mapping[str, Any], template: str) -> dict[str, Any]:
     """The SELF-defined standard record one Template-22 row describes.
 
     Returns ``{"CreationType": ..., "SelfDefinedMetadata": {...}}`` with
@@ -898,7 +899,9 @@ def record_from_row(row: Mapping[str, Any], template: str) -> dict:
         "Description": ({"Description": description, "_lang": description_lang}
                         if description else None),
     })
-    return _prune({
+    # _prune is typed Any (it recurses over any JSON value); a dict in is a
+    # dict out, which the cast states for the checker without a runtime test.
+    return cast(dict[str, Any], _prune({
         "CreationType": creation_type,
         "SelfDefinedMetadata": {
             "_xmlns": "http://www.eidr.org/schema",
@@ -907,7 +910,7 @@ def record_from_row(row: Mapping[str, Any], template: str) -> dict:
             "BaseObjectData": base,
             "ExtraObjectMetadata": _extra_from_row(row, template, creation_type),
         },
-    })
+    }))
 
 
 # --------------------------------------------------------------------------
@@ -977,7 +980,7 @@ _LIGHTWEIGHT = {"AlternateContentInfo", "PackagingInfo", "PromotionInfo",
                 "SupplementalContentInfo"}
 
 
-def _number(el: ET.Element) -> dict:
+def _number(el: ET.Element) -> dict[str, Any]:
     return {"Number": el.text, "Domain": _attr(el, "domain")}
 
 
@@ -1004,7 +1007,7 @@ def _generic(el: ET.Element) -> Any:
     return out
 
 
-def _info(el: ET.Element) -> dict:
+def _info(el: ET.Element) -> dict[str, Any]:
     """One ExtraObjectMetadata *Info block in the standard shape."""
     out: dict[str, Any] = {}
     for c in el:
@@ -1048,9 +1051,9 @@ def _info(el: ET.Element) -> dict:
     return out
 
 
-def _base_from_xml(bod: ET.Element) -> dict:
-    titles: list[dict] = []
-    alternates: list[dict] = []
+def _base_from_xml(bod: ET.Element) -> dict[str, Any]:
+    titles: list[dict[str, Any]] = []
+    alternates: list[dict[str, Any]] = []
     for t in _kids(bod, "ResourceName"):
         if not (t.text or "").strip():
             continue     # an empty element is no title (operator, 2026-11-15)
@@ -1088,7 +1091,7 @@ def _base_from_xml(bod: ET.Element) -> dict:
     for a_el in _kids(bod, "Administrators")[:1]:
         admins = {"Registrant": _kid_text(a_el, "Registrant"),
                   "MetadataAuthority": [m.text for m in _kids(a_el, "MetadataAuthority")]}
-    credits: dict[str, list] = {}
+    credits: dict[str, list[dict[str, Any]]] = {}
     for c_el in _kids(bod, "Credits"):
         for role in ("Director", "Actor"):
             for person in _kids(c_el, role):
@@ -1128,7 +1131,7 @@ _XMLNS = {"_xmlns": "http://www.eidr.org/schema",
           "_xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"}
 
 
-def record_from_xml(xml: str | bytes | ET.Element) -> dict:
+def record_from_xml(xml: str | bytes | ET.Element) -> dict[str, Any]:
     """The standard record a piece of registry XML describes.
 
     ``xml`` is a ``SelfDefinedMetadata`` or ``FullMetadata`` element (a
@@ -1168,4 +1171,4 @@ def record_from_xml(xml: str | bytes | ET.Element) -> dict:
                     extra[key] = _info(info)
         out[name] = {**_XMLNS, "BaseObjectData": _base_from_xml(bod[0]) if bod else None,
                      "ExtraObjectMetadata": extra or None}
-    return _prune(out)
+    return cast(dict[str, Any], _prune(out))  # a dict in is a dict out (see record_from_row)

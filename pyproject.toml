@@ -209,6 +209,36 @@ python_version = "3.10"
 # the base install; the gate must not require installing every extra.
 ignore_missing_imports = true
 
+# Modules a consumer VENDORS and checks under its own `mypy --strict`
+# (python-tools since 0.78.0: its vendored copy is part of its package, so a
+# finding here reddens its gate, not ours). Per-module strict makes the
+# existing `mypy src/eidr_core` CI step hold them to the same bar, so they
+# cannot drift back to bare dict/list annotations unnoticed (python-tools
+# handoff 2026-11-25, section 2: 74 findings at 0.78.0). The flags are
+# --strict's, spelled out: `strict = true` in an override is NOT scoped by
+# the pinned mypy 2.3.0 (measured 2026-11-26: it turned strict on for all 37
+# files, 282 findings outside these modules). warn_redundant_casts is
+# global-only, so it is the one --strict check not enforced here; the
+# consumer's own --strict run still sees it. Add a module here when a
+# consumer starts vendoring it under --strict.
+[[tool.mypy.overrides]]
+module = ["eidr_core.bmr_map", "eidr_core.bmr_map.*", "eidr_core.bmr_io", "eidr_core.bmr_io.*",
+          "eidr_core.inheritance", "eidr_core.inheritance.*",
+          "eidr_core.ordering", "eidr_core.ordering.*",
+          "eidr_core.mddf_json", "eidr_core.mddf_json.*"]
+disallow_any_generics = true
+disallow_subclassing_any = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_unused_ignores = true
+warn_return_any = true
+implicit_reexport = false
+strict_equality = true
+extra_checks = true
+
 # eidr-core never imports numpy; mypy reaches its stubs through openpyxl's
 # optional import, and numpy >= 2.5 writes `type X = ...` statements that the
 # 3.10 target refuses to parse (measured 2026-09-30: a machine-wide numpy

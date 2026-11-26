@@ -31,6 +31,7 @@ import json
 import re
 import warnings
 import xml.etree.ElementTree as ET
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -112,9 +113,9 @@ def _parse(xml: str | bytes) -> _Node:
     elems: list[ET.Element] = []
     for event, item in ET.iterparse(io.BytesIO(data), events=("start-ns", "start", "end")):
         if event == "start-ns":
-            pending.append(item)  # type: ignore[arg-type]
+            pending.append(item)
         elif event == "start":
-            el: ET.Element = item  # type: ignore[assignment]
+            el: ET.Element = item
             scope = dict(stack[-1].scope) if stack else {"xml": XML_NS}
             for p, uri in pending:
                 scope[p] = uri
@@ -178,7 +179,7 @@ def is_signed(xml: str | bytes) -> bool:
     return any(n == f"{{{DSIG}}}Signature" for n in _iter_qnames(_parse(xml)))
 
 
-def _iter_qnames(node: _Node):
+def _iter_qnames(node: _Node) -> Iterator[str]:
     yield node.qname
     for c in node.children:
         yield from _iter_qnames(c)
@@ -378,7 +379,8 @@ def json_to_xml(obj: dict[str, Any], *, schema: SchemaSet | None = None,
     return "".join(out)
 
 
-def _root_namespace(sch: SchemaSet, local: str, body: dict, given: dict[str, str] | None) -> str:
+def _root_namespace(sch: SchemaSet, local: str, body: dict[str, Any],
+                    given: dict[str, str] | None) -> str:
     candidates = [q for q in sch.elements if _split(q)[1] == local]
     default = body.get("_xmlns") or (given or {}).get("")
     if default and f"{{{default}}}{local}" in sch.elements:

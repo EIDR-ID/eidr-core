@@ -1,6 +1,6 @@
 # eidr-core dictionary
 
-Documents eidr-core <!-- dict-version -->0.81.0<!-- /dict-version -->. The canonical
+Documents eidr-core <!-- dict-version -->0.82.0<!-- /dict-version -->. The canonical
 copy is `DICTIONARY.md` at the root of
 [EIDR-ID/eidr-core](https://github.com/EIDR-ID/eidr-core) (public); on the
 portfolio machine, `D:\Software\eidr-core\DICTIONARY.md`. A file named
@@ -80,6 +80,32 @@ it reads the checkout's `pyproject.toml`, so it is never stale.
 ## Changes
 
 Newest first. Each entry says what a consumer could notice.
+
+### 0.82.0 (2026-11-26)
+
+* **New `merge` (S3; `specs/merge-rules.md` 1.0.0, landed from DRAFT):**
+  `merge(current, supplied, options=None, *, full=None) -> ChangeReport`
+  replaces the .NET BMR tool's Merge mode: a supplied record (XML or a
+  `bmr_map.record_from_row` record) merged into the current registry record
+  under the ruled rules; nothing to submit when nothing changes, else the
+  Modify XML in schema order (`ChangeReport.merged_xml`). Pure and vendorable.
+  `ChangeReport` (`changed`, `merged_xml`, `changes`, `conflicts`, `skipped`,
+  `altid_lines`, `spec_version`, `as_dict()`); `Change`, `Conflict`, `Skip`;
+  `MergeOptions(replace=False, altids_only=False, multi_form_domains=None)`.
+* Every ruled rule, the pre-process steps, the Pro-flag rulings (2026-09-30)
+  and "inherited counts as present" (2026-10-02) are in; pass FullMetadata for
+  a child record. Field keys as ruled 2026-11-26 (`FIELD_KEYS`; Alt IDs
+  `alt_id:<type>|<domain>`, with the normalized value). **Held rules are not
+  shipped** (AddTitleClass, SetStructuralType, the post-process title
+  overwrite, replace rules 2/4/5/6/7): `MergeOptions(replace=True)` raises
+  `ValueError`. Caps, Alt ID types, patterns and relations come from the
+  bundled schema. Rule 18 agrees with `altid_audit` (C5).
+* 90 golden fixtures in `specs/merge_pairs/`; values pin
+  `tests/merge_rules_values_pin.json`.
+* **`altidtool_io` now defines `AltId`, `kind_key`, `is_audited`,
+  `is_single_form`, `same_relation`, `IS_SAME_AS`** (moved from `altid_audit`
+  so `merge` can be vendored; `altid_audit` re-exports them, so existing
+  imports are unchanged).
 
 ### 0.81.0 (2026-11-26)
 

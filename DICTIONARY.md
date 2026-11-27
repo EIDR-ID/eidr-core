@@ -2582,7 +2582,7 @@ Source `src/eidr_core/compare/__init__.py`. Public names: 20 functions, 1 class,
 **Used by.**
 <!-- dict-usedby:eidr_core.compare -->
 Scan of 2026-11-26; regenerated at each release from the consumer trees.
-* **BMR-Review**: `alt_source`, `cmp_alt_ids`, `COMPARATORS`, `FieldResult`, `fuzzy`, `set_params`
+* **BMR-Review**: `cmp_alt_ids`, `COMPARATORS`, `FieldResult`, `set_params`
 * **De-Dupe UI**: `cmp_alt_ids`, `cmp_length`, `cmp_release_date`, `cmp_titles`, `fuzzy`
 <!-- /dict-usedby -->
 
@@ -3199,7 +3199,7 @@ Source `src/eidr_core/compare/states.py`. Public names: 5 functions (declared by
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.states -->
 Scan of 2026-11-26; regenerated at each release from the consumer trees.
-* **BMR-Review**: `band`, `field_not_counted`, `field_states`, `ui_field_key`, (the module)
+* **BMR-Review**: `band`, `field_item_states`, `field_not_counted`, `field_states`, `ui_field_key`, (the module)
 <!-- /dict-usedby -->
 
 **Specs.** `specs/dedupe-worklist.md` section 4 (payload shape, UI-manifest keys, states never recomputed by the UI); compare-spec.json `states` (defaults 0.985 / 0.75, empty `per_field`, `discriminative_fields` alt_id, release_date, length, edit_class, manifestation_class at 2.20.0); `specs/unified-scoring.md` (states are bands over q).
@@ -3331,7 +3331,7 @@ Source `src/eidr_core/compare/titles.py`. Public names: 9 functions, 2 constants
 **Used by.**
 <!-- dict-usedby:eidr_core.compare.titles -->
 Scan of 2026-11-26; regenerated at each release from the consumer trees.
-* **BMR-Review**: `is_internal`, `parse_part`, `parts_conflict`, `segments`, `select_titles`, `title_similarity`
+* **BMR-Review**: `parse_part`, `parts_conflict`, `segments`, `select_titles`, `title_similarity`
 * **De-Dupe UI**: `COMBINATION_DIFFERS_QUALITY`, `date_tokens`, `dates_ambiguous`, `parse_part`, `PART_AMBIGUOUS_QUALITY`, `parts_conflict`, `segments`, `title_similarity`
 * **LanguageTool**: `title_similarity`
 <!-- /dict-usedby -->

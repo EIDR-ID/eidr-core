@@ -1,0 +1,20 @@
+{
+ "id": "r17-key-present-with-other-value",
+ "set": "per_rule",
+ "rule": "17",
+ "why": "A key EIDR already has is not overwritten; the other value is reported.",
+ "mutation": "rule 17 adding by pair instead of by key",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [
+   [
+    "17",
+    "registrant_extra:rt"
+   ]
+  ],
+  "merged": []
+ }
+}

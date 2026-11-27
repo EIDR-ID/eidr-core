@@ -1,0 +1,24 @@
+{
+ "id": "r28-time-slot-added",
+ "set": "per_rule",
+ "rule": "28",
+ "why": "An Episode with no TimeSlot takes the supplied one.",
+ "mutation": "rule 28 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "28",
+    "time_slot",
+    "add",
+    null,
+    "20:00:00",
+    "20:00:00"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

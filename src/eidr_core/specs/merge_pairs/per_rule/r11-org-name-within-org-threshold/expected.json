@@ -1,0 +1,15 @@
+{
+ "id": "r11-org-name-within-org-threshold",
+ "set": "per_rule",
+ "rule": "11",
+ "why": "Org names match within FUZZY_THRESHOLD_ORG (6), not FUZZY_THRESHOLD (4): 'Acme Pictures Co' vs 'Acme Pictures Company' is distance 5.",
+ "mutation": "rule 11 comparing names on FUZZY_THRESHOLD",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

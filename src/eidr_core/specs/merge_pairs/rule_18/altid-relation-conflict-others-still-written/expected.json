@@ -1,0 +1,30 @@
+{
+ "id": "altid-relation-conflict-others-still-written",
+ "set": "rule_18",
+ "rule": "18",
+ "why": "18.4: a present value under a different relation is a conflict, never written, and the row's other Alt IDs still go.",
+ "mutation": "rule 18 withholding the whole row",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "18",
+    "alt_id:proprietary|themoviedb.org/movie",
+    "add",
+    null,
+    "603",
+    "603"
+   ]
+  ],
+  "conflicts": [
+   [
+    "18",
+    "alt_id:imdb|",
+    "ALT_ID_RELATION_CONFLICT"
+   ]
+  ],
+  "skipped": [],
+  "merged": []
+ }
+}

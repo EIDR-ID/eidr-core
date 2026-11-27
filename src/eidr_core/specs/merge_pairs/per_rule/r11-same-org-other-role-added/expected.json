@@ -1,0 +1,24 @@
+{
+ "id": "r11-same-org-other-role-added",
+ "set": "per_rule",
+ "rule": "11",
+ "why": "The role is part of the match: the same party in another role is added.",
+ "mutation": "rule 11 ignoring the role",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "11",
+    "associated_org:distributor",
+    "add",
+    null,
+    "Acme Pictures",
+    "10.5237/1234-5678"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

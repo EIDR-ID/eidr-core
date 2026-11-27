@@ -1,0 +1,15 @@
+{
+ "id": "r18a-present-authority-not-repeated",
+ "set": "per_rule",
+ "rule": "18a",
+ "why": "A party ID already listed (case-insensitive) is not added again.",
+ "mutation": "rule 18a comparing case-sensitively",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

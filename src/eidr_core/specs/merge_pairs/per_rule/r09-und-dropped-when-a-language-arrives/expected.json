@@ -1,0 +1,42 @@
+{
+ "id": "r09-und-dropped-when-a-language-arrives",
+ "set": "per_rule",
+ "rule": "9",
+ "why": "und goes once another language of the same mode is listed.",
+ "mutation": "rule 9 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "9",
+    "original_language",
+    "add",
+    null,
+    "fr (Audio)",
+    "fr|audio"
+   ],
+   [
+    "9",
+    "original_language",
+    "remove",
+    "und (Audio)",
+    null,
+    "und|audio"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": [
+   [
+    "BaseObjectData/OriginalLanguage",
+    [
+     {
+      "value": "fr",
+      "_mode": "Audio"
+     }
+    ]
+   ]
+  ]
+ }
+}

@@ -1,0 +1,42 @@
+{
+ "id": "pre1-alternate-equal-to-main-removed",
+ "set": "pre_process",
+ "rule": "pre.1",
+ "why": "An alternate equal (normalized) to the main title or an earlier alternate is removed from the fetched record, which alone makes the record change.",
+ "mutation": "pre.1 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "pre.1",
+    "title:alternate",
+    "remove",
+    "Example Film!",
+    null,
+    "example film!"
+   ],
+   [
+    "pre.1",
+    "title:alternate",
+    "remove",
+    "otro",
+    null,
+    "otro"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": [
+   [
+    "BaseObjectData/AlternateResourceName",
+    [
+     {
+      "Title": "Otro",
+      "_lang": "es"
+     }
+    ]
+   ]
+  ]
+ }
+}

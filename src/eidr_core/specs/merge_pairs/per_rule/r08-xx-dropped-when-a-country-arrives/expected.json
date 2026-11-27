@@ -1,0 +1,39 @@
+{
+ "id": "r08-xx-dropped-when-a-country-arrives",
+ "set": "per_rule",
+ "rule": "8",
+ "why": "XX goes once the list holds anything else.",
+ "mutation": "rule 8 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "8",
+    "country_of_origin",
+    "add",
+    null,
+    "FR",
+    "fr"
+   ],
+   [
+    "8",
+    "country_of_origin",
+    "remove",
+    "XX",
+    null,
+    "xx"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": [
+   [
+    "BaseObjectData/CountryOfOrigin",
+    [
+     "FR"
+    ]
+   ]
+  ]
+ }
+}

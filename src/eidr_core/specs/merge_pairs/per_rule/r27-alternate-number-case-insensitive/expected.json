@@ -1,0 +1,15 @@
+{
+ "id": "r27-alternate-number-case-insensitive",
+ "set": "per_rule",
+ "rule": "27",
+ "why": "The pair compares case-insensitively.",
+ "mutation": "rule 27 comparing case-sensitively",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

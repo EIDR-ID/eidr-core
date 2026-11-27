@@ -45,7 +45,9 @@ __all__ = ["AltIdRow", "AltIdRemoval", "format_line", "write_lines", "parse_line
            "multi_form_domains",
            "parse_edit_line", "format_removal",
            "is_identity_relation", "identity_relation_sql",
-           "emission_problem"]
+           "emission_problem",
+           "IS_SAME_AS", "AltId", "kind_key", "is_audited", "is_single_form",
+           "same_relation"]
 
 
 class AltIdRow(NamedTuple):
@@ -395,3 +397,82 @@ def emission_problem(row: AltIdRow, *, source: str = "") -> tuple[str, str] | No
                     f"{label} contains non-ASCII characters ({value!r}); AltIDTool "
                     f"input must be ASCII.")
     return None
+
+
+# -- Alt-ID identity helpers (moved here from altid_audit, 2026-11-26) -------
+# C5's per-Alt-ID identity vocabulary: the tuple a source asserts, its Kind,
+# whether rule 6 applies to it and whether two relations are one. Defined
+# here, beside is_identity_relation and multi_form_domains which they build
+# on, because the merge engine (rule 18, S3) must agree with the audit ladder
+# AND vendor, and altid_audit cannot vendor (its db_schemas dependency reads
+# package data by a literal package name). altid_audit re-exports every name,
+# so its callers are unchanged and there is one definition.
+
+# Blank/NULL is the registry default and means IsSameAs (BMRtoAltID ruling
+# 2026-08-26; specs/altidtool-format.md column 5).
+IS_SAME_AS = "IsSameAs"
+
+class AltId(NamedTuple):
+    """One Alt ID as its source asserts it.
+
+    Field order is BMRtoAltID's, so its tuples pass unchanged. ``source``
+    names where the Alt ID came from (a sheet's column header) and is quoted
+    in findings: an operator looking at a conflict needs to know which of 200
+    columns to open. It plays no part in the audit.
+    """
+
+    alt_type: str
+    domain: str
+    value: str
+    relation: str = ""
+    source: str = ""
+
+    @property
+    def kind(self) -> tuple[str, str]:
+        """The duplicate-identity key: Kind ``(Type, Domain)``.
+
+        Register R8 (closed): a blank Domain matches only blank, never by
+        resolved URL, so the IMDB type and the imdb.com domain stay two Kinds.
+        """
+        return (self.alt_type, self.domain)
+
+
+def kind_key(alt: AltId) -> tuple[str, str, str]:
+    """Full R8 identity: Kind ``(Type, Domain)`` plus value."""
+    return (alt.alt_type, alt.domain, alt.value)
+
+
+def is_audited(alt: AltId) -> bool:
+    """True when this Alt ID asserts identity, so the audit tests it."""
+    return is_identity_relation(alt.relation)
+
+
+def is_single_form(alt: AltId, multi_form_domains: frozenset[str] | None) -> bool:
+    """Does rule 6 apply to this Alt ID's Kind?
+
+    Every named type is single-form. A Proprietary Kind is single-form unless
+    its domain is in the multi-form set; with no set, unknown means exempt.
+    """
+    if alt.alt_type != "Proprietary":
+        return True
+    if multi_form_domains is None:
+        return False
+    return alt.domain.strip().casefold() not in multi_form_domains
+
+
+def same_relation(existing: set[str], relation: str) -> bool:
+    """Does ``relation`` match one the record already carries?
+
+    Blank and ``IsSameAs`` are one relation on both sides; otherwise the
+    names compare case-insensitively.
+    """
+    want = _norm_relation(relation)
+    return any(_norm_relation(r) == want for r in existing)
+
+
+def _norm_relation(rel: str) -> str:
+    # One spelling per relation, so rule 7 on the record and the two-relation
+    # check on the row (2026-11-24) cannot disagree about what "the same
+    # relation" is.
+    rel = (rel or "").strip()
+    return IS_SAME_AS.casefold() if not rel else rel.casefold()

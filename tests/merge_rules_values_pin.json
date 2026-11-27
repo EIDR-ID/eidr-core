@@ -1,0 +1,4 @@
+{
+ "_doc": "sha256 of eidr_core.merge.spec_values_digest()'s values (FUZZY_THRESHOLD, FUZZY_THRESHOLD_ORG, RULES, HELD_RULES, FIELD_KEYS families) per merge-rules.md version. A knob or rule change without a version bump fails tests/test_merge.py; a bump adds a line here in the same commit, as compare-spec's pin does.",
+ "1.0.0": "2f802cfa39ff17f4788ee01f7e632c9b036026b22b25e8c8bcf0da5f7544b538"
+}

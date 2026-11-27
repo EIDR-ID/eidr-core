@@ -1,0 +1,24 @@
+{
+ "id": "r22-season-number-added",
+ "set": "per_rule",
+ "rule": "22",
+ "why": "A Season with no SequenceNumber takes the supplied one.",
+ "mutation": "rule 22 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "22",
+    "season_number",
+    "add",
+    null,
+    "2",
+    "2"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

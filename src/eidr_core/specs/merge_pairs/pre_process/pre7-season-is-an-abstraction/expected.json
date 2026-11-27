@@ -1,0 +1,24 @@
+{
+ "id": "pre7-season-is-an-abstraction",
+ "set": "pre_process",
+ "rule": "pre.7",
+ "why": "CleanStructuralType: a Season (or Series) is an Abstraction.",
+ "mutation": "pre.7 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "pre.7",
+    "structural_type",
+    "replace",
+    "Performance",
+    "Abstraction",
+    "abstraction"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

@@ -1,0 +1,29 @@
+{
+ "id": "r01-title-language-copied",
+ "set": "per_rule",
+ "rule": "1",
+ "why": "An EIDR title in 'und' takes the real lang of a supplied title with the same normalized text.",
+ "mutation": "rule 1 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "1",
+    "title_language:primary",
+    "replace",
+    "und",
+    "en",
+    "example film"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": [
+   [
+    "BaseObjectData/ResourceName/0/_lang",
+    "en"
+   ]
+  ]
+ }
+}

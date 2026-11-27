@@ -1,14 +1,18 @@
 # merge-rules — merging a supplied record into the current registry record
 
-**Status: DRAFT (design; not landed; no version; no consumer).** Nothing is
-built in `eidr_core.merge`. S3 (the engine and its golden fixtures) is queued
-behind B5 (the BMR-row to record mapper). This file is the canonical home of
-the rule table as ruled on 2026-09-23 (register row "MergeTool design ...
-RULED") plus the operator's Pro-flag rulings of 2026-09-30. It gets a version
-number when S3 lands and is versioned exactly like `compare-spec.md` from
-then on: a version, a values pin, a golden fixture per rule, and consumers'
-conformance tests as the propagation mechanism. Until then a change here is
-a design change, made by eidr-core, with no version to bump.
+**Status: LANDED 1.0.0 (2026-11-26).** Implemented by `eidr_core.merge`
+(S3, `merge.SPEC_VERSION`); golden fixtures under
+`src/eidr_core/specs/merge_pairs/` (section 7); values pin
+`tests/merge_rules_values_pin.json` (the two knobs, the rule order, the held
+list and the field-key families, hashed per version by
+`merge.spec_values_digest()`). This file is the canonical home of the rule
+table as ruled on 2026-09-23 (register row "MergeTool design ... RULED"),
+the operator's Pro-flag rulings of 2026-09-30, section 4.2 of 2026-10-02
+and the field-key ruling of 2026-11-26 (section 5.1). From 1.0.0 it is
+versioned exactly like `compare-spec.md`: eidr-core assigns the version, a
+rule, knob or field-key change is a version bump with a new values-pin line
+and regenerated fixtures, and consumers' conformance tests are the
+propagation mechanism. Change history: section 8.
 
 Sources: eidr-wikidata's design handoff of 2026-09-23 (sections 2 to 5), its
 follow-up of the same day, python-tools' review of section 5 (no conflicts),
@@ -25,9 +29,9 @@ loses Alt IDs (section 6). This spec replaces it.
 
 | Piece | Home | State |
 |---|---|---|
-| The rules | this file | DRAFT |
-| Engine `eidr_core.merge` | eidr-core; pure (no I/O, SDK or registry), stdlib `xml.etree` only so it can be vendored | not built (S3, behind B5) |
-| BMR row to supplied record (B5) | eidr-core, from XML_to_JSON; acceptance criteria are python-tools' interface (register, 2026-09-23) | not built (S2) |
+| The rules | this file | 1.0.0 (2026-11-26) |
+| Engine `eidr_core.merge` | eidr-core; pure (no I/O, SDK or registry), stdlib `xml.etree` only so it can be vendored (closure `merge`, `bmr_map`, `bmr_io`, `inheritance`, `ids`, `ordering`, `mddf_json`, `altidtool_io`, `normalize`, `codes`; tests/test_vendor.py) | built (S3, 2026-11-26) |
+| BMR row to supplied record (B5) | eidr-core, from XML_to_JSON; acceptance criteria are python-tools' interface (register, 2026-09-23) | built: `bmr_map.record_from_row` (0.49.0), families read sparsely on `bmr_io.family_layout` |
 | `MergeTool` (public CLI) | python-tools, vendoring `merge`, `bmr_io` and B5 through `vendor.toml` | not built (S4) |
 | Unattended caller | eidr-wikidata, for confirmed Wikidata to EIDR pairs (`bmr_confirmed_*.xlsx`) | not built (S6) |
 | Identity gate (audit / subset / resolve) | BMRtoAltID, narrowed and renamed; its output is the verified sheet MergeTool takes | S5, after S4 |
@@ -38,27 +42,45 @@ fetched for the Modify (the modification base).
 ### 1.1 Engine contract (from v1)
 
 ```
-merge(current_xml, supplied_xml, MergeOptions(replace=False, altids_only=False)) -> ChangeReport
+merge(current, supplied, MergeOptions(replace=False, altids_only=False,
+                                      multi_form_domains=None), *, full=None) -> ChangeReport
 ```
+
+`current` is the registry's XML for the record and must hold its
+`SelfDefinedMetadata` (the modification base); it may also hold the
+`FullMetadata` (a resolve message carrying both), or `full=` gives it, and
+rule 15 decides presence on it (section 4.2). `supplied` is XML (a
+self-defined or full block, or a creation element such as `Basic`) or a
+standard record from B5 (`bmr_map.record_from_row`). A `FullMetadata`
+without its `SelfDefinedMetadata` is refused: the .NET tool merged into
+FullMetadata and submitted it, baking inherited values into the record.
 
 | `ChangeReport` field | Meaning |
 |---|---|
 | `changed` | `False` means the caller submits nothing |
-| `merged_xml` | the modification base with the edits applied, elements inserted in schema order |
-| `changes` | `(rule, field, action, old, new)` per edit |
+| `merged_xml` | the modification base with the edits applied, every element in schema order; `None` when `changed` is `False` |
+| `changes` | `(rule, field, action, old, new, value)` per edit, in rule order; `field` is the key of section 5.1, `action` is `add`, `replace` or `remove`, `value` the normalised value |
 | `conflicts` | `(rule, field, code, detail)`, e.g. `ALT_ID_RELATION_CONFLICT`; never written |
 | `skipped` | `(rule, field, reason)`, e.g. "similar title present" |
+| `altid_lines` | one AltIDTool line per Alt ID rule 18 added (18.6); empty when the record has no ID |
+| `spec_version` | this file's version |
 
 The report is a contract from v1 (ruled 2026-09-23): MergeTool's `-f json`
-output and eidr-wikidata's two-phase contribution ledger read it. The shape
-of the field key inside `changes` is open (section 5).
+output (`ChangeReport.as_dict()`) and eidr-wikidata's two-phase contribution
+ledger read it. `detail` and `reason` are prose for a human and are not part
+of the contract; the codes and keys are.
+
+`MergeOptions.multi_form_domains` is rule 18.5's exempt set: `None` reads
+`altidtool_io.multi_form_domains()`, which a vendored copy cannot (package
+data), so a vendoring caller passes the set; it is read only when a
+Proprietary identity value needs it.
 
 ### 1.2 Switches (MergeTool; all existing suite switches)
 
 | Switch | Effect |
 |---|---|
 | *(none)* | add-only rules; writes by default, like every suite tool (no `--apply`) |
-| `--replace` | also runs the replace-class rules (class `replace` below) |
+| `--replace` | also runs the replace-class rules (class `replace` below). Held (section 5): the engine raises rather than run add-only silently |
 | `--altids-only` | rule 18 only (BMRtoAltID's standard mode, which retires once shown equivalent on a real sheet) |
 | `--dryrun PREFIX` | write what would be submitted; submit nothing |
 | `-dd accept` | forced de-dupe Accept; superparty only, otherwise an error (no `--accept` alias: operator, 2026-09-23, "keep with the established conventions") |
@@ -79,8 +101,16 @@ of the field key inside `changes` is open (section 5).
 | `FUZZY_THRESHOLD_ORG` | 6 (org names, "Company"/"Co") | the .NET constant, carried verbatim; a reviewable knob, NOT a ruling |
 
 An add rule adds a supplied element only when its condition holds against
-**every** existing element. Per-family caps are `SCHEMA_MAX` from
-`common.xsd` (as `bmr_io.write_sheet` uses), never the .NET hardcoded caps.
+**every** existing element, those it added in the same merge included (so a
+value supplied twice is added once). Per-family caps are the `maxOccurs` of
+the bundled EIDR 2.7.0 schema (`common.xsd`, and EIDR's `md-v28-eidr.xsd`
+for SequenceInfo), read by the engine, never the .NET hardcoded caps; a value
+refused at a cap is reported in `skipped`.
+
+The normalisation is the .NET `CompareString.Compare`: diacritics folded
+(`normalize.ascii_fold`, the portfolio's fold, standing in for the .NET
+`ascii-fold.txt` table), its punctuation table (`&` reads `and`, dashes become
+spaces, the rest go), whitespace collapsed, upper-cased.
 
 ## 3. The rules
 
@@ -145,9 +175,40 @@ cited, not restated; where this list and that file disagree, that file wins.
 
 Remove alternate titles equal to the primary; remove duplicate directors,
 actors, org party IDs and metadata-authority IDs; `CleanCountryOfOrigin`;
-`CleanStructuralType`.
+`CleanStructuralType`. Rule ids `pre.1` to `pre.7` in that order. Equal is
+normalized-exact. `pre.1` compares an alternate with the main title and the
+earlier alternates only (the .NET compared it with every earlier sibling, so
+an alternate "Movie" went beside ReferentType Movie). `pre.4` compares
+(role, party ID) among orgs with `idType` EIDRPartyID; an org without one is
+never a duplicate. `pre.6` verbatim: a lone `AQ` becomes `XX`; with more than
+one country every `XX` goes. `pre.7` verbatim: a Season or Series is an
+Abstraction, and so is a record whose SeasonInfo names no Parent. A
+pre-process edit is a `Change` like any other and makes `changed` True (an
+open question for the operator: the S3 report).
 
-### 3.3 Post-process
+### 3.3 Readings settled when the engine was built (1.0.0)
+
+Where the table leaves a choice open, 1.0.0 reads it so; the .NET source
+(`CompareEidrRecord.cs`, read 2026-11-26) settled each where it could, and
+this file governs where they differ.
+
+| Rule | Reading |
+|---|---|
+| 1 | the first supplied title (main, then alternates) with a real lang and the same normalized text wins |
+| 3 | a supplied main title counts as a candidate alternate; a near match (distance 1 to `FUZZY_THRESHOLD`) is reported as skipped, an exact one is silent; a system-generated supplied title is never added |
+| 8 | a supplied `XX` is never added (the .NET `cond_CountryMismatch`) |
+| 9, 10 | a supplied `und` is never added (`cond_OriginalLanguageMatch`); "drop `und`/`zxx` if anything else is present" is read **within one mode** (as the .NET `CleanOriginalLanguage`), so a silent Audio track beside Visual intertitles keeps both. Note the .NET kept `zxx` and dropped the rest; this table drops `zxx` |
+| 11 | roles must agree (normalized-exact); then both party IDs present: they decide; otherwise both names present: fuzzy on `FUZZY_THRESHOLD_ORG` (the .NET used `FUZZY_THRESHOLD` when only the supplied org had an ID); a supplied org with neither is ignored |
+| 12, 13 | the .NET nickname steps verbatim: full names, then without the first quoted span, then from the first quote on |
+| 15 | the .NET round-figure replacement (EIDR 10, 15, 30, 60, 90 or 120 minutes replaced by a non-round supplied value) is not in the ruled rule and is not carried; the Movie/Short switch applies only when rule 15 changed the length; an inherited length that differs from the supplied one is reported as skipped; a record with a parent, no own length and no FullMetadata given is skipped ("unknown"), never filled |
+| 16 | a supplied description without a language is skipped (one is invalid without the other) |
+| 17 | tokens split at `;`, each `key:value` split at the first `:`; keys compare case-insensitively; a key present with another value is reported as skipped; the result is written `k:v; k:v;` |
+| 18 | C5's relation-aware rules (2026-11-24) on the supplied side too: an exact repeat is written once; one Kind+value offered under two relations withholds every copy (`ALT_ID_RELATION_CONFLICT`); two identity values of one single-form Kind offered together are both withheld (`SAME_KIND_CONFLICT`); a value under a non-identity relation never makes a rule-6 conflict. The helpers are C5's own (`altidtool_io.AltId`, `kind_key`, `is_audited`, `is_single_form`, `same_relation`, moved there from `altid_audit` so the engine vendors), and tests/test_merge.py runs the same cases through both and compares |
+| 18.7 | `altidtool_io.emission_problem` (no Type, non-ASCII), then the schema: a known type, a schema relation, length (`string1024Type`), each named type's patterns and `maxLength`, a Proprietary domain present and matching `constrainedURIType`. eidr-wikidata's further checks (URI-unsafe characters in a Proprietary value, the AMG/ISAN corrections) live in its `bmr/validator.py`, are not extracted, and are not applied (open question) |
+| 20, 21 | a Series without a SeriesInfo block gets one; SeriesClass occurs once in the schema, so "add all" adds the first |
+| 22 to 28 | apply only where the record has the info block (SeasonInfo, EpisodeInfo); SequenceInfo is created inside an EpisodeInfo that lacks it |
+
+### 3.4 Post-process
 
 | .NET step | v1 |
 |---|---|
@@ -206,12 +267,46 @@ record's own elements, to decide presence.
 
 ## 5. Held for review
 
+None of these runs in 1.0.0 (`merge.HELD_RULES`). The S3 report of
+2026-11-26 lists what each would have done on the fixture pairs.
+
 | Item | Held since | Decided when |
 |---|---|---|
 | AddTitleClass, SetStructuralType, the post-process primary-title overwrite | 2026-09-23 | after S3's fixtures show what each does on real pairs |
-| Replace-class rules 2, 4, 5, 6, 7 (whether and how they ship behind `--replace`) | 2026-09-23 | after S3's fixtures |
-| `FUZZY_THRESHOLD` 4 / `FUZZY_THRESHOLD_ORG` 6 | 2026-09-23 | reviewable knobs; any change is a versioned change once this spec has a version |
-| The field key in `ChangeReport.changes`: eidr-wikidata asked for a key stable across sheet and record (`alt_id:<type>\|<domain>` for Alt IDs, the ledger's convention, and a documented equivalent per family) plus the normalized value | 2026-09-23 | with S3, before the report shape is versioned |
+| Replace-class rules 2, 4, 5, 6, 7 (whether and how they ship behind `--replace`); `MergeOptions(replace=True)` raises until then | 2026-09-23 | after S3's fixtures |
+| `FUZZY_THRESHOLD` 4 / `FUZZY_THRESHOLD_ORG` 6 | 2026-09-23 | reviewable knobs, carried verbatim in 1.0.0 (operator, 2026-11-26); a change is a version bump with a values-pin line |
+
+### 5.1 The field key (RULED 2026-11-26)
+
+The operator, 2026-11-26, adopted eidr-wikidata's proposal of 2026-09-23: a
+key stable across sheet and record, Alt IDs as `alt_id:<type>|<domain>` (its
+ledger's convention), a documented equivalent for every other family, and
+the normalised value. Every `Change`, `Conflict` and `Skip` carries it in
+`field`; `Change.value` is the value `strip().lower()` (the ledger's
+`value_norm`). `<x>` parts are lowercased. The table is
+`eidr_core.merge.FIELD_KEYS`:
+
+| Key | Element | `value` |
+|---|---|---|
+| `title:primary` | ResourceName | its text |
+| `title:alternate` | an AlternateResourceName | its text |
+| `title_language:primary`, `title_language:alternate` | a title's `lang` (old/new are the codes) | the title's text |
+| `title_class:primary`, `title_class:alternate` | a title's `titleClass` (held AddTitleClass) | the title's text |
+| `structural_type`, `referent_type`, `status`, `mode`, `release_date` | the element (`mode` and `release_date` belong to the held rules 2 and 4 to 6) | the value |
+| `country_of_origin` | one CountryOfOrigin | the code |
+| `original_language`, `version_language` | one language | `code`, or `code\|mode` when a mode is set |
+| `associated_org:<role>` | one AssociatedOrg | its party ID, else its name |
+| `director`, `actor` | one credit | its DisplayName |
+| `approximate_length` | ApproximateLength | the length |
+| `description:<lang>` | Description with its lang | its text |
+| `registrant_extra:<key>` | one `key:value;` pair of RegistrantExtra | the pair's value |
+| `metadata_authority` | one MetadataAuthority | the party ID |
+| `alt_id:<type>\|<domain>` | one AlternateID (domain empty for a named type: `alt_id:imdb\|`) | the Alt ID value |
+| `series_info` | SeriesInfo flags (rule 19 reports only) | - |
+| `series_class`, `end_date` | SeriesInfo children | the value |
+| `season_number`, `season_class` | SeasonInfo SequenceNumber / one SeasonClass | the value |
+| `episode_class`, `time_slot` | EpisodeInfo children | the value |
+| `distribution_number:<domain>`, `house_sequence:<domain>`, `alternate_number:<domain>` | SequenceInfo numbers | the number |
 
 ## 6. .NET defects the engine must not carry
 
@@ -231,9 +326,29 @@ Each is a regression fixture (section 7).
 
 ## 7. Golden fixtures
 
-Land with the engine (S3), not before; none exist yet. Fixture shape:
-`current.xml` + `supplied.xml` -> expected `ChangeReport`, with
-version-independent invariants as in `golden-pairs.md` section 6.
+Landed with the engine (S3, 2026-11-26): 90 fixtures under
+`src/eidr_core/specs/merge_pairs/<set>/<id>/`, each `current.xml` (the
+registry's SelfDefinedMetadata) + `supplied.xml` (or `supplied_row.json`, a
+Template-22 row read by `bmr_map.record_from_row`), optionally `full.xml`
+(FullMetadata), and `expected.json`: `rule`, `why`, `mutation`, `options`
+and the version-independent invariants of `golden-pairs.md` section 6 --
+`changed`, every `changes` entry in order, the `conflicts` codes and
+`skipped` keys (never the prose), named values of the merged record,
+`altid_lines` where it matters, and the schema order of every merged
+element. `tools/gen_merge_pairs.py` authors them (each expectation stated by
+hand, never computed by the engine); eidr-core's `tests/test_merge_pairs.py`
+checks the engine against them, checks the files equal the generator's
+output, and disables each fixture's rule to prove the fixture then fails.
+
+| Set (directory) | Fixtures |
+|---|---|
+| `per_rule` | 51: every rule, firing and not firing where a condition exists, plus the identical pair |
+| `pre_process` | 8: every pre-process step (`pre.6` twice) |
+| `net_regression` | 11: every section 6 defect (the sheet-reading one three times: Alt ID gap, Country gap, blank Domain) |
+| `rule_18` | 11 |
+| `pro_flags` | 9 |
+
+The plan the sets were built to:
 
 | Set | Fixtures |
 |---|---|
@@ -241,3 +356,9 @@ version-independent invariants as in `golden-pairs.md` section 6.
 | .NET regressions | one per defect in section 6 |
 | Rule 18 | 18.2 with each of blank, `''` and `NULL` relation; 18.4 relation conflict with the row's other Alt IDs still written; 18.5 withheld on an ordinary Kind and written on a declared multi-form Kind |
 | Pro flags (section 4) | supplied `RD:Pro;` against each of rules 4, 5, 6 under `--replace` (no change); supplied `AL:Pro;` vs unflagged EIDR (no change); both flagged (EIDR stays); unflagged supplied vs flagged EIDR (replaced, flag removed); rule 17 with supplied `RD:Pro;` / `AL:Pro;` (not copied) beside `RT:Podcast;` (copied); an Episode whose length is inherited (rule 15 does not fire) |
+
+## 8. Change history
+
+| Version | Date | Change |
+|---|---|---|
+| 1.0.0 | 2026-11-26 | First version, with `eidr_core.merge` (S3) and 90 golden fixtures. The field key ruled (5.1, eidr-wikidata's proposal); the knobs carried verbatim; the held items not shipped (`--replace` raises); readings settled in 3.3; Status DRAFT -> landed |

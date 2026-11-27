@@ -1,0 +1,24 @@
+{
+ "id": "net3-schema-cap-not-dotnet-cap",
+ "set": "net_regression",
+ "rule": "27",
+ "why": "CompareEidrRecord.cs capped alternate numbers at 1 (and episode classes at 1); the schema allows 32. A second alternate number is added.",
+ "mutation": "rule 27 capped at 1",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "27",
+    "alternate_number:b.example.com",
+    "add",
+    null,
+    "S01E01",
+    "s01e01"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

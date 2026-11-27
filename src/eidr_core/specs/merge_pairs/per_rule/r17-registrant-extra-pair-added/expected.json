@@ -1,0 +1,29 @@
+{
+ "id": "r17-registrant-extra-pair-added",
+ "set": "per_rule",
+ "rule": "17",
+ "why": "A supplied key:value pair whose key EIDR lacks is added.",
+ "mutation": "rule 17 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "17",
+    "registrant_extra:rt",
+    "add",
+    null,
+    "RT:Podcast;",
+    "podcast"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": [
+   [
+    "BaseObjectData/RegistrantExtra",
+    "RT:Podcast;"
+   ]
+  ]
+ }
+}

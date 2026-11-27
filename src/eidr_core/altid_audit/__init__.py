@@ -101,11 +101,24 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from typing import NamedTuple
 
+# The Alt-ID identity helpers (AltId, kind_key, is_audited, is_single_form,
+# same_relation, IS_SAME_AS) are defined in altidtool_io since the merge
+# engine needed them (S3, 2026-11-26): eidr_core.merge must vendor, and this
+# module cannot (db_schemas reads its manifests through a literal package
+# name). They stay in this module's __all__ as re-exports, so every caller's
+# import keeps working and there is still exactly one definition.
 from eidr_core.altidtool_io import (
+    IS_SAME_AS,
+    AltId,
     AltIdRow,
+    _norm_relation,
     emission_problem,
     format_line,
+    is_audited,
     is_identity_relation,
+    is_single_form,
+    kind_key,
+    same_relation,
 )
 from eidr_core.db_schemas import assert_tables
 from eidr_core.ids import TOMBSTONE_ID, fault
@@ -136,10 +149,6 @@ __all__ = [
 # Alt IDs accumulated before a batch goes to the mirror. Sized so the
 # unnest() arrays stay comfortable while the query count stays low.
 DEFAULT_BATCH_ALT_IDS = 20_000
-
-# Blank/NULL is the registry default and means IsSameAs (BMRtoAltID ruling
-# 2026-08-26; specs/altidtool-format.md column 5).
-IS_SAME_AS = "IsSameAs"
 
 # Every class this module can put in a Finding. The names are BMRtoAltID's
 # report vocabulary and keep its spelling (ruling 2026-10-11: vocabulary
@@ -186,36 +195,6 @@ ALT_ID_TABLES = ("content_alternate_ids_self", "content_alternate_ids")
 
 class MirrorError(RuntimeError):
     """Any failure talking to the mirror. Always fatal to a run."""
-
-
-class AltId(NamedTuple):
-    """One Alt ID as its source asserts it.
-
-    Field order is BMRtoAltID's, so its tuples pass unchanged. ``source``
-    names where the Alt ID came from (a sheet's column header) and is quoted
-    in findings: an operator looking at a conflict needs to know which of 200
-    columns to open. It plays no part in the audit.
-    """
-
-    alt_type: str
-    domain: str
-    value: str
-    relation: str = ""
-    source: str = ""
-
-    @property
-    def kind(self) -> tuple[str, str]:
-        """The duplicate-identity key: Kind ``(Type, Domain)``.
-
-        Register R8 (closed): a blank Domain matches only blank, never by
-        resolved URL, so the IMDB type and the imdb.com domain stay two Kinds.
-        """
-        return (self.alt_type, self.domain)
-
-
-def kind_key(alt: AltId) -> tuple[str, str, str]:
-    """Full R8 identity: Kind ``(Type, Domain)`` plus value."""
-    return (alt.alt_type, alt.domain, alt.value)
 
 
 class AuditRow(NamedTuple):
@@ -319,42 +298,6 @@ class AliasResolution(NamedTuple):
     target: str
     depth: int
     exceeded: bool
-
-
-def is_audited(alt: AltId) -> bool:
-    """True when this Alt ID asserts identity, so the audit tests it."""
-    return is_identity_relation(alt.relation)
-
-
-def is_single_form(alt: AltId, multi_form_domains: frozenset[str] | None) -> bool:
-    """Does rule 6 apply to this Alt ID's Kind?
-
-    Every named type is single-form. A Proprietary Kind is single-form unless
-    its domain is in the multi-form set; with no set, unknown means exempt.
-    """
-    if alt.alt_type != "Proprietary":
-        return True
-    if multi_form_domains is None:
-        return False
-    return alt.domain.strip().casefold() not in multi_form_domains
-
-
-def same_relation(existing: set[str], relation: str) -> bool:
-    """Does ``relation`` match one the record already carries?
-
-    Blank and ``IsSameAs`` are one relation on both sides; otherwise the
-    names compare case-insensitively.
-    """
-    want = _norm_relation(relation)
-    return any(_norm_relation(r) == want for r in existing)
-
-
-def _norm_relation(rel: str) -> str:
-    # One spelling per relation, so rule 7 on the record and the two-relation
-    # check on the row (2026-11-24) cannot disagree about what "the same
-    # relation" is.
-    rel = (rel or "").strip()
-    return IS_SAME_AS.casefold() if not rel else rel.casefold()
 
 
 class MirrorClient:

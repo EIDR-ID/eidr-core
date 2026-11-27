@@ -1,0 +1,37 @@
+{
+ "id": "pro-al-flagged-eidr-replaced",
+ "set": "pro_flags",
+ "rule": "15",
+ "why": "Section 4.1: an unflagged supplied length replaces EIDR's AL:Pro; one, and the flag goes (RegistrantExtra emptied, so removed).",
+ "mutation": "rule 15 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "15",
+    "approximate_length",
+    "replace",
+    "PT1H30M",
+    "PT1H40M",
+    "pt1h40m"
+   ],
+   [
+    "15",
+    "registrant_extra:al",
+    "remove",
+    "AL:Pro;",
+    null,
+    "pro"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": [
+   [
+    "BaseObjectData/RegistrantExtra",
+    null
+   ]
+  ]
+ }
+}

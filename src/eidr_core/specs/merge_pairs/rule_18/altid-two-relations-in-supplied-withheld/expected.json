@@ -1,0 +1,26 @@
+{
+ "id": "altid-two-relations-in-supplied-withheld",
+ "set": "rule_18",
+ "rule": "18",
+ "why": "C5 2026-11-24: one value offered under two relations cannot be both; every copy is withheld.",
+ "mutation": "rule 18 writing the first copy",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [
+   [
+    "18",
+    "alt_id:proprietary|themoviedb.org/movie",
+    "ALT_ID_RELATION_CONFLICT"
+   ],
+   [
+    "18",
+    "alt_id:proprietary|themoviedb.org/movie",
+    "ALT_ID_RELATION_CONFLICT"
+   ]
+  ],
+  "skipped": [],
+  "merged": []
+ }
+}

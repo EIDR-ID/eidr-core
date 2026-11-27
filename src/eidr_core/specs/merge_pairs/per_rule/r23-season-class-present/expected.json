@@ -1,0 +1,15 @@
+{
+ "id": "r23-season-class-present",
+ "set": "per_rule",
+ "rule": "23",
+ "why": "A class already present (exact, case-folded) is not added again.",
+ "mutation": "rule 23 comparing case-sensitively",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

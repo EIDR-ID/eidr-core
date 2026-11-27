@@ -1,0 +1,27 @@
+{
+ "id": "altid-non-identity-never-conflicts",
+ "set": "rule_18",
+ "rule": "18",
+ "why": "A value under a non-identity relation asserts no identity, so it never makes a rule-6 conflict (operator, 2026-11-24).",
+ "mutation": "rule 6 applied to every relation",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "18",
+    "alt_id:imdb|",
+    "add",
+    null,
+    "tt0234215",
+    "tt0234215"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": [],
+  "altid_lines": [
+   "10.5240/7791-8534-2C23-9030-8610-5\tIMDB\ttt0234215\t\tDeprecated"
+  ]
+ }
+}

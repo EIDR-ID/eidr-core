@@ -1,0 +1,24 @@
+{
+ "id": "pre6-xx-removed-beside-others",
+ "set": "pre_process",
+ "rule": "pre.6",
+ "why": "CleanCountryOfOrigin: with more than one country every XX goes.",
+ "mutation": "pre.6 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "pre.6",
+    "country_of_origin",
+    "remove",
+    "XX",
+    null,
+    "xx"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

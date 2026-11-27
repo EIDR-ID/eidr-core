@@ -1,0 +1,24 @@
+{
+ "id": "r15-length-added-when-none",
+ "set": "per_rule",
+ "rule": "15",
+ "why": "A parentless record with no length takes the supplied one.",
+ "mutation": "rule 15 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "15",
+    "approximate_length",
+    "add",
+    null,
+    "PT1H40M",
+    "pt1h40m"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

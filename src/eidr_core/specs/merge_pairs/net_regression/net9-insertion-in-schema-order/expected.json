@@ -1,0 +1,57 @@
+{
+ "id": "net9-insertion-in-schema-order",
+ "set": "net_regression",
+ "rule": "3",
+ "why": "Every .NET insertion was '// TODO: ensure location correct'. Additions to the middle of BaseObjectData (an alternate title, a country, an Alt ID, a director, a description) land in the schema's content-model order.",
+ "mutation": "insertion by append",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "3",
+    "title:alternate",
+    "add",
+    null,
+    "Un film d'exemple",
+    "un film d'exemple"
+   ],
+   [
+    "8",
+    "country_of_origin",
+    "add",
+    null,
+    "FR",
+    "fr"
+   ],
+   [
+    "12",
+    "director",
+    "add",
+    null,
+    "Jane Doe",
+    "jane doe"
+   ],
+   [
+    "16",
+    "description:en",
+    "add",
+    null,
+    "A film.",
+    "a film."
+   ],
+   [
+    "18",
+    "alt_id:proprietary|themoviedb.org/movie",
+    "add",
+    null,
+    "603",
+    "603"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": [],
+  "schema_order": true
+ }
+}

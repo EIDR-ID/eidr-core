@@ -1,0 +1,24 @@
+{
+ "id": "altid-same-kind-written-on-multi-form-kind",
+ "set": "rule_18",
+ "rule": "18",
+ "why": "18.5: on a Kind multi_form_domains() declares (pbs.org) a second identity value is written.",
+ "mutation": "multi_form_domains ignored",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "18",
+    "alt_id:proprietary|pbs.org",
+    "add",
+    null,
+    "B2",
+    "b2"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

@@ -1,0 +1,15 @@
+{
+ "id": "altid-null-relation-reads-is-same-as",
+ "set": "rule_18",
+ "rule": "18",
+ "why": "18.2: the record's Alt ID without a relation (NULL) and a supplied IsSameAs are one relation: present, silent.",
+ "mutation": "same_relation treating NULL as its own relation",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

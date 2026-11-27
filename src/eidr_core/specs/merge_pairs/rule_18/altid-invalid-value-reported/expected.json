@@ -1,0 +1,30 @@
+{
+ "id": "altid-invalid-value-reported",
+ "set": "rule_18",
+ "rule": "18",
+ "why": "18.7: a value failing its type's schema pattern is reported, not dropped silently and not written; the others go.",
+ "mutation": "rule 18.7 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "18",
+    "alt_id:proprietary|themoviedb.org/movie",
+    "add",
+    null,
+    "603",
+    "603"
+   ]
+  ],
+  "conflicts": [
+   [
+    "18",
+    "alt_id:imdb|",
+    "ALT_ID_INVALID_VALUE"
+   ]
+  ],
+  "skipped": [],
+  "merged": []
+ }
+}

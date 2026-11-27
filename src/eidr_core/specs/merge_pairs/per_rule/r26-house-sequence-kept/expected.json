@@ -1,0 +1,15 @@
+{
+ "id": "r26-house-sequence-kept",
+ "set": "per_rule",
+ "rule": "26",
+ "why": "An existing HouseSequence is kept.",
+ "mutation": "rule 26 replacing a number",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

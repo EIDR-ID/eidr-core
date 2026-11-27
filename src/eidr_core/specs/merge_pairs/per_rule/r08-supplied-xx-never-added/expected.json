@@ -1,0 +1,15 @@
+{
+ "id": "r08-supplied-xx-never-added",
+ "set": "per_rule",
+ "rule": "8",
+ "why": "A supplied XX is never added (cond_CountryMismatch).",
+ "mutation": "rule 8 adding XX",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

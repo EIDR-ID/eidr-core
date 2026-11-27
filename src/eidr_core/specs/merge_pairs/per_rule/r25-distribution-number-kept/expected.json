@@ -1,0 +1,15 @@
+{
+ "id": "r25-distribution-number-kept",
+ "set": "per_rule",
+ "rule": "25",
+ "why": "An existing DistributionNumber is kept.",
+ "mutation": "rule 25 replacing a number",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

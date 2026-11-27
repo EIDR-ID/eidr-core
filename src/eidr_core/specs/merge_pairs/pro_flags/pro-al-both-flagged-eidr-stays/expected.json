@@ -1,0 +1,24 @@
+{
+ "id": "pro-al-both-flagged-eidr-stays",
+ "set": "pro_flags",
+ "rule": "15",
+ "why": "Section 4.1: both flagged; EIDR's value and its flag stay.",
+ "mutation": "rule 15 replacing on EIDR's flag alone",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [
+   [
+    "15",
+    "approximate_length"
+   ],
+   [
+    "17",
+    "registrant_extra:al"
+   ]
+  ],
+  "merged": []
+ }
+}

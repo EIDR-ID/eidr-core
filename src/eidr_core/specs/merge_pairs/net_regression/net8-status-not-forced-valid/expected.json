@@ -1,0 +1,20 @@
+{
+ "id": "net8-status-not-forced-valid",
+ "set": "net_regression",
+ "rule": "14",
+ "why": "SetPublicationStatus ignored the supplied value and forced 'in development' to 'valid'. Rule 14 is skipped: the Status is untouched.",
+ "mutation": "rule 14 forcing valid",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [
+   [
+    "14",
+    "status"
+   ]
+  ],
+  "merged": []
+ }
+}

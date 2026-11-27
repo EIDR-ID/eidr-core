@@ -389,6 +389,50 @@ def test_real_bmr_map_closure_vendors_and_works_without_eidr_core(tmp_path, sour
     assert r.stdout.strip() == "ok"
 
 
+# -- merge vendors with its closure (S3, 2026-11-26) -------------------------
+# merge-rules.md places the engine in python-tools' MergeTool by vendoring, so
+# eidr_core.merge must stay stdlib-only and closed over modules that vendor.
+# That is why rule 18 imports C5's identity helpers from altidtool_io (they
+# moved there for this) and never altid_audit, whose db_schemas dependency
+# names its own package. The copy has no package data, so the multi-form
+# list is passed in, as MergeOptions documents.
+
+_MERGE_CLOSURE = ["merge", "bmr_map", "bmr_io", "inheritance", "ids", "ordering", "mddf_json",
+                  "altidtool_io", "normalize", "codes"]
+
+
+def test_real_merge_closure_vendors_and_works_without_eidr_core(tmp_path, source):
+    import shutil
+    pkg = source / "src" / "eidr_core"
+    shutil.rmtree(pkg / "normalize")       # the fixture's toy normalize; the real one is used
+    for mod in _MERGE_CLOSURE:
+        if mod == "ids":
+            continue                       # the fixture already carries the real ids
+        shutil.copytree(_SRC / mod, pkg / mod, ignore=shutil.ignore_patterns("__pycache__"))
+    _git("-c", "user.email=t@t", "-c", "user.name=t", "add", "-A", cwd=source)
+    _git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "merge", cwd=source)
+    m = _manifest(tmp_path, source, _MERGE_CLOSURE)
+    sync(m, source_path=source)
+    code = (
+        "import sys\n"
+        "sys.modules['eidr_core'] = None\n"
+        f"sys.path.insert(0, {str(tmp_path / 'consumer' / 'src')!r})\n"
+        "from eidr._core.merge import merge, MergeOptions\n"
+        "from eidr._core.bmr_map import record_to_xml\n"
+        "base = {'ResourceName': [{'Title': 'T', '_lang': 'en'}], 'CountryOfOrigin': ['US']}\n"
+        "cur = record_to_xml({'SelfDefinedMetadata': {'BaseObjectData': dict(base, ID='x')}})\n"
+        "sup = {'SelfDefinedMetadata': {'BaseObjectData': dict(base, CountryOfOrigin=['US', 'FR'],"
+        " AlternateID=[{'AltID': '603', 'Type': 'Proprietary', 'Domain': 'themoviedb.org'}])}}\n"
+        "rep = merge(cur, sup, MergeOptions(multi_form_domains=frozenset()))\n"
+        "assert [c.field for c in rep.changes] == ['country_of_origin', "
+        "'alt_id:proprietary|themoviedb.org'], rep.changes\n"
+        "assert '<CountryOfOrigin>FR</CountryOfOrigin>' in rep.merged_xml\n"
+        "print('ok')\n")
+    r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() == "ok"
+
+
 def test_real_verdicts_closure_vendors_and_works_without_eidr_core(tmp_path, source):
     """C4 (0.53.0) is meant to be vendorable with bmr_io and ids."""
     import shutil

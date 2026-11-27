@@ -1,0 +1,24 @@
+{
+ "id": "net1-country-family-read-past-a-gap",
+ "set": "net_regression",
+ "rule": "8",
+ "why": "The same stop-at-first-blank loop lost Countries of Origin: 'Country of Origin 2' beside a blank 'Country of Origin' arrives and is added.",
+ "mutation": "B5 reading families densely, or rule 8 disabled",
+ "options": {},
+ "invariants": {
+  "changed": true,
+  "changes": [
+   [
+    "8",
+    "country_of_origin",
+    "add",
+    null,
+    "FR",
+    "fr"
+   ]
+  ],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

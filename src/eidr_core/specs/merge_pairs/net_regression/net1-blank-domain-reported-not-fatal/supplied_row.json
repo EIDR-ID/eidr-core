@@ -1,0 +1,20 @@
+{
+ "template": "non_episodic",
+ "cells": {
+  "Title": "Example Film",
+  "Title Language": "en",
+  "Structural Type": "Abstraction",
+  "Mode": "AudioVisual",
+  "Referent Type": "Movie",
+  "Release Date": "2001-05-04",
+  "Country of Origin": "US",
+  "Approx Length": "PT1H40M",
+  "Original Language": "en",
+  "Language Mode": "Audio",
+  "Registrant": "10.5237/A1B2-C3D4",
+  "Alt ID 1": "12345",
+  "Domain 1": null,
+  "Alt ID 2": "603",
+  "Domain 2": "themoviedb.org/movie"
+ }
+}

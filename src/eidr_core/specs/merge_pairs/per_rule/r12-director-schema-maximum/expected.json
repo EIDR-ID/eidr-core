@@ -1,0 +1,20 @@
+{
+ "id": "r12-director-schema-maximum",
+ "set": "per_rule",
+ "rule": "12",
+ "why": "Directors stop at the schema's maxOccurs (2), and the refusal is reported.",
+ "mutation": "rule 12 ignoring the schema cap",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [
+   [
+    "12",
+    "director"
+   ]
+  ],
+  "merged": []
+ }
+}

@@ -1,0 +1,15 @@
+{
+ "id": "r21-end-date-kept",
+ "set": "per_rule",
+ "rule": "21",
+ "why": "An existing EndDate is kept.",
+ "mutation": "rule 21 replacing an EndDate",
+ "options": {},
+ "invariants": {
+  "changed": false,
+  "changes": [],
+  "conflicts": [],
+  "skipped": [],
+  "merged": []
+ }
+}

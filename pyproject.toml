@@ -280,7 +280,10 @@ where = ["src"]
                "specs/db_schemas/*/manifest.json",
                "specs/db_schemas/*/schema.sql",
                "specs/db_schemas/*/CHANGES.md",
-               "specs/mddf_json/*.xml", "specs/mddf_json/*.json"]
+               "specs/mddf_json/*.xml", "specs/mddf_json/*.json",
+               # merge-rules golden fixtures (S3): <set>/<fixture>/{current,supplied,full}.xml,
+               # expected.json, supplied_row.json, for consumers' conformance tests.
+               "specs/merge_pairs/*/*/*.xml", "specs/merge_pairs/*/*/*.json"]
 # The EIDR 2.7.0 schema set mddf_json reads its cardinality from (0.70.0).
 "eidr_core.mddf_json" = ["schemas/*/*.xsd", "schemas/*/MANIFEST.json"]
 # word_alias.csv ships with the normalize package (aliases.py loads it

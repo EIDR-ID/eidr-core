@@ -112,8 +112,9 @@ _NOT_A_VALUE = {
     # JSON, the numeric-claim test below checks them like any other value.
     "TITLE_BONUS_MIN_BEST",
     "TITLE_DATE_TOKENS",
-    # Shipped inert after 2.25.0 (operator approved 2026-11-26): documented
-    # before BMR-Review defines it, at a version eidr-core has yet to reserve.
+    # Shipped inert after 2.25.0 (operator approved 2026-11-26); defined by
+    # BMR-Review at 2.26.0. A bool, so the numeric-claim test has nothing to
+    # check either way.
     "TITLE_DATE_VS_RELEASE_DATE",
 }
 

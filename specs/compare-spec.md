@@ -274,13 +274,14 @@ the version reserved for it, and these become porting requirements then.
   removed. The meta key is present only with the knob set. A non-bool value
   is refused.
 
-**Shipped inert, awaiting their version.** Read from an OPTIONAL parameter
-as above: absent, the engine scores exactly as before (the whole golden
-corpus is unchanged with it absent, and also with it set, since no fixture
-yet carries the shape). BMR-Review sets it in its own measured cycle, at the
-version eidr-core reserves for it, and it becomes a porting requirement then.
+**Shipped inert in eidr-core 0.81.0; LANDED 2026-11-27 (2.26.0).** Read from an OPTIONAL parameter
+as above: absent, the engine scores exactly as before. BMR-Review set it in
+its measured cycle at 2.26.0 (R2-episodic: 15 daily-programme rows return
+to `Accept: sole match`, every other labelled corpus unchanged); it is now a
+porting requirement, pinned by the golden pair
+`episode-title-date-differs-from-sibling-release-date`.
 
-* **`TITLE_DATE_VS_RELEASE_DATE` = true (operator approved 2026-11-26; BMR-Review handoff of 2026-11-24, section 1 follow-up; Episode/Season pairs only, and only with `TITLE_DATE_TOKENS` true; version 2.26.0 reserved).**
+* **`TITLE_DATE_VS_RELEASE_DATE` = true (operator approved 2026-11-26; BMR-Review handoff of 2026-11-24, section 1 follow-up; Episode/Season pairs only, and only with `TITLE_DATE_TOKENS` true; LANDED at compare-spec 2.26.0, 2026-11-27; now a porting requirement).**
   When exactly ONE title of a pair is dated, the undated record's own
   release date stands in for the date its title lacks: if none of the title's
   dates can be that day, the pair is two different days and scores

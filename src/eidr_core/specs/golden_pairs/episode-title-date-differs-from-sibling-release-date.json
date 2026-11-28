@@ -1,0 +1,83 @@
+{
+  "id": "episode-title-date-differs-from-sibling-release-date",
+  "added": "2026-11-27",
+  "mode": "case",
+  "creation_type": "Episode",
+  "tamr_kind": "NOMATCH",
+  "why": "A title date against the OTHER record's release date (compare-spec 2.26.0, TITLE_DATE_VS_RELEASE_DATE; operator approved 2026-11-26). Shape of round 2's daily programmes ('04/09/2026 - Esporte Total', row 1788872771510226971): the true record carries the same dated title and ReleaseDate 2026-09-04, and recovery also finds a system-titled sibling from another season, 'Esporte Total: Season 2025: Episode 182', ReleaseDate 2025-09-16. Under 2.23.0 the sibling's title compared as one-sided dated, so the rest of the title decided and the sibling reached the Review band; a Review-band rival stops the recovered sole-Accept rule, so the row went to a reviewer as 'Disagree: Tamr missed' (14 rows of round 2 did). With the knob the sibling's own asserted release date stands in for the date its title lacks; 04/09/2026 cannot be 2025-09-16 under either d/m or m/d reading, so the title scores 0.20, the sibling falls to Reject, and the true record clears as 'Accept: sole match'. Mutation-tested: with TITLE_DATE_VS_RELEASE_DATE removed the sibling is Review and the row is 'Disagree: Tamr missed' (fails assessment_in and clears_without_review). SCOPE: Episode, NOMATCH, one side dated d/m/y, the undated side's release date asserted (self) and a full date. Not pinned: an ambiguous d/m date, an inherited or year-only release date, both titles dated.",
+  "submitted": {
+    "creation_type": "Episode",
+    "countries": [
+      "BR"
+    ],
+    "length_minutes": 60,
+    "family_id": "10.5240/E5A0-0000-0000-0000-0003-Y",
+    "titles": [
+      {
+        "text": "04/09/2026 - Esporte Total",
+        "lang": "pt",
+        "is_resource": true
+      }
+    ],
+    "release_date": "2026-09-04",
+    "parent_id": "10.5240/E5A0-2026-0000-0000-0002-G",
+    "distribution_number": "177"
+  },
+  "candidates": [
+    {
+      "creation_type": "Episode",
+      "countries": [
+        "BR"
+      ],
+      "length_minutes": 60,
+      "family_id": "10.5240/E5A0-0000-0000-0000-0003-Y",
+      "eidr_id": "10.5240/E5A0-2026-0904-0000-0177-N",
+      "titles": [
+        {
+          "text": "04/09/2026 - Esporte Total",
+          "lang": "pt",
+          "is_resource": true
+        }
+      ],
+      "release_date": "2026-09-04",
+      "parent_id": "10.5240/E5A0-2026-0000-0000-0002-G",
+      "distribution_number": "177"
+    },
+    {
+      "creation_type": "Episode",
+      "countries": [
+        "BR"
+      ],
+      "length_minutes": 60,
+      "family_id": "10.5240/E5A0-0000-0000-0000-0003-Y",
+      "eidr_id": "10.5240/E5A0-2025-0916-0000-0182-T",
+      "titles": [
+        {
+          "text": "Esporte Total: Season 2025: Episode 182",
+          "lang": "pt-BR",
+          "is_resource": true,
+          "system_generated": true
+        }
+      ],
+      "release_date": "2025-09-16",
+      "parent_id": "10.5240/E5A0-2025-0000-0000-0001-X",
+      "distribution_number": "182"
+    }
+  ],
+  "invariants": {
+    "assessment_in": [
+      "Accept: sole match"
+    ],
+    "proposed_id_is": "10.5240/E5A0-2026-0904-0000-0177-N",
+    "clears_without_review": true
+  },
+  "expected": {
+    "spec_version": "2.26.0",
+    "assessment": "Accept: sole match",
+    "proposed_id": "10.5240/E5A0-2026-0904-0000-0177-N",
+    "confidence": 100.0,
+    "clears_without_review": true,
+    "notes": [],
+    "reason": "Tamr found no match; a registry search found a single high-scoring record and every other candidate scores Reject. Auto-accepted — no review needed."
+  }
+}

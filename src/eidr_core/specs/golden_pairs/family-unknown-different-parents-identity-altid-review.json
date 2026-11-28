@@ -63,7 +63,7 @@
     ]
   },
   "expected": {
-    "spec_version": "2.25.0",
+    "spec_version": "2.26.0",
     "assessment": "Review",
     "proposed_id": "10.5240/FEED-0000-0000-0016-0002-H",
     "confidence": 30.0,

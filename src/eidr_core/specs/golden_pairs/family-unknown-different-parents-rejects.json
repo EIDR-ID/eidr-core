@@ -50,7 +50,7 @@
     ]
   },
   "expected": {
-    "spec_version": "2.25.0",
+    "spec_version": "2.26.0",
     "assessment": "Agree: no match",
     "proposed_id": "NO MATCH",
     "confidence": 10.7,

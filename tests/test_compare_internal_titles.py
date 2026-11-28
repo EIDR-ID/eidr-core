@@ -91,6 +91,9 @@ def _spec_without_knob():
     # TITLE_DATE_TOKENS set every cmp_titles meta carries `date_ambiguous`.
     spec.pop("TITLE_BONUS_MIN_BEST", None)
     spec.pop("TITLE_DATE_TOKENS", None)
+    # And the 2.26.0 knob, which acts only beside TITLE_DATE_TOKENS and adds
+    # its own meta key.
+    spec.pop("TITLE_DATE_VS_RELEASE_DATE", None)
     return spec
 
 
